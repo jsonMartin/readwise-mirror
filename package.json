@@ -1,5 +1,5 @@
 {
-  "name": "obsidian-sample-plugin",
+  "name": "readwise-sync",
   "version": "0.12.0",
   "description": "This is a sample plugin for Obsidian (https://obsidian.md)",
   "main": "main.js",
@@ -19,5 +19,8 @@
     "rollup": "^2.32.1",
     "tslib": "^2.2.0",
     "typescript": "^4.2.4"
+  },
+  "dependencies": {
+    "spacetime": "^6.16.0"
   }
 }

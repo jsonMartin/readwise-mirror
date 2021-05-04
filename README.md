@@ -1,57 +1,46 @@
-## Obsidian Sample Plugin
+# Readwise Sync Plugin
+Readwise Sync Plugin is an unoffical open source plugin for Obsidian allowing for downloading & syncing an entire Readwise library directly to an Obsidian vault.
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+The format of the output is similar to the Markdown export available directly from Readwise (which groups all highlights together in one file per book/article/etc), except that it is integrated directly into Obsidian and provides beneficial Obsidian formatting enhancements, such as automatically creating `[[Links]]` for Book Titles and Author Names (supports multiple authors) and block level link references (using highlight ID).
 
-This project uses Typescript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in Typescript Definition format, which contains TSDoc comments describing what it does.
+The first time this plugin is ran, it will do a full sync downloading all content from Readwise. Every subsequent sync will only check for and download new highlights created after the last sync attempt.
 
-**Note:** The Obsidian API is still in early alpha and is subject to change at any time!
+![example.gif](example.gif)
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Changes the default font color to red using `styles.css`.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open Sample Modal" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+## Features
+- Supports custom folder for Readwise Library content (default is `Readwise`)
+- Subfolders for content type (such as `Books`, `Articles`, etc)
+- Full one way sync ensuring highlights are always current
+- Downloads entire Readwise library in a format similar to Readwise manual Markdown export
+- Enhanced Obsidian Markdown formatting
+  - Automatically creates `[[Links]]` for book titles and authors
+  - Contains block level link references (using the Highlight ID). Allows to automatically link/transclude any highlight without needing to modify the Readwise note.
 
-### First time developing plugins?
+## Usage
+After installing, visit the plugin configuration page to enter the Readwise Access Token, which can be found here: [https://readwise.io/access_token](https://readwise.io/access_token)
 
-Quick starting guide for new plugin devs:
+Then run any of the below commands or click the Readwise toolbar to sync for the first time.
+## Commands
+- `Sync new highlights`: Download all new highlights since previous update
+- `Test Readwise API key`: Ensure the Access Token works
+- `Delete Readwise library`: Remove the Readwise library file folder from vault
+- `Download entire Readwise library (force)`: Forces a full download of all content from Readwise
 
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+## How does this work?
+Any changes made to content in Readwise will be automatically updated during the next sync. It's important to note that this currently is a **read only/one way sync**, meaning that any new highlights detected from Readwise will cause the note file to automatically regenerate with the new content. This was a deliberate design decision to ensure that Readwise is the ultimate source of truth for data; any changes to currently existing highlights in Readwise are always reflected rather than getting out of sync. While another possible solution is to append new highlights to existing content notes instead, it is not feasible to modify existing highlights; this is how Readwise's integration with other services such as Notion & Roam work:
+> If I edit or format an existing highlight in Readwise, or make a new note or tag to an existing highlight, will that change be updated in Notion? <br /><br />
+> Not at the moment. Any edits, formatting, notes, or tags you had in Readwise before your first sync with Notion will appear in Notion, but new updates to existing highlights will not be reflected in already synced highlights.
 
-### Releasing new releases
+If the update is so large that a Readwise API limit is reached, this plugin has a rate limiting throttling solution in place to continue automatically continue downloading the entire library as soon as the limit expires.
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments.
-- Publish the release.
+As a reference for performance, syncing my library of 5,067 Highlights across 92 books and 9 articles took approximately 20 seconds.
 
-### Adding your plugin to the community plugin list
+**Note: This has not yet been tested on Mobile beta**
 
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+## Future possible feature ideas
+- Custom Template engine support
+  - Would allow for custom headers/footers
 
-### How to use
-
-- Clone this repo.
-- `npm i` or `yarn` to install dependencies
-- `npm run dev` to start compilation in watch mode.
-
-### Manually installing the plugin
-
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
-
-### API Documentation
-
-See https://github.com/obsidianmd/obsidian-api
+- Separate option to append new highlights to existing notes?
+  - This would allow users to manually edit their Readwise notes in Obsidian, at the expense of existing highlights no longer being synced (for example, if a note is added to an existing highlight while using a Kindle). This mimics how Readwise's other integrations work.
+  - New Highlights would be appended to the bottom of the existing note if it exists; if not, a new note would be created.
