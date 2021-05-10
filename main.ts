@@ -3,14 +3,14 @@ import spacetime from 'spacetime';
 
 import { ReadwiseApi, Library, Highlight, Book } from 'readwiseApi';
 
-interface MyPluginSettings {
+interface PluginSettings {
   baseFolderName: string;
   apiToken: string | null;
   lastUpdated: string | null;
   autoSync: boolean;
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
+const DEFAULT_SETTINGS: PluginSettings = {
   baseFolderName: 'Readwise',
   apiToken: null,
   lastUpdated: null,
@@ -18,7 +18,7 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 };
 
 export default class ReadwiseSync extends Plugin {
-  settings: MyPluginSettings;
+  settings: PluginSettings;
   readwiseApi: ReadwiseApi;
   statusBarItem: HTMLElement;
 
@@ -228,7 +228,7 @@ Readwise URL: ${highlights_url}${category === 'articles' ? `\nSource URL: ${sour
       }, 1000)
     );
 
-    this.addSettingTab(new SampleSettingTab(this.app, this, this.statusBarItem));
+    this.addSettingTab(new ReadwiseSyncSettingTab(this.app, this, this.statusBarItem));
 
     if (this.settings.autoSync) this.sync();
   }
@@ -242,7 +242,7 @@ Readwise URL: ${highlights_url}${category === 'articles' ? `\nSource URL: ${sour
   }
 }
 
-class SampleSettingTab extends PluginSettingTab {
+class ReadwiseSyncSettingTab extends PluginSettingTab {
   plugin: ReadwiseSync;
   statusBarItem: HTMLElement;
 
@@ -259,11 +259,7 @@ class SampleSettingTab extends PluginSettingTab {
     containerEl.createEl('h1', { text: 'Readwise Sync Configuration' });
 
     const apiTokenFragment = document.createDocumentFragment();
-    apiTokenFragment.createEl('span', null, (spanEl) => {
-      spanEl.createEl('a', null, (aEl) => {
-        aEl.innerText=aEl.href="https://readwise.io/access_token"
-      })
-    });
+    apiTokenFragment.createEl('span', null, (spanEl) => spanEl.createEl('a', null, (aEl) => (aEl.innerText = aEl.href = 'https://readwise.io/access_token')));
 
     new Setting(containerEl)
       .setName('Enter your Readwise Access Token')
