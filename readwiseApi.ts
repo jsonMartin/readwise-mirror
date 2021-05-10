@@ -1,3 +1,5 @@
+import Notify from 'notify';
+
 const API_ENDPOINT = 'https://readwise.io/api/v2';
 const API_PAGE_SIZE = 1000; // number of results per page, default 100 / max 1000
 
@@ -31,7 +33,7 @@ export interface Book {
   highlights_url: string;
   source_url: string | null;
   asin: string;
-  highlights: Highlight[]
+  highlights: Highlight[];
 }
 
 export interface Books {
@@ -46,17 +48,15 @@ export interface Library {
 
 export class ReadwiseApi {
   private apiToken: string;
-  private statusBarItem: HTMLElement;
+  private notify: Notify;
 
-  constructor(apiToken: string, statusBarItem: HTMLElement) {
-    // Intended to use event emitters to pass status message updates back to main module rather than write directly to statusBarItem here,
-    // but encountered issues with using event the `app.on` syntax provided in Obsidian API, so writing directly to the statusBar for now to solve the problem.
+  constructor(apiToken: string, notify: Notify) {
     if (!apiToken) {
       throw new Error('API Token Required!');
     }
 
     this.setToken(apiToken);
-    this.statusBarItem = statusBarItem;
+    this.notify = notify;
   }
 
   setToken(apiToken: string) {
@@ -93,9 +93,9 @@ export class ReadwiseApi {
       if (lastUpdated) console.info(`Readwise: Checking for new content since ${lastUpdated}`);
       if (bookId) console.info(`Readwise: Checking for all highlights on book ID: ${bookId}`);
 
-      let statusBarText = `Readwise: Fetching ${contentType}`
+      let statusBarText = `Readwise: Fetching ${contentType}`;
       if (data && data['count']) statusBarText += ` (${results.length} / ${data.count})`;
-      this.statusBarItem.setText(statusBarText);
+      this.notify.setStatusBarText(statusBarText);
 
       const response = await fetch(url, this.headers);
       data = await response.json();
@@ -104,11 +104,11 @@ export class ReadwiseApi {
         // Error handling for rate limit throttling
         const rateLimitedDelayTime = parseInt(response.headers.get('Retry-After')) * 1000 + 1000;
         console.warn(`Readwise: API Rate Limited, waiting to retry for ${rateLimitedDelayTime}`);
-        this.statusBarItem.setText(`Readwise: API Rate Limited, waiting ${rateLimitedDelayTime}`);
+        this.notify.setStatusBarText(`Readwise: API Rate Limited, waiting ${rateLimitedDelayTime}`);
 
         await new Promise((_) => setTimeout(_, rateLimitedDelayTime));
         console.info('Readwise: Trying to fetch highlights again...');
-        this.statusBarItem.setText(`Readwise: Attempting to retry...`);
+        this.notify.setStatusBarText(`Readwise: Attempting to retry...`);
         data.next = url;
       } else {
         results.push(...data.results);
