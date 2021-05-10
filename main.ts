@@ -1,4 +1,5 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import Notify from 'notify';
 import spacetime from 'spacetime';
 
 import { ReadwiseApi, Library, Highlight, Book } from 'readwiseApi';
@@ -20,7 +21,7 @@ const DEFAULT_SETTINGS: PluginSettings = {
 export default class ReadwiseSync extends Plugin {
   settings: PluginSettings;
   readwiseApi: ReadwiseApi;
-  statusBarItem: HTMLElement;
+  notify: Notify;
 
   private formatHighlight(highlight: Highlight, book: Book) {
     const { id, text, note, location, color } = highlight;
@@ -126,7 +127,7 @@ Readwise URL: ${highlights_url}${category === 'articles' ? `\nSource URL: ${sour
 
   async sync() {
     if (!this.settings.apiToken) {
-      new Notice('Readwise: API Token Required', 5000);
+      this.notify.notice('Readwise: API Token Required');
       return;
     }
 
@@ -134,23 +135,23 @@ Readwise URL: ${highlights_url}${category === 'articles' ? `\nSource URL: ${sour
     const lastUpdated = this.settings.lastUpdated;
 
     if (!lastUpdated) {
-      new Notice('Readwise: Previous sync not detected...\nDownloading full Readwise library', 5000);
+      this.notify.notice('Readwise: Previous sync not detected...\nDownloading full Readwise library');
       library = await this.readwiseApi.downloadFullLibrary();
     } else {
-      new Notice(`Readwise: Checking for new updates since ${this.lastUpdatedHumanReadableFormat()}`, 5000);
+      this.notify.notice(`Readwise: Checking for new updates since ${this.lastUpdatedHumanReadableFormat()}`);
       library = await this.readwiseApi.downloadUpdates(lastUpdated);
     }
 
     if (Object.keys(library.books).length > 0) {
       this.writeLibraryToMarkdown(library);
-      new Notice(`Readwise: Downloaded ${library.highlightCount} Highlights from ${Object.keys(library.books).length} Sources`, 5000);
+      this.notify.notice(`Readwise: Downloaded ${library.highlightCount} Highlights from ${Object.keys(library.books).length} Sources`);
     } else {
-      new Notice(`Readwise: No new content available`, 5000);
+      this.notify.notice(`Readwise: No new content available`);
     }
 
     this.settings.lastUpdated = new Date().toISOString();
     await this.saveSettings();
-    this.statusBarItem.setText(`Readwise: Synced ${this.lastUpdatedHumanReadableFormat()}`);
+    this.notify.setStatusBarText(`Readwise: Synced ${this.lastUpdatedHumanReadableFormat()}`);
   }
 
   async download() {
@@ -165,12 +166,12 @@ Readwise URL: ${highlights_url}${category === 'articles' ? `\nSource URL: ${sour
     await this.saveSettings();
 
     if (await this.deleteLibraryFolder()) {
-      new Notice('Readwise: library folder deleted', 5000);
+      this.notify.notice('Readwise: library folder deleted');
     } else {
-      new Notice('Readwise: Error deleting library folder', 5000);
+      this.notify.notice('Readwise: Error deleting library folder');
     }
 
-    this.statusBarItem.setText('Readwise: Click to Sync');
+    this.notify.setStatusBarText('Readwise: Click to Sync');
   }
 
   lastUpdatedHumanReadableFormat() {
@@ -180,18 +181,20 @@ Readwise URL: ${highlights_url}${category === 'articles' ? `\nSource URL: ${sour
   async onload() {
     await this.loadSettings();
 
-    this.statusBarItem = this.addStatusBarItem();
+    const statusBarItem = this.addStatusBarItem();
+
+    this.notify = new Notify(statusBarItem);
 
     if (!this.settings.apiToken) {
-      new Notice('Readwise: API Token not detected\nPlease enter in configuration page');
-      this.statusBarItem.setText('Readwise: API Token Required');
+      this.notify.notice('Readwise: API Token not detected\nPlease enter in configuration page');
+      this.notify.setStatusBarText('Readwise: API Token Required');
     } else {
-      this.readwiseApi = new ReadwiseApi(this.settings.apiToken, this.statusBarItem);
-      if (this.settings.lastUpdated) this.statusBarItem.setText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`);
-      else this.statusBarItem.setText(`Readwise: Click to Sync`);
+      this.readwiseApi = new ReadwiseApi(this.settings.apiToken, this.notify);
+      if (this.settings.lastUpdated) this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`);
+      else this.notify.setStatusBarText(`Readwise: Click to Sync`);
     }
 
-    this.registerDomEvent(this.statusBarItem, 'click', this.sync.bind(this));
+    this.registerDomEvent(statusBarItem, 'click', this.sync.bind(this));
 
     this.addCommand({
       id: 'download',
@@ -204,7 +207,7 @@ Readwise URL: ${highlights_url}${category === 'articles' ? `\nSource URL: ${sour
       name: 'Test Readwise API key',
       callback: async () => {
         const isTokenValid = await this.readwiseApi.checkToken();
-        new Notice('Readwise: ' + (isTokenValid ? 'Token is valid' : 'INVALID TOKEN'), 5000);
+        this.notify.notice('Readwise: ' + (isTokenValid ? 'Token is valid' : 'INVALID TOKEN'));
       },
     });
 
@@ -222,13 +225,13 @@ Readwise URL: ${highlights_url}${category === 'articles' ? `\nSource URL: ${sour
 
     this.registerInterval(
       window.setInterval(() => {
-        if (/Synced/.test(this.statusBarItem.textContent)) {
-          this.statusBarItem.setText(`Readwise: Synced ${this.lastUpdatedHumanReadableFormat()}`);
+        if (/Synced/.test(this.notify.getStatusBarText())) {
+          this.notify.setStatusBarText(`Readwise: Synced ${this.lastUpdatedHumanReadableFormat()}`);
         }
       }, 1000)
     );
 
-    this.addSettingTab(new ReadwiseSyncSettingTab(this.app, this, this.statusBarItem));
+    this.addSettingTab(new ReadwiseSyncSettingTab(this.app, this, this.notify));
 
     if (this.settings.autoSync) this.sync();
   }
@@ -244,11 +247,12 @@ Readwise URL: ${highlights_url}${category === 'articles' ? `\nSource URL: ${sour
 
 class ReadwiseSyncSettingTab extends PluginSettingTab {
   plugin: ReadwiseSync;
-  statusBarItem: HTMLElement;
+  notify: Notify;
 
-  constructor(app: App, plugin: ReadwiseSync, statusBarItem: HTMLElement) {
+  constructor(app: App, plugin: ReadwiseSync, notify: Notify) {
     super(app, plugin);
     this.plugin = plugin;
+    this.notify = notify;
   }
 
   display(): void {
@@ -272,7 +276,7 @@ class ReadwiseSyncSettingTab extends PluginSettingTab {
             if (!value) return;
             this.plugin.settings.apiToken = value;
             await this.plugin.saveSettings();
-            this.plugin.readwiseApi = new ReadwiseApi(value, this.statusBarItem);
+            this.plugin.readwiseApi = new ReadwiseApi(value, this.notify);
           })
       );
 
