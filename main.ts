@@ -18,7 +18,7 @@ const DEFAULT_SETTINGS: PluginSettings = {
   autoSync: true,
 };
 
-export default class ReadwiseSync extends Plugin {
+export default class ReadwiseMirror extends Plugin {
   settings: PluginSettings;
   readwiseApi: ReadwiseApi;
   notify: Notify;
@@ -231,7 +231,7 @@ Readwise URL: ${highlights_url}${category === 'articles' ? `\nSource URL: ${sour
       }, 1000)
     );
 
-    this.addSettingTab(new ReadwiseSyncSettingTab(this.app, this, this.notify));
+    this.addSettingTab(new ReadwiseMirrorSettingTab(this.app, this, this.notify));
 
     if (this.settings.autoSync) this.sync();
   }
@@ -245,11 +245,11 @@ Readwise URL: ${highlights_url}${category === 'articles' ? `\nSource URL: ${sour
   }
 }
 
-class ReadwiseSyncSettingTab extends PluginSettingTab {
-  plugin: ReadwiseSync;
+class ReadwiseMirrorSettingTab extends PluginSettingTab {
+  plugin: ReadwiseMirror;
   notify: Notify;
 
-  constructor(app: App, plugin: ReadwiseSync, notify: Notify) {
+  constructor(app: App, plugin: ReadwiseMirror, notify: Notify) {
     super(app, plugin);
     this.plugin = plugin;
     this.notify = notify;
