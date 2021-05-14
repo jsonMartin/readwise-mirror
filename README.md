@@ -19,7 +19,7 @@ The first time this plugin is ran, it will do a full sync downloading all conten
 ## Installation
 This plug-in is not yet added to the community repository.
 
-- Browse to [releases](https://github.com/jsonMartin/readwise-mirror/releases]
+- Browse to [releases](https://github.com/jsonMartin/readwise-mirror/releases)
 - Download `main.js` and `manifest.json` of the latest release
 - Create a readwise-mirror subdirectory in your Obsidian plug-in directory (in `.obsidian/plugins` in your vault)
 - Move the two downloaded files there
