@@ -16,6 +16,15 @@ The first time this plugin is ran, it will do a full sync downloading all conten
   - Automatically creates `[[Links]]` for book titles and authors
   - Contains block level link references *(using the Highlight ID)*. Allows to automatically link/transclude any highlight without needing to modify the Readwise note.
 
+## Installation
+This plug-in is not yet added to the community repository.
+
+- Browse to [releases](https://github.com/jsonMartin/readwise-mirror/releases]
+- Download `main.js` and `manifest.json` of the latest release
+- Create a readwise-mirror subdirectory in your Obsidian plug-in directory (in `.obsidian/plugins` in your vault)
+- Move the two downloaded files there
+- In Obsidian, go to Settings, scroll down to Community Plug-ins, and activate it.  If it refuses to activate with an error message, open the developer console (with Ctrl-Shift-I) and check for error messages.
+
 ## Usage
 After installing, visit the plugin configuration page to enter the Readwise Access Token, which can be found here: [https://readwise.io/access_token](https://readwise.io/access_token)
 
