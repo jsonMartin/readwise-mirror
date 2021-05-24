@@ -115,7 +115,9 @@ export class ReadwiseApi {
 
         if (data.next) {
           const remainingRecords = data.count - results.length;
-          console.info(`Readwise: There are ${remainingRecords} more records left, proceeding to next page:` + data.next);
+          console.info(
+            `Readwise: There are ${remainingRecords} more records left, proceeding to next page:` + data.next
+          );
           url = `${data.next}`;
         }
       }

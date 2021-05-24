@@ -1,8 +1,8 @@
-import { App, Plugin, PluginSettingTab, Setting } from "obsidian";
-import Notify from "notify";
-import spacetime from "spacetime";
+import {App, Plugin, PluginSettingTab, Setting} from 'obsidian';
+import Notify from 'notify';
+import spacetime from 'spacetime';
 
-import { ReadwiseApi, Library, Highlight, Book } from "readwiseApi";
+import {ReadwiseApi, Library, Highlight, Book} from 'readwiseApi';
 
 interface PluginSettings {
   baseFolderName: string;
@@ -12,7 +12,7 @@ interface PluginSettings {
 }
 
 const DEFAULT_SETTINGS: PluginSettings = {
-  baseFolderName: "Readwise",
+  baseFolderName: 'Readwise',
   apiToken: null,
   lastUpdated: null,
   autoSync: true,
@@ -24,14 +24,14 @@ export default class ReadwiseMirror extends Plugin {
   notify: Notify;
 
   private formatHighlight(highlight: Highlight, book: Book) {
-    const { id, text, note, location, color } = highlight;
-    const locationUrl = `https://readwise.io/to_kindle?action=open&asin=${book["asin"]}&location=${location}`;
+    const {id, text, note, location, color} = highlight;
+    const locationUrl = `https://readwise.io/to_kindle?action=open&asin=${book['asin']}&location=${location}`;
     const locationBlock =
-      location !== null ? `([${location}](${locationUrl}))` : "";
+      location !== null ? `([${location}](${locationUrl}))` : '';
 
     return `
-${text} ${book.category === "books" ? locationBlock : ""}${
-      color ? ` %% Color: ${color} %%` : ""
+${text} ${book.category === 'books' ? locationBlock : ''}${
+      color ? ` %% Color: ${color} %%` : ''
     } ^${id}${note ? `\n\n**Note: ${note}**` : ``}
 
 ---
@@ -39,14 +39,14 @@ ${text} ${book.category === "books" ? locationBlock : ""}${
   }
 
   private formatDate(dateStr: string) {
-    return dateStr.split("T")[0];
+    return dateStr.split('T')[0];
   }
 
   async writeLibraryToMarkdown(library: Library) {
     const vault = this.app.vault;
 
     // Create parent directories for all categories, if they do not exist
-    library["categories"].forEach(async (category: string) => {
+    library['categories'].forEach(async (category: string) => {
       category = category.charAt(0).toUpperCase() + category.slice(1); // Title Case the directory name
 
       const path = `${this.settings.baseFolderName}/${category}`;
@@ -54,12 +54,12 @@ ${text} ${book.category === "books" ? locationBlock : ""}${
 
       if (!abstractFolder) {
         vault.createFolder(path);
-        console.info("Readwise: Successfully created folder", path);
+        console.info('Readwise: Successfully created folder', path);
       }
     });
 
-    for (let bookId in library["books"]) {
-      const book = library["books"][bookId];
+    for (let bookId in library['books']) {
+      const book = library['books'][bookId];
 
       const {
         id,
@@ -74,20 +74,20 @@ ${text} ${book.category === "books" ? locationBlock : ""}${
         last_highlight_at,
         source_url,
       } = book;
-      const fileName = `${title.replace(/[<>:"\/\\|?*]+/g, "")}.md`;
+      const fileName = `${title.replace(/[<>:"\/\\|?*]+/g, '')}.md`;
 
       const formattedHighlights = highlights
         .map((highlight: Highlight) => this.formatHighlight(highlight, book))
-        .join("");
+        .join('');
 
       const authors = author ? author.split(/and |,/) : [];
 
       let authorStr =
         authors[0] && authors?.length > 1
           ? authors
-              .filter((authorName: string) => authorName.trim() != "")
+              .filter((authorName: string) => authorName.trim() != '')
               .map((authorName: string) => `[[${authorName.trim()}]]`)
-              .join(", ")
+              .join(', ')
           : author
           ? `[[${author}]]`
           : ``;
@@ -96,21 +96,21 @@ ${text} ${book.category === "books" ? locationBlock : ""}${
 ID: ${id}
 Updated: ${this.formatDate(updated)}
 %%
-![](${cover_image_url.replace("SL200", "SL500").replace("SY160", "SY500")})
+![](${cover_image_url.replace('SL200', 'SL500').replace('SY160', 'SY500')})
 
 # About
 Title: [[${title}]]
-${authors.length > 1 ? "Authors" : "Author"}: ${authorStr}
+${authors.length > 1 ? 'Authors' : 'Author'}: ${authorStr}
 Category: #${category}
 Number of Highlights: ==${num_highlights}==
 Last Highlighted: *${
-        last_highlight_at ? this.formatDate(last_highlight_at) : "Never"
+        last_highlight_at ? this.formatDate(last_highlight_at) : 'Never'
       }*
 Readwise URL: ${highlights_url}${
-        category === "articles" ? `\nSource URL: ${source_url}\n` : ""
+        category === 'articles' ? `\nSource URL: ${source_url}\n` : ''
       }
 
-# Highlights ${formattedHighlights.replace(/---\n$/g, "")}`;
+# Highlights ${formattedHighlights.replace(/---\n$/g, '')}`;
       let path = `${this.settings.baseFolderName}/${
         category.charAt(0).toUpperCase() + category.slice(1)
       }/${fileName}`;
@@ -143,7 +143,7 @@ Readwise URL: ${highlights_url}${
     if (abstractFile) {
       try {
         console.info(
-          "Readwise: Attempting to delete entire library at:",
+          'Readwise: Attempting to delete entire library at:',
           abstractFile
         );
         await vault.delete(abstractFile, true);
@@ -160,7 +160,7 @@ Readwise URL: ${highlights_url}${
 
   async sync() {
     if (!this.settings.apiToken) {
-      this.notify.notice("Readwise: API Token Required");
+      this.notify.notice('Readwise: API Token Required');
       return;
     }
 
@@ -169,7 +169,7 @@ Readwise URL: ${highlights_url}${
 
     if (!lastUpdated) {
       this.notify.notice(
-        "Readwise: Previous sync not detected...\nDownloading full Readwise library"
+        'Readwise: Previous sync not detected...\nDownloading full Readwise library'
       );
       library = await this.readwiseApi.downloadFullLibrary();
     } else {
@@ -209,12 +209,12 @@ Readwise URL: ${highlights_url}${
     await this.saveSettings();
 
     if (await this.deleteLibraryFolder()) {
-      this.notify.notice("Readwise: library folder deleted");
+      this.notify.notice('Readwise: library folder deleted');
     } else {
-      this.notify.notice("Readwise: Error deleting library folder");
+      this.notify.notice('Readwise: Error deleting library folder');
     }
 
-    this.notify.setStatusBarText("Readwise: Click to Sync");
+    this.notify.setStatusBarText('Readwise: Click to Sync');
   }
 
   lastUpdatedHumanReadableFormat() {
@@ -230,9 +230,9 @@ Readwise URL: ${highlights_url}${
 
     if (!this.settings.apiToken) {
       this.notify.notice(
-        "Readwise: API Token not detected\nPlease enter in configuration page"
+        'Readwise: API Token not detected\nPlease enter in configuration page'
       );
-      this.notify.setStatusBarText("Readwise: API Token Required");
+      this.notify.setStatusBarText('Readwise: API Token Required');
     } else {
       this.readwiseApi = new ReadwiseApi(this.settings.apiToken, this.notify);
       if (this.settings.lastUpdated)
@@ -242,34 +242,34 @@ Readwise URL: ${highlights_url}${
       else this.notify.setStatusBarText(`Readwise: Click to Sync`);
     }
 
-    this.registerDomEvent(statusBarItem, "click", this.sync.bind(this));
+    this.registerDomEvent(statusBarItem, 'click', this.sync.bind(this));
 
     this.addCommand({
-      id: "download",
-      name: "Download entire Readwise library (force)",
+      id: 'download',
+      name: 'Download entire Readwise library (force)',
       callback: this.download.bind(this),
     });
 
     this.addCommand({
-      id: "test",
-      name: "Test Readwise API key",
+      id: 'test',
+      name: 'Test Readwise API key',
       callback: async () => {
         const isTokenValid = await this.readwiseApi.checkToken();
         this.notify.notice(
-          "Readwise: " + (isTokenValid ? "Token is valid" : "INVALID TOKEN")
+          'Readwise: ' + (isTokenValid ? 'Token is valid' : 'INVALID TOKEN')
         );
       },
     });
 
     this.addCommand({
-      id: "delete",
-      name: "Delete Readwise library",
+      id: 'delete',
+      name: 'Delete Readwise library',
       callback: this.deleteLibrary.bind(this),
     });
 
     this.addCommand({
-      id: "update",
-      name: "Sync new highlights",
+      id: 'update',
+      name: 'Sync new highlights',
       callback: this.sync.bind(this),
     });
 
@@ -310,27 +310,27 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
   }
 
   display(): void {
-    let { containerEl } = this;
+    let {containerEl} = this;
 
     containerEl.empty();
 
-    containerEl.createEl("h1", { text: "Readwise Sync Configuration" });
+    containerEl.createEl('h1', {text: 'Readwise Sync Configuration'});
 
     const apiTokenFragment = document.createDocumentFragment();
-    apiTokenFragment.createEl("span", null, (spanEl) =>
+    apiTokenFragment.createEl('span', null, (spanEl) =>
       spanEl.createEl(
-        "a",
+        'a',
         null,
-        (aEl) => (aEl.innerText = aEl.href = "https://readwise.io/access_token")
+        (aEl) => (aEl.innerText = aEl.href = 'https://readwise.io/access_token')
       )
     );
 
     new Setting(containerEl)
-      .setName("Enter your Readwise Access Token")
+      .setName('Enter your Readwise Access Token')
       .setDesc(apiTokenFragment)
       .addText((text) =>
         text
-          .setPlaceholder("Readwise Access Token")
+          .setPlaceholder('Readwise Access Token')
           .setValue(this.plugin.settings.apiToken)
           .onChange(async (value) => {
             if (!value) return;
@@ -341,11 +341,11 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Readwise library folder name")
-      .setDesc("Default: Readwise")
+      .setName('Readwise library folder name')
+      .setDesc('Default: Readwise')
       .addText((text) =>
         text
-          .setPlaceholder("Readwise")
+          .setPlaceholder('Readwise')
           .setValue(this.plugin.settings.baseFolderName)
           .onChange(async (value) => {
             if (!value) return;
@@ -355,8 +355,8 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Auto Sync when starting")
-      .setDesc("Automatically syncs new highlights after opening Obsidian")
+      .setName('Auto Sync when starting')
+      .setDesc('Automatically syncs new highlights after opening Obsidian')
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.autoSync)
