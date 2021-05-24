@@ -1,14 +1,15 @@
-import {App, Plugin, PluginSettingTab, Setting} from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import Notify from 'notify';
 import spacetime from 'spacetime';
 
-import {ReadwiseApi, Library, Highlight, Book} from 'readwiseApi';
+import { ReadwiseApi, Library, Highlight, Book } from 'readwiseApi';
 
 interface PluginSettings {
   baseFolderName: string;
   apiToken: string | null;
   lastUpdated: string | null;
   autoSync: boolean;
+  highlightSortOldestToNewest: boolean;
 }
 
 const DEFAULT_SETTINGS: PluginSettings = {
@@ -16,6 +17,7 @@ const DEFAULT_SETTINGS: PluginSettings = {
   apiToken: null,
   lastUpdated: null,
   autoSync: true,
+  highlightSortOldestToNewest: false,
 };
 
 export default class ReadwiseMirror extends Plugin {
@@ -24,15 +26,14 @@ export default class ReadwiseMirror extends Plugin {
   notify: Notify;
 
   private formatHighlight(highlight: Highlight, book: Book) {
-    const {id, text, note, location, color} = highlight;
+    const { id, text, note, location, color } = highlight;
     const locationUrl = `https://readwise.io/to_kindle?action=open&asin=${book['asin']}&location=${location}`;
-    const locationBlock =
-      location !== null ? `([${location}](${locationUrl}))` : '';
+    const locationBlock = location !== null ? `([${location}](${locationUrl}))` : '';
 
     return `
-${text} ${book.category === 'books' ? locationBlock : ''}${
-      color ? ` %% Color: ${color} %%` : ''
-    } ^${id}${note ? `\n\n**Note: ${note}**` : ``}
+${text} ${book.category === 'books' ? locationBlock : ''}${color ? ` %% Color: ${color} %%` : ''} ^${id}${
+      note ? `\n\n**Note: ${note}**` : ``
+    }
 
 ---
 `;
@@ -76,9 +77,10 @@ ${text} ${book.category === 'books' ? locationBlock : ''}${
       } = book;
       const fileName = `${title.replace(/[<>:"\/\\|?*]+/g, '')}.md`;
 
-      const formattedHighlights = highlights
+      const formattedHighlights = (this.settings.highlightSortOldestToNewest ? highlights.reverse() : highlights)
         .map((highlight: Highlight) => this.formatHighlight(highlight, book))
-        .join('');
+        .join('')
+        .replace(/---\n$/g, '');
 
       const authors = author ? author.split(/and |,/) : [];
 
@@ -103,17 +105,11 @@ Title: [[${title}]]
 ${authors.length > 1 ? 'Authors' : 'Author'}: ${authorStr}
 Category: #${category}
 Number of Highlights: ==${num_highlights}==
-Last Highlighted: *${
-        last_highlight_at ? this.formatDate(last_highlight_at) : 'Never'
-      }*
-Readwise URL: ${highlights_url}${
-        category === 'articles' ? `\nSource URL: ${source_url}\n` : ''
-      }
+Last Highlighted: *${last_highlight_at ? this.formatDate(last_highlight_at) : 'Never'}*
+Readwise URL: ${highlights_url}${category === 'articles' ? `\nSource URL: ${source_url}\n` : ''}
 
-# Highlights ${formattedHighlights.replace(/---\n$/g, '')}`;
-      let path = `${this.settings.baseFolderName}/${
-        category.charAt(0).toUpperCase() + category.slice(1)
-      }/${fileName}`;
+# Highlights ${formattedHighlights}`;
+      let path = `${this.settings.baseFolderName}/${category.charAt(0).toUpperCase() + category.slice(1)}/${fileName}`;
 
       const abstractFile = vault.getAbstractFileByPath(path);
 
@@ -122,10 +118,7 @@ Readwise URL: ${highlights_url}${
         try {
           await vault.delete(abstractFile);
         } catch (err) {
-          console.error(
-            `Readwise: Attempted to delete file ${path} but no file was found`,
-            err
-          );
+          console.error(`Readwise: Attempted to delete file ${path} but no file was found`, err);
         }
       }
 
@@ -142,17 +135,11 @@ Readwise URL: ${highlights_url}${
     // Delete old instance of file
     if (abstractFile) {
       try {
-        console.info(
-          'Readwise: Attempting to delete entire library at:',
-          abstractFile
-        );
+        console.info('Readwise: Attempting to delete entire library at:', abstractFile);
         await vault.delete(abstractFile, true);
         return true;
       } catch (err) {
-        console.error(
-          `Readwise: Attempted to delete file ${path} but no file was found`,
-          err
-        );
+        console.error(`Readwise: Attempted to delete file ${path} but no file was found`, err);
         return false;
       }
     }
@@ -168,23 +155,17 @@ Readwise URL: ${highlights_url}${
     const lastUpdated = this.settings.lastUpdated;
 
     if (!lastUpdated) {
-      this.notify.notice(
-        'Readwise: Previous sync not detected...\nDownloading full Readwise library'
-      );
+      this.notify.notice('Readwise: Previous sync not detected...\nDownloading full Readwise library');
       library = await this.readwiseApi.downloadFullLibrary();
     } else {
-      this.notify.notice(
-        `Readwise: Checking for new updates since ${this.lastUpdatedHumanReadableFormat()}`
-      );
+      this.notify.notice(`Readwise: Checking for new updates since ${this.lastUpdatedHumanReadableFormat()}`);
       library = await this.readwiseApi.downloadUpdates(lastUpdated);
     }
 
     if (Object.keys(library.books).length > 0) {
       this.writeLibraryToMarkdown(library);
       this.notify.notice(
-        `Readwise: Downloaded ${library.highlightCount} Highlights from ${
-          Object.keys(library.books).length
-        } Sources`
+        `Readwise: Downloaded ${library.highlightCount} Highlights from ${Object.keys(library.books).length} Sources`
       );
     } else {
       this.notify.notice(`Readwise: No new content available`);
@@ -192,9 +173,7 @@ Readwise URL: ${highlights_url}${
 
     this.settings.lastUpdated = new Date().toISOString();
     await this.saveSettings();
-    this.notify.setStatusBarText(
-      `Readwise: Synced ${this.lastUpdatedHumanReadableFormat()}`
-    );
+    this.notify.setStatusBarText(`Readwise: Synced ${this.lastUpdatedHumanReadableFormat()}`);
   }
 
   async download() {
@@ -229,16 +208,12 @@ Readwise URL: ${highlights_url}${
     this.notify = new Notify(statusBarItem);
 
     if (!this.settings.apiToken) {
-      this.notify.notice(
-        'Readwise: API Token not detected\nPlease enter in configuration page'
-      );
+      this.notify.notice('Readwise: API Token not detected\nPlease enter in configuration page');
       this.notify.setStatusBarText('Readwise: API Token Required');
     } else {
       this.readwiseApi = new ReadwiseApi(this.settings.apiToken, this.notify);
       if (this.settings.lastUpdated)
-        this.notify.setStatusBarText(
-          `Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`
-        );
+        this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`);
       else this.notify.setStatusBarText(`Readwise: Click to Sync`);
     }
 
@@ -255,9 +230,7 @@ Readwise URL: ${highlights_url}${
       name: 'Test Readwise API key',
       callback: async () => {
         const isTokenValid = await this.readwiseApi.checkToken();
-        this.notify.notice(
-          'Readwise: ' + (isTokenValid ? 'Token is valid' : 'INVALID TOKEN')
-        );
+        this.notify.notice('Readwise: ' + (isTokenValid ? 'Token is valid' : 'INVALID TOKEN'));
       },
     });
 
@@ -276,16 +249,12 @@ Readwise URL: ${highlights_url}${
     this.registerInterval(
       window.setInterval(() => {
         if (/Synced/.test(this.notify.getStatusBarText())) {
-          this.notify.setStatusBarText(
-            `Readwise: Synced ${this.lastUpdatedHumanReadableFormat()}`
-          );
+          this.notify.setStatusBarText(`Readwise: Synced ${this.lastUpdatedHumanReadableFormat()}`);
         }
       }, 1000)
     );
 
-    this.addSettingTab(
-      new ReadwiseMirrorSettingTab(this.app, this, this.notify)
-    );
+    this.addSettingTab(new ReadwiseMirrorSettingTab(this.app, this, this.notify));
 
     if (this.settings.autoSync) this.sync();
   }
@@ -310,19 +279,15 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
   }
 
   display(): void {
-    let {containerEl} = this;
+    let { containerEl } = this;
 
     containerEl.empty();
 
-    containerEl.createEl('h1', {text: 'Readwise Sync Configuration'});
+    containerEl.createEl('h1', { text: 'Readwise Sync Configuration' });
 
     const apiTokenFragment = document.createDocumentFragment();
     apiTokenFragment.createEl('span', null, (spanEl) =>
-      spanEl.createEl(
-        'a',
-        null,
-        (aEl) => (aEl.innerText = aEl.href = 'https://readwise.io/access_token')
-      )
+      spanEl.createEl('a', null, (aEl) => (aEl.innerText = aEl.href = 'https://readwise.io/access_token'))
     );
 
     new Setting(containerEl)
@@ -358,12 +323,22 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setName('Auto Sync when starting')
       .setDesc('Automatically syncs new highlights after opening Obsidian')
       .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.autoSync)
-          .onChange(async (value) => {
-            this.plugin.settings.autoSync = value;
-            await this.plugin.saveSettings();
-          })
+        toggle.setValue(this.plugin.settings.autoSync).onChange(async (value) => {
+          this.plugin.settings.autoSync = value;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName('Sort Highlights in notes from Oldest to Newest')
+      .setDesc(
+        'If checked, highlights will be listed from oldest to newest. Unchecked, newest highlights will appear first.'
+      )
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.highlightSortOldestToNewest).onChange(async (value) => {
+          this.plugin.settings.highlightSortOldestToNewest = value;
+          await this.plugin.saveSettings();
+        })
       );
   }
 }
