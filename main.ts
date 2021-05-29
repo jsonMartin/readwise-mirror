@@ -17,7 +17,7 @@ const DEFAULT_SETTINGS: PluginSettings = {
   apiToken: null,
   lastUpdated: null,
   autoSync: true,
-  highlightSortOldestToNewest: false,
+  highlightSortOldestToNewest: true,
 };
 
 export default class ReadwiseMirror extends Plugin {
@@ -75,7 +75,7 @@ ${text} ${book.category === 'books' ? locationBlock : ''}${color ? ` %% Color: $
         last_highlight_at,
         source_url,
       } = book;
-      const fileName = `${title.replace(/[<>:"\/\\|?*]+/g, '')}.md`;
+      const sanitizedTitle = `${title.replace(':', '-').replace(/[<>"'\/\\|?*]+/g, '')}`;
 
       const formattedHighlights = (this.settings.highlightSortOldestToNewest ? highlights.reverse() : highlights)
         .map((highlight: Highlight) => this.formatHighlight(highlight, book))
@@ -101,7 +101,7 @@ Updated: ${this.formatDate(updated)}
 ![](${cover_image_url.replace('SL200', 'SL500').replace('SY160', 'SY500')})
 
 # About
-Title: [[${title}]]
+Title: [[${sanitizedTitle}]]
 ${authors.length > 1 ? 'Authors' : 'Author'}: ${authorStr}
 Category: #${category}
 Number of Highlights: ==${num_highlights}==
@@ -109,7 +109,10 @@ Last Highlighted: *${last_highlight_at ? this.formatDate(last_highlight_at) : 'N
 Readwise URL: ${highlights_url}${category === 'articles' ? `\nSource URL: ${source_url}\n` : ''}
 
 # Highlights ${formattedHighlights}`;
-      let path = `${this.settings.baseFolderName}/${category.charAt(0).toUpperCase() + category.slice(1)}/${fileName}`;
+
+      let path = `${this.settings.baseFolderName}/${
+        category.charAt(0).toUpperCase() + category.slice(1)
+      }/${sanitizedTitle}.md`;
 
       const abstractFile = vault.getAbstractFileByPath(path);
 
