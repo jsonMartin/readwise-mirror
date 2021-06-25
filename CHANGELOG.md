@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.0 (2021-06-24)
+### Added
+- Added tag support, both in highlights and sources (books, articles, etc)
+
 ## 1.0.2 (2021-05-24)
 ### Fixed
 - Fixed linking bug when illegal characters were stripped in filename, but not in Note title (https://github.com/jsonMartin/readwise-mirror/issues/4)

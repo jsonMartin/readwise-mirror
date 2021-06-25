@@ -15,6 +15,7 @@ The first time this plugin is ran, it will do a full sync downloading all conten
 - Enhanced Obsidian Markdown formatting
   - Automatically creates `[[Links]]` for book titles and authors
   - Contains block level link references *(using the Highlight ID)*. Allows to automatically link/transclude any highlight without needing to modify the Readwise note.
+- Supports tags, both within highlights as well as sources (books, articles, etc)
 
 ## Usage
 After installing, visit the plugin configuration page to enter the Readwise Access Token, which can be found here: [https://readwise.io/access_token](https://readwise.io/access_token)
