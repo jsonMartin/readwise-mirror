@@ -2,7 +2,7 @@ import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import Notify from 'notify';
 import spacetime from 'spacetime';
 
-import { ReadwiseApi, Library, Highlight, Book } from 'readwiseApi';
+import { ReadwiseApi, Library, Highlight, Book, Tag } from 'readwiseApi';
 
 interface PluginSettings {
   baseFolderName: string;
@@ -25,15 +25,22 @@ export default class ReadwiseMirror extends Plugin {
   readwiseApi: ReadwiseApi;
   notify: Notify;
 
+  private formatTags(tags: Tag[]) {
+    return tags.map((tag) => `#${tag.name}`).join(', ');
+  }
+
   private formatHighlight(highlight: Highlight, book: Book) {
-    const { id, text, note, location, color } = highlight;
+    const { id, text, note, location, color, tags } = highlight;
     const locationUrl = `https://readwise.io/to_kindle?action=open&asin=${book['asin']}&location=${location}`;
     const locationBlock = location !== null ? `([${location}](${locationUrl}))` : '';
+
+    const formattedTags = tags.filter((tag) => tag.name !== color);
+    const formattedTagStr = this.formatTags(formattedTags);
 
     return `
 ${text} ${book.category === 'books' ? locationBlock : ''}${color ? ` %% Color: ${color} %%` : ''} ^${id}${
       note ? `\n\n**Note: ${note}**` : ``
-    }
+    }${formattedTagStr.length >= 1 ? `\n\n**Tags: ${formattedTagStr}**` : ``}
 
 ---
 `;
@@ -74,6 +81,7 @@ ${text} ${book.category === 'books' ? locationBlock : ''}${color ? ` %% Color: $
         highlights,
         last_highlight_at,
         source_url,
+        tags
       } = book;
       const sanitizedTitle = `${title.replace(':', '-').replace(/[<>"'\/\\|?*]+/g, '')}`;
 
@@ -103,7 +111,7 @@ Updated: ${this.formatDate(updated)}
 # About
 Title: [[${sanitizedTitle}]]
 ${authors.length > 1 ? 'Authors' : 'Author'}: ${authorStr}
-Category: #${category}
+Category: #${category}${tags.length > 1 ? ('\nTags: ' + this.formatTags(tags)): ''}
 Number of Highlights: ==${num_highlights}==
 Last Highlighted: *${last_highlight_at ? this.formatDate(last_highlight_at) : 'Never'}*
 Readwise URL: ${highlights_url}${category === 'articles' ? `\nSource URL: ${source_url}\n` : ''}

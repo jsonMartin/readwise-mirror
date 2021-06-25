@@ -19,6 +19,12 @@ export interface Highlight {
   color: string;
   updated: string;
   book_id: number;
+  tags: Tag[];
+}
+
+export interface Tag {
+  id: number;
+  name: string;
 }
 
 export interface Book {
@@ -34,6 +40,7 @@ export interface Book {
   source_url: string | null;
   asin: string;
   highlights: Highlight[];
+  tags: Tag[];
 }
 
 export interface Books {
