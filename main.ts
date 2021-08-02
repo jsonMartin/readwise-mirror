@@ -10,6 +10,8 @@ interface PluginSettings {
   lastUpdated: string | null;
   autoSync: boolean;
   highlightSortOldestToNewest: boolean;
+  logFile: boolean;
+  logFileName: string;
 }
 
 const DEFAULT_SETTINGS: PluginSettings = {
@@ -18,6 +20,8 @@ const DEFAULT_SETTINGS: PluginSettings = {
   lastUpdated: null,
   autoSync: true,
   highlightSortOldestToNewest: true,
+  logFile: true,
+  logFileName: 'Sync.md',
 };
 
 export default class ReadwiseMirror extends Plugin {
@@ -48,6 +52,40 @@ ${text} ${book.category === 'books' ? locationBlock : ''}${color ? ` %% Color: $
 
   private formatDate(dateStr: string) {
     return dateStr.split('T')[0];
+  }
+
+  async writeLogToMarkdown(library: Library) {
+    const vault = this.app.vault;
+
+    let path = `${this.settings.baseFolderName}/${this.settings.logFileName}`;
+    const abstractFile = vault.getAbstractFileByPath(path);
+
+    const now = spacetime.now();
+    let logString = `# [[${now.format('iso-short')}]] *(${now.time()})*`;
+
+    for (let bookId in library['books']) {
+      const book = library['books'][bookId];
+
+      const { title, num_highlights } = book;
+      const sanitizedTitle = `${title.replace(':', '-').replace(/[<>"'\/\\|?*]+/g, '')}`;
+      const contents = `\n- [[${sanitizedTitle}]] *(${num_highlights} highlights)*`;
+      logString += contents;
+    }
+
+    try {
+      if (abstractFile) {
+        // If log file already exists, append to the content instead of overwriting
+        const logFile = vault.getFiles().filter((file) => file.name === this.settings.logFileName)[0];
+        console.log('logFile:', logFile);
+
+        const logFileContents = await vault.read(logFile);
+        vault.modify(logFile, logFileContents + '\n\n' + logString);
+      } else {
+        vault.create(path, logString);
+      }
+    } catch (err) {
+      console.error(`Readwise: Error writing to sync log file`, err);
+    }
   }
 
   async writeLibraryToMarkdown(library: Library) {
@@ -81,7 +119,7 @@ ${text} ${book.category === 'books' ? locationBlock : ''}${color ? ` %% Color: $
         highlights,
         last_highlight_at,
         source_url,
-        tags
+        tags,
       } = book;
       const sanitizedTitle = `${title.replace(':', '-').replace(/[<>"'\/\\|?*]+/g, '')}`;
 
@@ -111,7 +149,7 @@ Updated: ${this.formatDate(updated)}
 # About
 Title: [[${sanitizedTitle}]]
 ${authors.length > 1 ? 'Authors' : 'Author'}: ${authorStr}
-Category: #${category}${tags.length > 1 ? ('\nTags: ' + this.formatTags(tags)): ''}
+Category: #${category}${tags.length > 1 ? '\nTags: ' + this.formatTags(tags) : ''}
 Number of Highlights: ==${num_highlights}==
 Last Highlighted: *${last_highlight_at ? this.formatDate(last_highlight_at) : 'Never'}*
 Readwise URL: ${highlights_url}${category === 'articles' ? `\nSource URL: ${source_url}\n` : ''}
@@ -175,6 +213,9 @@ Readwise URL: ${highlights_url}${category === 'articles' ? `\nSource URL: ${sour
 
     if (Object.keys(library.books).length > 0) {
       this.writeLibraryToMarkdown(library);
+
+      if (this.settings.logFile) this.writeLogToMarkdown(library);
+
       this.notify.notice(
         `Readwise: Downloaded ${library.highlightCount} Highlights from ${Object.keys(library.books).length} Sources`
       );
@@ -350,6 +391,30 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
           this.plugin.settings.highlightSortOldestToNewest = value;
           await this.plugin.saveSettings();
         })
+      );
+
+    new Setting(containerEl)
+      .setName('Sync Log')
+      .setDesc('Save sync log to file in Library')
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.logFile).onChange(async (value) => {
+          this.plugin.settings.logFile = value;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName('Sync Log File Name')
+      .setDesc('Default: Sync.md')
+      .addText((text) =>
+        text
+          .setPlaceholder('Sync.md')
+          .setValue(this.plugin.settings.logFileName)
+          .onChange(async (value) => {
+            if (!value) return;
+            this.plugin.settings.logFileName = value;
+            await this.plugin.saveSettings();
+          })
       );
   }
 }

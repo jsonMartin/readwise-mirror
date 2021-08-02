@@ -130,7 +130,7 @@ export class ReadwiseApi {
       }
     } while (data.next);
 
-    console.info(`Readwise: Processed ${results.length} total ${contentType} results successfully`);
+    if (results.length > 0) console.info(`Readwise: Processed ${results.length} total ${contentType} results successfully`);
     return results;
   }
 

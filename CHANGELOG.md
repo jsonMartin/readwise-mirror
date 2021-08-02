@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1 (2021-08-01)
+### Added
+- Added Sync Log functionality. Creates a file (configurable, with a default filename of `Sync.md`) in the Readwise library root folder, which stores a time-based log listing when Readwise sources have synced new highlights
+
 ## 1.1.0 (2021-06-24)
 ### Added
 - Added tag support, both in highlights and sources (books, articles, etc)
