@@ -60,7 +60,9 @@ A lot of the value of Readwise highlights lies in the notes associated with them
 
 The option "Only sync highlights with notes" will do exactly that: it will only sync highlights with notes. If an item in your library has only highlights without notes, it will not be synced.
 ## Templating
-The plugin allows for simple templating. Similarly to Readwise's templating, it allows to define - a header template,
+The plugin allows for simple templating. Similarly to Readwise's templating, it allows to define 
+
+- a header template,
 - a highlight template, and
 - a template for frontmatter
 
