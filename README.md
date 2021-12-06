@@ -88,7 +88,8 @@ The template exposes the following variables (they can be used for both the head
 
 - ```id```: Document id,
 - ```title```: Sanitized title,
-- ```author```: Author (formatted),
+- ```author```: Author (raw),
+- ```authorStr```: Author (formatted, as Wiki Links ```[[Author Name]]```),
 - ```category```: Document category,
 - ```num_highlights```: Number of highlights,
 - ```updated```: Date of last update,
