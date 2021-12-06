@@ -55,6 +55,85 @@ As a reference for performance, syncing my library of 5,067 Highlights across 92
 - In Obsidian, go to Settings, scroll down to Community Plug-ins, and activate it.
   - If it refuses to activate with an error message, open the developer console (with Ctrl-Shift-I) and check for error messages.
 
-## Future possible feature ideas
-- Custom Template engine support
-  - Would allow for custom headers/footers
+## Sync highlights with notes only
+A lot of the value of Readwise highlights lies in the notes associated with them. E.g. if you are building a Zettelkasten and want to work with literature notes, you typically only want highlights with notes in your Zettelkasten -- and not every highlight. 
+
+The option "Only sync highlights with notes" will do exactly that: it will only sync highlights with notes. If an item in your library has only highlights without notes, it will not be synced.
+## Templating
+The plugin allows for simple templating. Similarly to Readwise's templating, it allows to define - a header template,
+- a highlight template, and
+- a template for frontmatter
+
+The frontmatter template can be turned on and off. If you want to revert to the default template, you can just empty the template completely and the plugin will restore the default.
+
+### Header and frontmatter template
+The template exposes the following variables (they can be used for both the header and frontmatter):
+
+- ```id```: Document id,
+- ```title```: Sanitized title,
+- ```author```: Author (formatted),
+- ```category```: Document category,
+- ```num_highlights```: Number of highlights,
+- ```updated```: Date of last update,
+- ```cover_image_url```: Cover image,
+- ```highlights_url```: Readwise URL,
+- ```highlights```: Highlights,
+- ```last_highlight_at```: Date of last highlight,
+- ```source_url```: Source URL,
+- ```tags```: Document tags
+
+#### Default frontmatter template
+```
+---
+id: {{ id }}
+updated: {{ updated }}
+title: {{ title }}
+author: {{ author }}
+---
+```
+
+#### Default header template
+```
+%%
+ID: {{ id }}
+Updated: {{ updated }}
+%%
+
+![]( {{ cover_image_url }})
+
+# About
+Title: {{ title }}
+Authors: {{ authorStr }}
+Category: # {{ category }}
+{%- if tags %}
+Tags: {{ tags }}
+{%- endif %}
+Number of Highlights: =={{ num_highlights }}==
+Readwise URL: {{ highlights_url }}
+Source URL: {{ source_url }}
+Date: [[{{ updated }}]]
+Last Highlighted: *{{ last_highlight_at }}*
+---
+```
+
+### Highlights
+
+The highlight template exposes the following variables:
+
+- ```id```: The id of the highlight
+- ```text```: The highlighted text
+- ```note```: Your nore
+- ```location```: The location
+- ```color```: The color
+- ```highlighted_at```: Date highlighted (empty if none)
+- ```tags```: A formatted string of tags
+#### Default highlight template
+```
+{{ text }} %% highlight_id: {{ id }} %%
+{%- if note %}
+Note: {{ note }}
+{%- endif %}
+```
+### Limitations
+- The templating is based on the [`nunjucks`](https://mozilla.github.io/nunjucks/templating.html) templating library and thus shares its limitations;
+- Certain strings (e.g. date, tags, authors) are currently preformatted
