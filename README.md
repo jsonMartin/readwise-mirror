@@ -124,7 +124,7 @@ Updated: {{ updated }}
 # About
 Title: {{ title }}
 Authors: {{ authorStr }}
-Category: # {{ category }}
+Category: #{{ category }}
 {%- if tags %}
 Tags: {{ tags }}
 {%- endif %}
