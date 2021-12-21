@@ -134,6 +134,8 @@ Source URL: {{ source_url }}
 Date: [[{{ updated }}]]
 Last Highlighted: *{{ last_highlight_at }}*
 ---
+
+# Highlights 
 ```
 
 ### Highlights

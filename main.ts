@@ -58,6 +58,8 @@ Source URL: {{ source_url }}
 Date: [[{{ updated }}]]
 Last Highlighted: *{{ last_highlight_at }}*
 ---
+
+# Highlights 
 `,
   highlightTemplate: `{{ text }} %% highlight_id: {{ id }} %%
 {%- if note %}
@@ -218,10 +220,7 @@ export default class ReadwiseMirror extends Plugin {
 
         const frontMatterContents = this.settings.frontMatter ? this.frontMatterTemplate.render(metadata) : '';
         const headerContents = this.headerTemplate.render(metadata);
-        const contents = `${frontMatterContents}${headerContents}
-
-# Highlights 
-${formattedHighlights}`;
+        const contents = `${frontMatterContents}${headerContents}${formattedHighlights}`;
 
         let path = `${this.settings.baseFolderName}/${
           category.charAt(0).toUpperCase() + category.slice(1)
