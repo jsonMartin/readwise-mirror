@@ -65,8 +65,9 @@ Last Highlighted: *{{ last_highlight_at }}*
 # Highlights 
 
 `,
-  highlightTemplate: `{{ text }} {%- if category == 'books' %}([{{ location }}]({{ url }})){%- endif %}{%- if color %}%% Color: {{ color }} %%{%- endif %} ^{{ id }} %%
+  highlightTemplate: `{{ text }} {%- if category == 'books' %}([{{ location }}]({{ location_url }})){%- endif %}{%- if color %}%% Color: {{ color }} %%{%- endif %} ^{{ id }} %%
 {%- if note %}
+
 Note: {{ note }}
 {%- endif %}
 `,
@@ -89,7 +90,6 @@ export default class ReadwiseMirror extends Plugin {
     const { id, text, note, location, color, url, tags, highlighted_at } = highlight;
     
     const locationUrl = `https://readwise.io/to_kindle?action=open&asin=${book['asin']}&location=${location}`;
-    const locationBlock = location !== null ? `([${location}](${locationUrl}))` : '';
 
     const formattedTags = tags.filter((tag) => tag.name !== color);
     const formattedTagStr = this.formatTags(formattedTags);
@@ -100,7 +100,7 @@ export default class ReadwiseMirror extends Plugin {
       text: text,
       note: note,
       location: location,
-      url: url,
+      location_url: locationUrl,
       color: color,
       highlighted_at: highlighted_at ? this.formatDate(highlighted_at) : '',
       tags: formattedTagStr,

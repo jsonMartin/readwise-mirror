@@ -150,7 +150,7 @@ The highlight template exposes the following variables:
 - ```text```: The highlighted text
 - ```note```: Your nore
 - ```location```: The location
-- ```url```: The url of the location
+- ```location_url```: The url of the location
 - ```color```: The color
 - ```highlighted_at```: Date highlighted (empty if none)
 - ```tags```: A formatted string of tags
@@ -159,8 +159,9 @@ The highlight template exposes the following variables:
 #### Default highlight template
 
 ```markdown+nunjucks
-{{ text }} {%- if category == 'books' %}([{{ location }}]({{ url }})){%- endif %}{%- if color %}%% Color: {{ color }} %%{%- endif %} ^{{ id }} %%
+{{ text }} {%- if category == 'books' %}([{{ location }}]({{ location_url }})){%- endif %}{%- if color %}%% Color: {{ color }} %%{%- endif %} ^{{ id }}
 {%- if note %}
+
 Note: {{ note }}
 {%- endif %}
 ```
