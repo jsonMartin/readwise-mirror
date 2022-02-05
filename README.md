@@ -122,7 +122,7 @@ Updated: {{ updated }}
 ![]( {{ cover_image_url }})
 
 # About
-Title: {{ title }}
+Title: [[{{ title }}]]
 Authors: {{ authorStr }}
 Category: #{{ category }}
 {%- if tags %}
@@ -130,12 +130,16 @@ Tags: {{ tags }}
 {%- endif %}
 Number of Highlights: =={{ num_highlights }}==
 Readwise URL: {{ highlights_url }}
+{%- if source_url %}
 Source URL: {{ source_url }}
+{%- endif %}
 Date: [[{{ updated }}]]
 Last Highlighted: *{{ last_highlight_at }}*
+
 ---
 
-# Highlights 
+# Highlights
+
 ```
 
 ### Highlights
@@ -153,7 +157,7 @@ The highlight template exposes the following variables:
 #### Default highlight template
 
 ```markdown+nunjucks
-{{ text }} %% highlight_id: {{ id }} %%
+{{ text }} {%- if category == 'books' %}([{{ location }}]({{ locationUrl }})){%- endif %}{%- if color %}%% Color: {{ color }} %%{%- endif %} ^{{ id }} %%
 {%- if note %}
 Note: {{ note }}
 {%- endif %}
