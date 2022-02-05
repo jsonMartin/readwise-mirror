@@ -159,7 +159,7 @@ The highlight template exposes the following variables:
 #### Default highlight template
 
 ```markdown+nunjucks
-{{ text }} {%- if category == 'books' %}([{{ location }}]({{ location_url }})){%- endif %}{%- if color %}%% Color: {{ color }} %%{%- endif %} ^{{ id }}
+{{ text }}{%- if category == 'books' %} ([{{ location }}]({{ location_url }})){%- endif %}{%- if color %}%% Color: {{ color }} %%{%- endif %} ^{{ id }}
 {%- if note %}
 
 Note: {{ note }}
