@@ -1,6 +1,7 @@
 import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import Notify from 'notify';
 import spacetime from 'spacetime';
+import { Environment, Template, ConfigureOptions } from 'nunjucks';
 
 import { ReadwiseApi, Library, Highlight, Book, Tag } from 'readwiseApi';
 
@@ -10,8 +11,13 @@ interface PluginSettings {
   lastUpdated: string | null;
   autoSync: boolean;
   highlightSortOldestToNewest: boolean;
+  syncNotesOnly: boolean;
   logFile: boolean;
   logFileName: string;
+  frontMatter: boolean;
+  frontMatterTemplate: string;
+  headerTemplate: string;
+  highlightTemplate: string;
 }
 
 const DEFAULT_SETTINGS: PluginSettings = {
@@ -20,34 +26,92 @@ const DEFAULT_SETTINGS: PluginSettings = {
   lastUpdated: null,
   autoSync: true,
   highlightSortOldestToNewest: true,
+  syncNotesOnly: false,
   logFile: true,
   logFileName: 'Sync.md',
+  frontMatter: false,
+  frontMatterTemplate: `---
+id: {{ id }}
+updated: {{ updated }}
+title: {{ title }}
+author: {{ author }}
+---
+`,
+  headerTemplate: `
+%%
+ID: {{ id }}
+Updated: {{ updated }}
+%%
+
+![]( {{ cover_image_url }})
+
+# About
+Title: [[{{ title }}]]
+Authors: {{ authorStr }}
+Category: #{{ category }}
+{%- if tags %}
+Tags: {{ tags }}
+{%- endif %}
+Number of Highlights: =={{ num_highlights }}==
+Readwise URL: {{ highlights_url }}
+{%- if source_url %}
+Source URL: {{ source_url }}
+{%- endif %}
+Date: [[{{ updated }}]]
+Last Highlighted: *{{ last_highlight_at }}*
+
+---
+
+# Highlights 
+
+`,
+  highlightTemplate: `{{ text }}{%- if category == 'books' %} ([{{ location }}]({{ location_url }})){%- endif %}{%- if color %}%% Color: {{ color }} %%{%- endif %} ^{{ id }} %%
+{%- if note %}
+
+Note: {{ note }}
+{%- endif %}
+`,
 };
 
 export default class ReadwiseMirror extends Plugin {
   settings: PluginSettings;
   readwiseApi: ReadwiseApi;
   notify: Notify;
+  env: Environment;
+  frontMatterTemplate: Template;
+  headerTemplate: Template;
+  highlightTemplate: Template;
 
   private formatTags(tags: Tag[]) {
     return tags.map((tag) => `#${tag.name}`).join(', ');
   }
 
   private formatHighlight(highlight: Highlight, book: Book) {
-    const { id, text, note, location, color, tags } = highlight;
+    const { id, text, note, location, color, url, tags, highlighted_at } = highlight;
+    
     const locationUrl = `https://readwise.io/to_kindle?action=open&asin=${book['asin']}&location=${location}`;
-    const locationBlock = location !== null ? `([${location}](${locationUrl}))` : '';
 
     const formattedTags = tags.filter((tag) => tag.name !== color);
     const formattedTagStr = this.formatTags(formattedTags);
 
-    return `
-${text} ${book.category === 'books' ? locationBlock : ''}${color ? ` %% Color: ${color} %%` : ''} ^${id}${
-      note ? `\n\n**Note: ${note}**` : ``
-    }${formattedTagStr.length >= 1 ? `\n\n**Tags: ${formattedTagStr}**` : ``}
+    return this.highlightTemplate.render({
+      // Highlight fields
+      id: id,
+      text: text,
+      note: note,
+      location: location,
+      location_url: locationUrl,
+      color: color,
+      highlighted_at: highlighted_at ? this.formatDate(highlighted_at) : '',
+      tags: formattedTagStr,
+      // Book fields
+      category: book.category,
+    });
+  }
 
----
-`;
+  private filterHighlight(highlight: Highlight) {
+    if (this.settings.syncNotesOnly && !highlight.note) return false;
+    else return true;
   }
 
   private formatDate(dateStr: string) {
@@ -123,55 +187,66 @@ ${text} ${book.category === 'books' ? locationBlock : ''}${color ? ` %% Color: $
       } = book;
       const sanitizedTitle = `${title.replace(':', '-').replace(/[<>"'\/\\|?*]+/g, '')}`;
 
-      const formattedHighlights = (this.settings.highlightSortOldestToNewest ? highlights.reverse() : highlights)
-        .map((highlight: Highlight) => this.formatHighlight(highlight, book))
-        .join('')
-        .replace(/---\n$/g, '');
+      const filteredHighlights = highlights.filter((highlight: Highlight) => this.filterHighlight(highlight));
 
-      const authors = author ? author.split(/and |,/) : [];
+      if (filteredHighlights.length == 0) {
+        console.log(`Readwise: No highlights found for '${sanitizedTitle}'`);
+      } else {
+        const formattedHighlights = (
+          this.settings.highlightSortOldestToNewest ? filteredHighlights.reverse() : filteredHighlights
+        )
+          .map((highlight: Highlight) => this.formatHighlight(highlight, book))
+          .join('\n');
 
-      let authorStr =
-        authors[0] && authors?.length > 1
-          ? authors
-              .filter((authorName: string) => authorName.trim() != '')
-              .map((authorName: string) => `[[${authorName.trim()}]]`)
-              .join(', ')
-          : author
-          ? `[[${author}]]`
-          : ``;
+        const authors = author ? author.split(/and |,/) : [];
 
-      const contents = `%%
-ID: ${id}
-Updated: ${this.formatDate(updated)}
-%%
-![](${cover_image_url.replace('SL200', 'SL500').replace('SY160', 'SY500')})
+        let authorStr =
+          authors[0] && authors?.length > 1
+            ? authors
+                .filter((authorName: string) => authorName.trim() != '')
+                .map((authorName: string) => `[[${authorName.trim()}]]`)
+                .join(', ')
+            : author
+            ? `[[${author}]]`
+            : ``;
 
-# About
-Title: [[${sanitizedTitle}]]
-${authors.length > 1 ? 'Authors' : 'Author'}: ${authorStr}
-Category: #${category}${tags.length > 1 ? '\nTags: ' + this.formatTags(tags) : ''}
-Number of Highlights: ==${num_highlights}==
-Last Highlighted: *${last_highlight_at ? this.formatDate(last_highlight_at) : 'Never'}*
-Readwise URL: ${highlights_url}${category === 'articles' ? `\nSource URL: ${source_url}\n` : ''}
+        const metadata = {
+          id: id,
+          title: sanitizedTitle,
+          author: author,
+          authorStr: authorStr,
+          category: category,
+          num_highlights: num_highlights,
+          updated: this.formatDate(updated),
+          cover_image_url: cover_image_url.replace('SL200', 'SL500').replace('SY160', 'SY500'),
+          highlights_url: highlights_url,
+          highlights: highlights,
+          last_highlight_at: last_highlight_at ? this.formatDate(last_highlight_at) : '',
+          source_url: source_url,
+          tags: this.formatTags(tags),
+        };
 
-# Highlights ${formattedHighlights}`;
+        const frontMatterContents = this.settings.frontMatter ? this.frontMatterTemplate.render(metadata) : '';
+        const headerContents = this.headerTemplate.render(metadata);
+        const contents = `${frontMatterContents}${headerContents}${formattedHighlights}`;
 
-      let path = `${this.settings.baseFolderName}/${
-        category.charAt(0).toUpperCase() + category.slice(1)
-      }/${sanitizedTitle}.md`;
+        let path = `${this.settings.baseFolderName}/${
+          category.charAt(0).toUpperCase() + category.slice(1)
+        }/${sanitizedTitle}.md`;
 
-      const abstractFile = vault.getAbstractFileByPath(path);
+        const abstractFile = vault.getAbstractFileByPath(path);
 
-      // Delete old instance of file
-      if (abstractFile) {
-        try {
-          await vault.delete(abstractFile);
-        } catch (err) {
-          console.error(`Readwise: Attempted to delete file ${path} but no file was found`, err);
+        // Delete old instance of file
+        if (abstractFile) {
+          try {
+            await vault.delete(abstractFile);
+          } catch (err) {
+            console.error(`Readwise: Attempted to delete file ${path} but no file was found`, err);
+          }
         }
-      }
 
-      vault.create(path, contents);
+        vault.create(path, contents);
+      }
     }
   }
 
@@ -256,6 +331,12 @@ Readwise URL: ${highlights_url}${category === 'articles' ? `\nSource URL: ${sour
     await this.loadSettings();
 
     const statusBarItem = this.addStatusBarItem();
+
+    // Setup templating
+    this.env = new Environment(null, { autoescape: false } as ConfigureOptions);
+    this.frontMatterTemplate = new Template(this.settings.frontMatterTemplate, this.env, null, true);
+    this.headerTemplate = new Template(this.settings.headerTemplate, this.env, null, true);
+    this.highlightTemplate = new Template(this.settings.highlightTemplate, this.env, null, true);
 
     this.notify = new Notify(statusBarItem);
 
@@ -394,6 +475,18 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName('Only sync highlights with notes')
+      .setDesc(
+        'If checked, highlights will only be synced if they have a note. This makes it easier to use these notes for Zettelkasten.'
+      )
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.syncNotesOnly).onChange(async (value) => {
+          this.plugin.settings.syncNotesOnly = value;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
       .setName('Sync Log')
       .setDesc('Save sync log to file in Library')
       .addToggle((toggle) =>
@@ -415,6 +508,71 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
             this.plugin.settings.logFileName = value;
             await this.plugin.saveSettings();
           })
+      );
+
+    new Setting(containerEl)
+      .setName('Header Template')
+      .setDesc('')
+      .addTextArea((text) =>
+        text.setValue(this.plugin.settings.headerTemplate).onChange(async (value) => {
+          if (!value) {
+            this.plugin.settings.headerTemplate = DEFAULT_SETTINGS.headerTemplate;
+          } else {
+            this.plugin.settings.headerTemplate = value;
+          }
+          this.plugin.headerTemplate = new Template(this.plugin.settings.headerTemplate, this.plugin.env, null, true);
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName('Frontmatter')
+      .setDesc('Add frontmatter (defined with the following Template)')
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.frontMatter).onChange(async (value) => {
+          this.plugin.settings.frontMatter = value;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName('Frontmatter Template')
+      .setDesc('')
+      .addTextArea((text) =>
+        text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
+          if (!value) {
+            this.plugin.settings.frontMatterTemplate = DEFAULT_SETTINGS.frontMatterTemplate;
+          } else {
+            this.plugin.settings.frontMatterTemplate = value;
+          }
+          this.plugin.frontMatterTemplate = new Template(
+            this.plugin.settings.frontMatterTemplate,
+            this.plugin.env,
+            null,
+            true
+          );
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName('Highlight Template')
+      .setDesc('')
+      .addTextArea((text) =>
+        text.setValue(this.plugin.settings.highlightTemplate).onChange(async (value) => {
+          if (!value) {
+            this.plugin.settings.highlightTemplate = DEFAULT_SETTINGS.highlightTemplate;
+          } else {
+            this.plugin.settings.highlightTemplate = value;
+          }
+          this.plugin.highlightTemplate = new Template(
+            this.plugin.settings.highlightTemplate,
+            this.plugin.env,
+            null,
+            true
+          );
+          await this.plugin.saveSettings();
+        })
       );
   }
 }
