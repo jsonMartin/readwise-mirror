@@ -95,7 +95,7 @@ export default class ReadwiseMirror extends Plugin {
 
     if (nohash) {
       // don't return a hash in the tag name
-      return uniqueTags.map((tag) => `${tag}`).join(', ');
+      return uniqueTags.map((tag) => `'${tag}'`).join(', ');
     } else {
       return uniqueTags.map((tag) => `#${tag}`).join(', ');
     }
