@@ -172,4 +172,4 @@ Note: {{ note }}
 
 - The templating is based on the [`nunjucks`](https://mozilla.github.io/nunjucks/templating.html) templating library and thus shares its limitations;
 - Certain strings (e.g. date, tags, authors) are currently preformatted
-- If you have frontmatter and items with `@` in the title or author's name (typically this happens with highlights imported from Twitter), the frontmatter will be invalid.
+- If you have frontmatter and items with `@` in the title or author's name (typically this happens with highlights imported from Twitter), the frontmatter will be invalid. You can add quotes in your frontmatter template to try to work around these cases: `title: "{{ title }}" but any quotes already present in the title will break your frontmatter too.
