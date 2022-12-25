@@ -88,10 +88,13 @@ export default class ReadwiseMirror extends Plugin {
   highlightTemplate: Template;
 
   private formatTags(tags: Tag[], quote: boolean = false) {
+    // use unique list of tags
+    const uniqueTags = [...new Set(tags.map((tag) => tag.name))];
+
     if (quote) {
-      return tags.map((tag) => `"#${tag.name}"`).join(', ');
+      return uniqueTags.map((tag) => `"#${tag}"`).join(', ');
     } else {
-      return tags.map((tag) => `#${tag.name}`).join(', ');
+      return uniqueTags.map((tag) => `#${tag}`).join(', ');
     }
   }
 
@@ -169,7 +172,7 @@ export default class ReadwiseMirror extends Plugin {
     this.sortHighlights(highlights).forEach((highlight: Highlight) =>
       highlight.tags ? (tags = [...tags, ...highlight.tags]) : tags
     );
-    return Array.from(new Set(tags));
+    return tags;
   }
 
   async writeLogToMarkdown(library: Library) {
