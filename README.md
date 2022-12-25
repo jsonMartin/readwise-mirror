@@ -99,7 +99,8 @@ The template exposes the following variables (they can be used for both the head
 - ```last_highlight_at```: Date of last highlight,
 - ```source_url```: Source URL,
 - ```tags```: Document tags,
-- ```frontmatter_tags```: Document tags to be used in an array in frontmatter  (use `tags: [ {{ frontmatter_tags }}]` in your frontmatter template)
+- ```quoted_tags```: Document tags to be used in an array in frontmatter  (use `tags: [ {{ frontmatter_tags }}]` in your frontmatter template)
+- ```quoted_highlight_tags```: List of all highlight tags to be used in an array in frontmatter (similar to `quoted_tags`)
 
 #### Default frontmatter template
 
@@ -109,6 +110,23 @@ id: {{ id }}
 updated: {{ updated }}
 title: {{ title }}
 author: {{ author }}
+---
+```
+
+#### Example of a more complex frontmatter template
+
+The following would print both document and all highlight tags, rolled-up:
+
+```markdown+nunjucks
+---
+id: {{ id }}
+updated: {{ updated }}
+title: "{{ title }}"
+author: "{{ author }}"
+highlights: {{ num_highlights }}
+last_highlight_at: {{ last_highlight_at }}
+source: {{ source_url }}
+tags: [ {%- if quoted_tags %}{{ quoted_tags }},{%- endif %}{%- if quoted_highlight_tags %} {{ quoted_highlight_tags }}{%- endif %} ]
 ---
 ```
 

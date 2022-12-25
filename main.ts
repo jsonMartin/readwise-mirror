@@ -161,6 +161,17 @@ export default class ReadwiseMirror extends Plugin {
     return sortedHighlights;
   };
 
+  private getTagsFromHighlights(highlights: Highlight[]) {
+    // extract all tags from all Highlights and
+    // construct an array with unique values
+
+    var tags: Tag[] = [];
+    this.sortHighlights(highlights).forEach((highlight: Highlight) =>
+      highlight.tags ? (tags = [...tags, ...highlight.tags]) : tags
+    );
+    return Array.from(new Set(tags));
+  }
+
   async writeLogToMarkdown(library: Library) {
     const vault = this.app.vault;
 
@@ -240,6 +251,8 @@ export default class ReadwiseMirror extends Plugin {
           .map((highlight: Highlight) => this.formatHighlight(highlight, book))
           .join('\n');
 
+        // get an array with all tags from highlights
+        const highlightTags = this.getTagsFromHighlights(filteredHighlights);
         const authors = author ? author.split(/and |,/) : [];
 
         let authorStr =
@@ -266,7 +279,9 @@ export default class ReadwiseMirror extends Plugin {
           last_highlight_at: last_highlight_at ? this.formatDate(last_highlight_at) : '',
           source_url: source_url,
           tags: this.formatTags(tags),
-          frontmatter_tags: this.formatTags(tags, true),
+          highlight_tags: this.formatTags(highlightTags),
+          quoted_tags: this.formatTags(tags, true),
+          quoted_highlight_tags: this.formatTags(highlightTags, true),
         };
 
         const frontMatterContents = this.settings.frontMatter ? this.frontMatterTemplate.render(metadata) : '';
