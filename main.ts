@@ -87,7 +87,7 @@ export default class ReadwiseMirror extends Plugin {
   headerTemplate: Template;
   highlightTemplate: Template;
 
-  private formatTags(tags: Tag[]) {
+  private formatTags(tags: Tag[], quote: boolean = false) {
     return tags.map((tag) => `#${tag.name}`).join(', ');
   }
 
@@ -118,10 +118,8 @@ export default class ReadwiseMirror extends Plugin {
     // is_discard is not a field in the API response for (https://readwise.io/api/v2/highlights/), so we need to check if the highlight has the discard tag
     // is_discard field only showing under the /export API endpoint in the API docs: https://readwise.io/api_deets
 
-    return highlight.tags.some(tag => tag.name === 'discard')
-  }
-
-
+    return highlight.tags.some((tag) => tag.name === 'discard');
+  };
 
   private filterHighlights(highlights: Highlight[]) {
     return highlights.filter((highlight: Highlight) => {
@@ -129,7 +127,7 @@ export default class ReadwiseMirror extends Plugin {
 
       // Check if is discarded
       if (this.settings.highlightDiscard && this.highlightIsDiscarded(highlight)) {
-        console.log("Readwise: Found discarded highlight, removing", highlight)
+        console.log('Readwise: Found discarded highlight, removing', highlight);
         return false;
       }
 
@@ -149,15 +147,15 @@ export default class ReadwiseMirror extends Plugin {
         if (highlightA.location < highlightB.location) return -1;
         else if (highlightA.location > highlightB.location) return 1;
         return 0;
-      })
+      });
 
-      if (!this.settings.highlightSortOldestToNewest) sortedHighlights = sortedHighlights.reverse()
+      if (!this.settings.highlightSortOldestToNewest) sortedHighlights = sortedHighlights.reverse();
     } else {
-      sortedHighlights = this.settings.highlightSortOldestToNewest ? sortedHighlights.reverse() : sortedHighlights
+      sortedHighlights = this.settings.highlightSortOldestToNewest ? sortedHighlights.reverse() : sortedHighlights;
     }
 
-    return sortedHighlights
-  }
+    return sortedHighlights;
+  };
 
   async writeLogToMarkdown(library: Library) {
     const vault = this.app.vault;
@@ -234,7 +232,8 @@ export default class ReadwiseMirror extends Plugin {
       if (filteredHighlights.length === 0) {
         console.log(`Readwise: No highlights found for '${sanitizedTitle}'`);
       } else {
-        const formattedHighlights = this.sortHighlights(filteredHighlights).map((highlight: Highlight) => this.formatHighlight(highlight, book))
+        const formattedHighlights = this.sortHighlights(filteredHighlights)
+          .map((highlight: Highlight) => this.formatHighlight(highlight, book))
           .join('\n');
 
         const authors = author ? author.split(/and |,/) : [];
@@ -242,12 +241,12 @@ export default class ReadwiseMirror extends Plugin {
         let authorStr =
           authors[0] && authors?.length > 1
             ? authors
-              .filter((authorName: string) => authorName.trim() != '')
-              .map((authorName: string) => `[[${authorName.trim()}]]`)
-              .join(', ')
+                .filter((authorName: string) => authorName.trim() != '')
+                .map((authorName: string) => `[[${authorName.trim()}]]`)
+                .join(', ')
             : author
-              ? `[[${author}]]`
-              : ``;
+            ? `[[${author}]]`
+            : ``;
 
         const metadata = {
           id: id,
@@ -263,14 +262,16 @@ export default class ReadwiseMirror extends Plugin {
           last_highlight_at: last_highlight_at ? this.formatDate(last_highlight_at) : '',
           source_url: source_url,
           tags: this.formatTags(tags),
+          frontmatter_tags: this.formatTags(tags, true),
         };
 
         const frontMatterContents = this.settings.frontMatter ? this.frontMatterTemplate.render(metadata) : '';
         const headerContents = this.headerTemplate.render(metadata);
         const contents = `${frontMatterContents}${headerContents}${formattedHighlights}`;
 
-        let path = `${this.settings.baseFolderName}/${category.charAt(0).toUpperCase() + category.slice(1)
-          }/${sanitizedTitle}.md`;
+        let path = `${this.settings.baseFolderName}/${
+          category.charAt(0).toUpperCase() + category.slice(1)
+        }/${sanitizedTitle}.md`;
 
         const abstractFile = vault.getAbstractFileByPath(path);
 
@@ -526,9 +527,7 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Filter Discarded Highlights')
-      .setDesc(
-        'If enabled, do not display discarded highlights in the Readwise library.'
-      )
+      .setDesc('If enabled, do not display discarded highlights in the Readwise library.')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.highlightDiscard).onChange(async (value) => {
           this.plugin.settings.highlightDiscard = value;
