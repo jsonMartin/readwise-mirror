@@ -173,7 +173,7 @@ The highlight template exposes the following variables:
 - ```color```: The color
 - ```highlighted_at```: Date highlighted (empty if none)
 - ```tags```: A formatted string of tags
-- ```category```: Categroy of the source item (book, article, etc.)
+- ```category```: Category of the source item (book, article, etc.)
 
 #### Default highlight template
 
