@@ -88,7 +88,11 @@ export default class ReadwiseMirror extends Plugin {
   highlightTemplate: Template;
 
   private formatTags(tags: Tag[], quote: boolean = false) {
-    return tags.map((tag) => `#${tag.name}`).join(', ');
+    if (quote) {
+      return tags.map((tag) => `"#${tag.name}"`).join(', ');
+    } else {
+      return tags.map((tag) => `#${tag.name}`).join(', ');
+    }
   }
 
   private formatHighlight(highlight: Highlight, book: Book) {

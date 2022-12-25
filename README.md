@@ -98,7 +98,8 @@ The template exposes the following variables (they can be used for both the head
 - ```highlights```: Highlights,
 - ```last_highlight_at```: Date of last highlight,
 - ```source_url```: Source URL,
-- ```tags```: Document tags
+- ```tags```: Document tags,
+- ```frontmatter_tags```: Document tags to be used in an array in frontmatter  (use `tags: [ {{ frontmatter_tags }}]` in your frontmatter template)
 
 #### Default frontmatter template
 
