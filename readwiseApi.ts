@@ -109,10 +109,22 @@ export class ReadwiseApi {
 
       if (response.status === 429) {
         // Error handling for rate limit throttling
-        const rateLimitedDelayTime = parseInt(response.headers.get('Retry-After')) * 1000 + 1000;
+        // b/c of limitations with cross-origin requests, we don't have (easy) access to the header
+        // We must therefore extract the seconds from the statusText:
+        // "Request was throttled. Expected available in 39 seconds."
+
+        let rateLimitedDelayTime: number = 3; // Base throttling, 20 requests per minute are the maximum allowable
+
+        if (data.detail) {
+          console.log(`Readwise: ${data.detail}`);
+          const rate = data.detail.match(/available\sin\s([0-9]+) seconds/);
+          if (rate) {
+            rateLimitedDelayTime = parseInt(rate[1]) * 1000 + 1000;
+          }
+        }
+
         console.warn(`Readwise: API Rate Limited, waiting to retry for ${rateLimitedDelayTime}`);
         this.notify.setStatusBarText(`Readwise: API Rate Limited, waiting ${rateLimitedDelayTime}`);
-
         await new Promise((_) => setTimeout(_, rateLimitedDelayTime));
         console.info('Readwise: Trying to fetch highlights again...');
         this.notify.setStatusBarText(`Readwise: Attempting to retry...`);
@@ -130,7 +142,8 @@ export class ReadwiseApi {
       }
     } while (data.next);
 
-    if (results.length > 0) console.info(`Readwise: Processed ${results.length} total ${contentType} results successfully`);
+    if (results.length > 0)
+      console.info(`Readwise: Processed ${results.length} total ${contentType} results successfully`);
     return results;
   }
 
