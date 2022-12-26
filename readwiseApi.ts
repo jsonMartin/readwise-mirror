@@ -113,11 +113,11 @@ export class ReadwiseApi {
         // We must therefore extract the seconds from the statusText:
         // "Request was throttled. Expected available in 39 seconds."
 
-        let rateLimitedDelayTime: number = 3; // Base throttling, 20 requests per minute are the maximum allowable
+        let rateLimitedDelayTime: number = 4000; // Base throttling, 20 requests per minute are the maximum allowable
 
         if (data.detail) {
           console.log(`Readwise: ${data.detail}`);
-          const rate = data.detail.match(/available\sin\s([0-9]+) seconds/);
+          const rate = data.detail.match(/available\sin\s([0-9]+)\sseconds/);
           if (rate) {
             rateLimitedDelayTime = parseInt(rate[1]) * 1000 + 1000;
           }
