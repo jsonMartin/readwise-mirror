@@ -173,7 +173,7 @@ export default class ReadwiseMirror extends Plugin {
 
       const { title, num_highlights } = book;
       console.warn(`Readwise: Replacing colon with ${this.settings.colonSubstitute}`);
-      const sanitizedTitle = `${title.replace('/:/g', this.settings.colonSubstitute).replace(/[<>"'\/\\|?*]+/g, '')}`;
+      const sanitizedTitle = `${title.replace(/:/g, this.settings.colonSubstitute).replace(/[<>"'\/\\|?*]+/g, '')}`;
       const contents = `\n- [[${sanitizedTitle}]] *(${num_highlights} highlights)*`;
       logString += contents;
     }
@@ -230,7 +230,7 @@ export default class ReadwiseMirror extends Plugin {
 
       // Sanitize title, replace colon with substitute from settings
       const sanitizedTitle = `${title
-        .replace('/:/g', this.settings.colonSubstitute ?? '-')
+        .replace(/:/g, this.settings.colonSubstitute ?? '-')
         .replace(/[<>"'\/\\|?*]+/g, '')}`;
 
       // Filter highlights
