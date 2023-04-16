@@ -14,6 +14,7 @@ interface PluginSettings {
   highlightSortByLocation: boolean;
   highlightDiscard: boolean;
   syncNotesOnly: boolean;
+  colonSubstitute: string;
   logFile: boolean;
   logFileName: string;
   frontMatter: boolean;
@@ -31,6 +32,7 @@ const DEFAULT_SETTINGS: PluginSettings = {
   highlightSortByLocation: true,
   highlightDiscard: false,
   syncNotesOnly: false,
+  colonSubstitute: '-',
   logFile: true,
   logFileName: 'Sync.md',
   frontMatter: false,
@@ -189,7 +191,8 @@ export default class ReadwiseMirror extends Plugin {
       const book = library['books'][bookId];
 
       const { title, num_highlights } = book;
-      const sanitizedTitle = `${title.replace(':', '-').replace(/[<>"'\/\\|?*]+/g, '')}`;
+      console.warn(`Readwise: Replacing colon with ${this.settings.colonSubstitute}`);
+      const sanitizedTitle = `${title.replace(/:/g, this.settings.colonSubstitute).replace(/[<>"'\/\\|?*]+/g, '')}`;
       const contents = `\n- [[${sanitizedTitle}]] *(${num_highlights} highlights)*`;
       logString += contents;
     }
@@ -243,7 +246,11 @@ export default class ReadwiseMirror extends Plugin {
         source_url,
         tags,
       } = book;
-      const sanitizedTitle = `${title.replace(':', '-').replace(/[<>"'\/\\|?*]+/g, '')}`;
+
+      // Sanitize title, replace colon with substitute from settings
+      const sanitizedTitle = `${title
+        .replace(/:/g, this.settings.colonSubstitute ?? '-')
+        .replace(/[<>"'\/\\|?*]+/g, '')}`;
 
       // Filter highlights
       const filteredHighlights = this.filterHighlights(highlights);
@@ -568,6 +575,27 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
           this.plugin.settings.syncNotesOnly = value;
           await this.plugin.saveSettings();
         })
+      );
+
+    new Setting(containerEl)
+      .setName('Replacement string for colons in filenames')
+      .setDesc(
+        "Set the string to be used for replacement of colon (:) in filenames derived from the title. The default value for this setting is '-'."
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder('Colon replacement in title')
+          .setValue(this.plugin.settings.colonSubstitute)
+          .onChange(async (value) => {
+            if (!value || value.match(':')) {
+              console.warn(`Readwise: colon replacement: empty or invalid value: ${value}`);
+              this.plugin.settings.colonSubstitute = DEFAULT_SETTINGS.colonSubstitute;
+            } else {
+              console.info(`Readwise: colon replacement: setting value: ${value}`);
+              this.plugin.settings.colonSubstitute = value;
+            }
+            await this.plugin.saveSettings();
+          })
       );
 
     new Setting(containerEl)
