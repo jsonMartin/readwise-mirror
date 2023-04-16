@@ -14,6 +14,7 @@ interface PluginSettings {
   highlightSortByLocation: boolean;
   highlightDiscard: boolean;
   syncNotesOnly: boolean;
+  colonSubstitute: string;
   logFile: boolean;
   logFileName: string;
   frontMatter: boolean;
@@ -31,6 +32,7 @@ const DEFAULT_SETTINGS: PluginSettings = {
   highlightSortByLocation: true,
   highlightDiscard: false,
   syncNotesOnly: false,
+  colonSubstitute: '-',
   logFile: true,
   logFileName: 'Sync.md',
   frontMatter: false,
@@ -118,10 +120,8 @@ export default class ReadwiseMirror extends Plugin {
     // is_discard is not a field in the API response for (https://readwise.io/api/v2/highlights/), so we need to check if the highlight has the discard tag
     // is_discard field only showing under the /export API endpoint in the API docs: https://readwise.io/api_deets
 
-    return highlight.tags.some(tag => tag.name === 'discard')
-  }
-
-
+    return highlight.tags.some((tag) => tag.name === 'discard');
+  };
 
   private filterHighlights(highlights: Highlight[]) {
     return highlights.filter((highlight: Highlight) => {
@@ -129,7 +129,7 @@ export default class ReadwiseMirror extends Plugin {
 
       // Check if is discarded
       if (this.settings.highlightDiscard && this.highlightIsDiscarded(highlight)) {
-        console.log("Readwise: Found discarded highlight, removing", highlight)
+        console.log('Readwise: Found discarded highlight, removing', highlight);
         return false;
       }
 
@@ -149,15 +149,15 @@ export default class ReadwiseMirror extends Plugin {
         if (highlightA.location < highlightB.location) return -1;
         else if (highlightA.location > highlightB.location) return 1;
         return 0;
-      })
+      });
 
-      if (!this.settings.highlightSortOldestToNewest) sortedHighlights = sortedHighlights.reverse()
+      if (!this.settings.highlightSortOldestToNewest) sortedHighlights = sortedHighlights.reverse();
     } else {
-      sortedHighlights = this.settings.highlightSortOldestToNewest ? sortedHighlights.reverse() : sortedHighlights
+      sortedHighlights = this.settings.highlightSortOldestToNewest ? sortedHighlights.reverse() : sortedHighlights;
     }
 
-    return sortedHighlights
-  }
+    return sortedHighlights;
+  };
 
   async writeLogToMarkdown(library: Library) {
     const vault = this.app.vault;
@@ -172,7 +172,8 @@ export default class ReadwiseMirror extends Plugin {
       const book = library['books'][bookId];
 
       const { title, num_highlights } = book;
-      const sanitizedTitle = `${title.replace(':', '-').replace(/[<>"'\/\\|?*]+/g, '')}`;
+      console.warn(`Readwise: Replacing colon with ${this.settings.colonSubstitute}`);
+      const sanitizedTitle = `${title.replace(/:/g, this.settings.colonSubstitute).replace(/[<>"'\/\\|?*]+/g, '')}`;
       const contents = `\n- [[${sanitizedTitle}]] *(${num_highlights} highlights)*`;
       logString += contents;
     }
@@ -226,7 +227,11 @@ export default class ReadwiseMirror extends Plugin {
         source_url,
         tags,
       } = book;
-      const sanitizedTitle = `${title.replace(':', '-').replace(/[<>"'\/\\|?*]+/g, '')}`;
+
+      // Sanitize title, replace colon with substitute from settings
+      const sanitizedTitle = `${title
+        .replace(/:/g, this.settings.colonSubstitute ?? '-')
+        .replace(/[<>"'\/\\|?*]+/g, '')}`;
 
       // Filter highlights
       const filteredHighlights = this.filterHighlights(highlights);
@@ -234,7 +239,8 @@ export default class ReadwiseMirror extends Plugin {
       if (filteredHighlights.length === 0) {
         console.log(`Readwise: No highlights found for '${sanitizedTitle}'`);
       } else {
-        const formattedHighlights = this.sortHighlights(filteredHighlights).map((highlight: Highlight) => this.formatHighlight(highlight, book))
+        const formattedHighlights = this.sortHighlights(filteredHighlights)
+          .map((highlight: Highlight) => this.formatHighlight(highlight, book))
           .join('\n');
 
         const authors = author ? author.split(/and |,/) : [];
@@ -242,12 +248,12 @@ export default class ReadwiseMirror extends Plugin {
         let authorStr =
           authors[0] && authors?.length > 1
             ? authors
-              .filter((authorName: string) => authorName.trim() != '')
-              .map((authorName: string) => `[[${authorName.trim()}]]`)
-              .join(', ')
+                .filter((authorName: string) => authorName.trim() != '')
+                .map((authorName: string) => `[[${authorName.trim()}]]`)
+                .join(', ')
             : author
-              ? `[[${author}]]`
-              : ``;
+            ? `[[${author}]]`
+            : ``;
 
         const metadata = {
           id: id,
@@ -269,8 +275,9 @@ export default class ReadwiseMirror extends Plugin {
         const headerContents = this.headerTemplate.render(metadata);
         const contents = `${frontMatterContents}${headerContents}${formattedHighlights}`;
 
-        let path = `${this.settings.baseFolderName}/${category.charAt(0).toUpperCase() + category.slice(1)
-          }/${sanitizedTitle}.md`;
+        let path = `${this.settings.baseFolderName}/${
+          category.charAt(0).toUpperCase() + category.slice(1)
+        }/${sanitizedTitle}.md`;
 
         const abstractFile = vault.getAbstractFileByPath(path);
 
@@ -526,9 +533,7 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Filter Discarded Highlights')
-      .setDesc(
-        'If enabled, do not display discarded highlights in the Readwise library.'
-      )
+      .setDesc('If enabled, do not display discarded highlights in the Readwise library.')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.highlightDiscard).onChange(async (value) => {
           this.plugin.settings.highlightDiscard = value;
@@ -546,6 +551,27 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
           this.plugin.settings.syncNotesOnly = value;
           await this.plugin.saveSettings();
         })
+      );
+
+    new Setting(containerEl)
+      .setName('Replacement string for colons in filenames')
+      .setDesc(
+        "Set the string to be used for replacement of colon (:) in filenames derived from the title. The default value for this setting is '-'."
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder('Colon replacement in title')
+          .setValue(this.plugin.settings.colonSubstitute)
+          .onChange(async (value) => {
+            if (!value || value.match(':')) {
+              console.warn(`Readwise: colon replacement: empty or invalid value: ${value}`);
+              this.plugin.settings.colonSubstitute = DEFAULT_SETTINGS.colonSubstitute;
+            } else {
+              console.info(`Readwise: colon replacement: setting value: ${value}`);
+              this.plugin.settings.colonSubstitute = value;
+            }
+            await this.plugin.saveSettings();
+          })
       );
 
     new Setting(containerEl)
