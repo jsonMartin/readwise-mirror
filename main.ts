@@ -291,7 +291,7 @@ export default class ReadwiseMirror extends Plugin {
           source_url: source_url,
           tags: this.formatTags(tags),
           highlight_tags: this.formatTags(highlightTags),
-          tags_nohash: this.formatTags(tags, true),
+          tags_nohash: this.formatTags(tags, true, "'"),
           hl_tags_nohash: this.formatTags(highlightTags, true, "'"),
         };
 
