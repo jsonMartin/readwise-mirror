@@ -101,7 +101,7 @@ The template exposes the following variables (they can be used for both the head
 - ```tags```: Document tags,
 - ```highlight_tags```: Rolled-up list of highlight tags,
 - ```tags_nohash```: Document tags withough "#" to be used in an array in frontmatter (use `tags: [ {{ tags_nohash }}]` in your frontmatter template)
-- ```hl_tags_nohash```: List of all highlight tags to be used in an array in frontmatter (withouth "#", similar to `tags_nohash`)
+- ```hl_tags_nohash```: List of all highlight tags to be used in an array in frontmatter (withouth "#",, similar to `tags_nohash`, but with single quotes "'" to avoid issues with tags that are valid in readwise but require special care when used in Obsidian frontmatter (e.g. tags using '@'))
 
 #### Default frontmatter template
 
