@@ -89,15 +89,15 @@ export default class ReadwiseMirror extends Plugin {
   headerTemplate: Template;
   highlightTemplate: Template;
 
-  private formatTags(tags: Tag[], nohash: boolean = false) {
+  private formatTags(tags: Tag[], nohash: boolean = false, q: string = '') {
     // use unique list of tags
     const uniqueTags = [...new Set(tags.map((tag) => tag.name.replace(/\s/, '-')))];
 
     if (nohash) {
       // don't return a hash in the tag name
-      return uniqueTags.map((tag) => `'${tag}'`).join(', ');
+      return uniqueTags.map((tag) => `${q}${tag}${q}`).join(', ');
     } else {
-      return uniqueTags.map((tag) => `#${tag}`).join(', ');
+      return uniqueTags.map((tag) => `${q}#${tag}${q}`).join(', ');
     }
   }
 
@@ -292,7 +292,7 @@ export default class ReadwiseMirror extends Plugin {
           tags: this.formatTags(tags),
           highlight_tags: this.formatTags(highlightTags),
           tags_nohash: this.formatTags(tags, true),
-          hl_tags_nohash: this.formatTags(highlightTags, true),
+          hl_tags_nohash: this.formatTags(highlightTags, true, "'"),
         };
 
         const frontMatterContents = this.settings.frontMatter ? this.frontMatterTemplate.render(metadata) : '';
