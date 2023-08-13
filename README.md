@@ -167,6 +167,20 @@ Note: {{ note }}
 ---
 ```
 
+### Blockquote filter
+
+If you want to use blockquotes for text fields in your template, there's a handy `bq` filter that will put the quote character (`>`) in front of every new line. This is useful for both multi-line highlights as well as multi-line notes.
+
+With this filter, templates like the following become possible, without breaking the blockquote.
+
+```markdown+nunjucks
+> [!quote]
+> {{ text | bq }}{%- if category == 'books' %} ([{{ location }}]({{ location_url }})){%- endif %}{%- if color %} %% Color: {{ color }} %%{%- endif %} ^{{id}}{%- if note %}
+Note: {{ note }}
+{%- endif %}
+---
+```
+
 ### Limitations
 
 - The templating is based on the [`nunjucks`](https://mozilla.github.io/nunjucks/templating.html) templating library and thus shares its limitations;

@@ -379,6 +379,12 @@ export default class ReadwiseMirror extends Plugin {
 
     // Setup templating
     this.env = new Environment(null, { autoescape: false } as ConfigureOptions);
+
+    // Add a nunjucks filter to convert newlines to "newlines + >" for quotes
+    this.env.addFilter('bq', function (str) {
+      return str.replace(/\r|\n|\r\n/g, '\r\n> ');
+    });
+
     this.frontMatterTemplate = new Template(this.settings.frontMatterTemplate, this.env, null, true);
     this.headerTemplate = new Template(this.settings.headerTemplate, this.env, null, true);
     this.highlightTemplate = new Template(this.settings.highlightTemplate, this.env, null, true);
