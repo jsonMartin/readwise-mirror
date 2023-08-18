@@ -8,7 +8,28 @@ Thanks to @johannrichard for the following contributions:
   - a rolled-up (deduplicated) list highlight tags can be used in frontmatter via the field `quoted_highlight_tags`
 - Feature: ✨ user setting for "colon" (:) replacement
   - The colon in a title is a special character which by default is replaced witha a dash (-) in filenames. With this change, users can choose what string to use as a replacement.
-
+- Feature: ✨ Multi-line text can be filtered with the `bq` filter
+  - The filter adds the `>` character after each line-break
+  - With this, you can get multi-line text blockquotes in your templates working correctly
+    ### Example
+    The following highlight
+    ```
+    Multi-line text in blockquotes
+    
+    This is an example of a multi-line highlight with line-breaks. 
+    ```
+    ... with this template
+    ```markdown+nunjucks
+    > [!quote]
+    > {{ text | bq }}
+    ```
+    will turn into 
+    ```markdown
+    > [!quote]
+    > Multi-line text in blockquotes
+    >
+    > This is an example of a multi-line highlight with line-breaks. 
+    ```
 ### Updates
 - Change field names to reflect their use in frontmatter
 - Introduce option for quotes in tag format
