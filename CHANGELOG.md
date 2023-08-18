@@ -1,5 +1,5 @@
 # Changelog
-## 1.3.1 (2023-08-18)
+## 1.4.0 (2023-08-18)
 Thanks to @johannrichard for the following contributions:
 
 ### Features
@@ -10,7 +10,6 @@ Thanks to @johannrichard for the following contributions:
   - The colon in a title is a special character which by default is replaced witha a dash (-) in filenames. With this change, users can choose what string to use as a replacement.
 
 ### Updates
-- Implement improved readwise API throttling
 - Change field names to reflect their use in frontmatter
 - Introduce option for quotes in tag format
   - make tag formatting more flexible
