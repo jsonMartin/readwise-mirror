@@ -1,4 +1,22 @@
 # Changelog
+## 1.3.1 (2023-08-18)
+Thanks to @johannrichard for the following contributions:
+
+### Features
+- Feature: ✨ add frontmatter tag field
+- Feature: ✨ roll-up of highlight tags into frontmatter
+  - a rolled-up (deduplicated) list highlight tags can be used in frontmatter via the field `quoted_highlight_tags`
+- Feature: ✨ user setting for "colon" (:) replacement
+  - The colon in a title is a special character which by default is replaced witha a dash (-) in filenames. With this change, users can choose what string to use as a replacement.
+
+### Updates
+- Implement improved readwise API throttling
+- Change field names to reflect their use in frontmatter
+- Introduce option for quotes in tag format
+  - make tag formatting more flexible
+  - avoid adding quotes all the time
+  - differentiate nohas from quoting
+- Introduce option for quotes in tag format
 
 ## 1.3.0 (2022-12-10)
 ### Added
