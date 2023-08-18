@@ -89,8 +89,16 @@ export default class ReadwiseMirror extends Plugin {
   headerTemplate: Template;
   highlightTemplate: Template;
 
-  private formatTags(tags: Tag[]) {
-    return tags.map((tag) => `#${tag.name}`).join(', ');
+  private formatTags(tags: Tag[], nohash: boolean = false, q: string = '') {
+    // use unique list of tags
+    const uniqueTags = [...new Set(tags.map((tag) => tag.name.replace(/\s/, '-')))];
+
+    if (nohash) {
+      // don't return a hash in the tag name
+      return uniqueTags.map((tag) => `${q}${tag}${q}`).join(', ');
+    } else {
+      return uniqueTags.map((tag) => `${q}#${tag}${q}`).join(', ');
+    }
   }
 
   private formatHighlight(highlight: Highlight, book: Book) {
@@ -158,6 +166,17 @@ export default class ReadwiseMirror extends Plugin {
 
     return sortedHighlights;
   };
+
+  private getTagsFromHighlights(highlights: Highlight[]) {
+    // extract all tags from all Highlights and
+    // construct an array with unique values
+
+    var tags: Tag[] = [];
+    this.sortHighlights(highlights).forEach((highlight: Highlight) =>
+      highlight.tags ? (tags = [...tags, ...highlight.tags]) : tags
+    );
+    return tags;
+  }
 
   async writeLogToMarkdown(library: Library) {
     const vault = this.app.vault;
@@ -243,6 +262,8 @@ export default class ReadwiseMirror extends Plugin {
           .map((highlight: Highlight) => this.formatHighlight(highlight, book))
           .join('\n');
 
+        // get an array with all tags from highlights
+        const highlightTags = this.getTagsFromHighlights(filteredHighlights);
         const authors = author ? author.split(/and |,/) : [];
 
         let authorStr =
@@ -269,6 +290,9 @@ export default class ReadwiseMirror extends Plugin {
           last_highlight_at: last_highlight_at ? this.formatDate(last_highlight_at) : '',
           source_url: source_url,
           tags: this.formatTags(tags),
+          highlight_tags: this.formatTags(highlightTags),
+          tags_nohash: this.formatTags(tags, true, "'"),
+          hl_tags_nohash: this.formatTags(highlightTags, true, "'"),
         };
 
         const frontMatterContents = this.settings.frontMatter ? this.frontMatterTemplate.render(metadata) : '';

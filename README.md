@@ -98,7 +98,10 @@ The template exposes the following variables (they can be used for both the head
 - ```highlights```: Highlights,
 - ```last_highlight_at```: Date of last highlight,
 - ```source_url```: Source URL,
-- ```tags```: Document tags
+- ```tags```: Document tags,
+- ```highlight_tags```: Rolled-up list of highlight tags,
+- ```tags_nohash```: Document tags withough "#",  but with single quotes "'" to avoid issues with tags that are valid in readwise but require special care when used in Obsidian frontmatter (e.g. tags using '@'). To be used in an array in frontmatter (use `tags: [ {{ tags_nohash }}]` in your frontmatter template)
+- ```hl_tags_nohash```: List of all highlight tags to be used in an array in frontmatter (withouth "#", similar to `tags_nohash`)
 
 #### Default frontmatter template
 
@@ -108,6 +111,23 @@ id: {{ id }}
 updated: {{ updated }}
 title: {{ title }}
 author: {{ author }}
+---
+```
+
+#### Example of a more complex frontmatter template
+
+The following would print both document and all highlight tags, rolled-up:
+
+```markdown+nunjucks
+---
+id: {{ id }}
+updated: {{ updated }}
+title: "{{ title }}"
+author: "{{ author }}"
+highlights: {{ num_highlights }}
+last_highlight_at: {{ last_highlight_at }}
+source: {{ source_url }}
+tags: [ {%- if tags_nohash %}{{ tags_nohash }},{%- endif %}{%- if hl_tags_nohash %} {{ hl_tags_nohash }}{%- endif %} ]
 ---
 ```
 
@@ -154,7 +174,7 @@ The highlight template exposes the following variables:
 - ```color```: The color
 - ```highlighted_at```: Date highlighted (empty if none)
 - ```tags```: A formatted string of tags
-- ```category``: Categroy of the source item (book, article, etc.)
+- ```category```: Category of the source item (book, article, etc.)
 
 #### Default highlight template
 
@@ -171,4 +191,4 @@ Note: {{ note }}
 
 - The templating is based on the [`nunjucks`](https://mozilla.github.io/nunjucks/templating.html) templating library and thus shares its limitations;
 - Certain strings (e.g. date, tags, authors) are currently preformatted
-- If you have frontmatter and items with `@` in the title or author's name (typically this happens with highlights imported from Twitter), the frontmatter will be invalid.
+- If you have frontmatter and items with `@` in the title or author's name (typically this happens with highlights imported from Twitter), the frontmatter will be invalid. You can add quotes in your frontmatter template to try to work around these cases: `title: "{{ title }}" but any quotes already present in the title will break your frontmatter too.
