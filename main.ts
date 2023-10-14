@@ -116,6 +116,7 @@ export default class ReadwiseMirror extends Plugin {
       note: note,
       location: location,
       location_url: locationUrl,
+      url: url,
       color: color,
       highlighted_at: highlighted_at ? this.formatDate(highlighted_at) : '',
       tags: formattedTagStr,
