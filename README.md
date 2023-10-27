@@ -171,6 +171,7 @@ The highlight template exposes the following variables:
 - ```note```: Your nore
 - ```location```: The location
 - ```location_url```: The url of the location
+- ```url```: Unique highlight link (Open in Readwise)
 - ```color```: The color
 - ```highlighted_at```: Date highlighted (empty if none)
 - ```tags```: A formatted string of tags

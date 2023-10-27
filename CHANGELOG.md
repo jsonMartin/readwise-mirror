@@ -1,4 +1,12 @@
 # Changelog
+## 1.4.1 (2023-10-27)
+This update adds better support for Readwise article highlighting and default tag template additions. Thanks to first time contributor @tdznr for adding to this release!
+
+- Feature: Add "Open in Readwise" link when Readwise url field is present.
+  -The url field contains the link to Readwise's website showing the highlighted snippet in its source context.
+  - The url field is not available for book types, but is available for other content types such as Articles.
+- Feature: Show tags in default highlight template
+
 ## 1.4.0 (2023-08-18)
 Thanks to @johannrichard for the following contributions:
 
@@ -15,20 +23,20 @@ Thanks to @johannrichard for the following contributions:
     The following highlight
     ```
     Multi-line text in blockquotes
-    
-    This is an example of a multi-line highlight with line-breaks. 
+
+    This is an example of a multi-line highlight with line-breaks.
     ```
     ... with this template
     ```markdown+nunjucks
     > [!quote]
     > {{ text | bq }}
     ```
-    will turn into 
+    will turn into
     ```markdown
     > [!quote]
     > Multi-line text in blockquotes
     >
-    > This is an example of a multi-line highlight with line-breaks. 
+    > This is an example of a multi-line highlight with line-breaks.
     ```
 ### Updates
 - Change field names to reflect their use in frontmatter

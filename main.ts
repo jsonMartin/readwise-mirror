@@ -77,6 +77,9 @@ Note: {{ note }}
 {%- endif %}{%- if tags %}
 
 Tags: {{ tags }}
+{%- endif %}{%- if url %}
+
+[Open in Readwise]({{ url }})
 {%- endif %}
 
 ---
@@ -119,9 +122,11 @@ export default class ReadwiseMirror extends Plugin {
       note: note,
       location: location,
       location_url: locationUrl,
+      url, // URL is set for source of highlight (webpage, tweet, etc). null for books
       color: color,
       highlighted_at: highlighted_at ? this.formatDate(highlighted_at) : '',
       tags: formattedTagStr,
+
       // Book fields
       category: book.category,
     });
@@ -272,12 +277,12 @@ export default class ReadwiseMirror extends Plugin {
         let authorStr =
           authors[0] && authors?.length > 1
             ? authors
-                .filter((authorName: string) => authorName.trim() != '')
-                .map((authorName: string) => `[[${authorName.trim()}]]`)
-                .join(', ')
+              .filter((authorName: string) => authorName.trim() != '')
+              .map((authorName: string) => `[[${authorName.trim()}]]`)
+              .join(', ')
             : author
-            ? `[[${author}]]`
-            : ``;
+              ? `[[${author}]]`
+              : ``;
 
         const metadata = {
           id: id,
@@ -302,9 +307,8 @@ export default class ReadwiseMirror extends Plugin {
         const headerContents = this.headerTemplate.render(metadata);
         const contents = `${frontMatterContents}${headerContents}${formattedHighlights}`;
 
-        let path = `${this.settings.baseFolderName}/${
-          category.charAt(0).toUpperCase() + category.slice(1)
-        }/${sanitizedTitle}.md`;
+        let path = `${this.settings.baseFolderName}/${category.charAt(0).toUpperCase() + category.slice(1)
+          }/${sanitizedTitle}.md`;
 
         const abstractFile = vault.getAbstractFileByPath(path);
 
