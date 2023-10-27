@@ -74,6 +74,9 @@ Last Highlighted: *{{ last_highlight_at }}*
   highlightTemplate: `{{ text }}{%- if category == 'books' %} ([{{ location }}]({{ location_url }})){%- endif %}{%- if color %} %% Color: {{ color }} %%{%- endif %} ^{{id}}{%- if note %}
 
 Note: {{ note }}
+{%- endif %}{%- if tags %}
+
+Tags: {{ tags }}
 {%- endif %}
 
 ---
