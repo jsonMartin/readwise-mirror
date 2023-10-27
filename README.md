@@ -182,6 +182,9 @@ The highlight template exposes the following variables:
 {{ text }}{%- if category == 'books' %} ([{{ location }}]({{ location_url }})){%- endif %}{%- if color %} %% Color: {{ color }} %%{%- endif %} ^{{id}}{%- if note %}
 
 Note: {{ note }}
+{%- endif %}{%- if tags %}
+
+Tags: {{ tags }}
 {%- endif %}
 
 ---
@@ -197,6 +200,8 @@ With this filter, templates like the following become possible, without breaking
 > [!quote]
 > {{ text | bq }}{%- if category == 'books' %} ([{{ location }}]({{ location_url }})){%- endif %}{%- if color %} %% Color: {{ color }} %%{%- endif %} ^{{id}}{%- if note %}
 Note: {{ note }}
+{%- endif %}{%- if tags %}
+Tags: {{ tags }}
 {%- endif %}
 ---
 ```
