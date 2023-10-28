@@ -1,4 +1,7 @@
 # Changelog
+## 1.4.11 (2023-10-28)
+- UI: Update "Open in Readwise" text to "View Highlight", to better align with official plugin expected behavior
+
 ## 1.4.1 (2023-10-27)
 This update adds better support for Readwise article highlighting and default tag template additions. Thanks to first time contributor @tdznr for adding to this release!
 

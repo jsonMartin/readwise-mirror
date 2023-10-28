@@ -79,7 +79,7 @@ Note: {{ note }}
 Tags: {{ tags }}
 {%- endif %}{%- if url %}
 
-[Open in Readwise]({{ url }})
+[View Highlight]({{ url }})
 {%- endif %}
 
 ---
