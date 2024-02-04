@@ -258,7 +258,7 @@ export default class ReadwiseMirror extends Plugin {
       // Sanitize title, replace colon with substitute from settings
       const sanitizedTitle = `${title
         .replace(/:/g, this.settings.colonSubstitute ?? '-')
-        .replace(/[<>"'\/\\|?*]+/g, '')}`;
+        .replace(/[<>"'\/\\|?*#]+/g, '')}`;
 
       // Filter highlights
       const filteredHighlights = this.filterHighlights(highlights);
