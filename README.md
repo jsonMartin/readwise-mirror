@@ -18,6 +18,7 @@ The first time this plugin is ran, it will do a full sync downloading all conten
   - Automatically creates `[[Links]]` for book titles and authors
   - Contains block level link references *(using the Highlight ID)*. Allows to automatically link/transclude any highlight without needing to modify the Readwise note.
 - Supports tags, both within highlights as well as sources (books, articles, etc)
+- Supports Readwise Reader fields, notably the summary and document note
 
 ## Usage
 
@@ -88,6 +89,8 @@ The template exposes the following variables (they can be used for both the head
 
 - ```id```: Document id,
 - ```title```: Sanitized title,
+- ```document_note```: Readwise Reader document note,
+- ```summary```: Readwise Reader summary
 - ```author```: Author (raw),
 - ```authorStr```: Author (formatted, as Wiki Links ```[[Author Name]]```),
 - ```category```: Document category,
@@ -155,8 +158,17 @@ Source URL: {{ source_url }}
 {%- endif %}
 Date: [[{{ updated }}]]
 Last Highlighted: *{{ last_highlight_at }}*
+{%- if summary %}
+Summary: {{ summary }}
+{%- endif %}
 
 ---
+
+{%- if document_note %}
+# Document Note
+
+{{ document_note }}
+{%- endif %}
 
 # Highlights
 

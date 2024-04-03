@@ -1,11 +1,25 @@
 import Notify from 'notify';
+import { receiveMessageOnPort } from 'worker_threads';
 
 const API_ENDPOINT = 'https://readwise.io/api/v2';
 const API_PAGE_SIZE = 1000; // number of results per page, default 100 / max 1000
 
-export interface BooksAndHighlights {
-  books: Book[];
-  highlights: Highlight[];
+export interface Export {
+  user_book_id: number,
+  title: string,
+  author: string,
+  readable_title: string,
+  source: string,
+  cover_image_url: string,
+  unique_url:string,
+  book_tags: Tag[],
+  category: string,
+  document_note: string,
+  summary: string,
+  readwise_url: string,
+  source_url: string,
+  asin: string | null,
+  highlights: Highlight[],
 }
 
 export interface Highlight {
@@ -15,9 +29,10 @@ export interface Highlight {
   location: number;
   location_type: string;
   highlighted_at: string;
+  created_at: string;
+  updated_at: string;
   url: string | null;
   color: string;
-  updated: string;
   book_id: number;
   tags: Tag[];
 }
@@ -27,29 +42,13 @@ export interface Tag {
   name: string;
 }
 
-export interface Book {
-  id: number;
-  title: string;
-  author: string;
-  category: string;
-  num_highlights: number;
-  last_highlight_at: string;
-  updated: string;
-  cover_image_url: string;
-  highlights_url: string;
-  source_url: string | null;
-  asin: string;
-  highlights: Highlight[];
-  tags: Tag[];
-}
-
-export interface Books {
-  [key: string]: Book;
+export interface Exports {
+  [key: string]: Export;
 }
 
 export interface Library {
   categories: Set<String>;
-  books: Books;
+  books: Exports;
   highlightCount: number;
 }
 
@@ -86,25 +85,34 @@ export class ReadwiseApi {
   }
 
   // If lastUpdated or bookID aren't provided, fetch everything.
-  async fetchData(contentType = 'highlights', lastUpdated?: string, bookId?: Number): Promise<Highlight[] | Book[]> {
-    let url = `${API_ENDPOINT}/${contentType}?page_size=${API_PAGE_SIZE}`;
-    if (lastUpdated) url += `&updated__gt=${lastUpdated}`;
-    if (bookId) url += `&book_id=${bookId}`;
-
+  async fetchData(contentType = 'export', lastUpdated?: string, bookId?: Number): Promise<Export[]> {
+    let url = `${API_ENDPOINT}/${contentType}?`;
     let data;
+    let nextPageCursor;
 
     const results = [];
 
-    do {
+    while(true) {
+      const queryParams = new URLSearchParams();
+      queryParams.append('page_size', API_PAGE_SIZE.toString());
+      if (lastUpdated) {
+        queryParams.append('updatedAfter', lastUpdated);
+      }
+      if (bookId) {
+        queryParams.append('ids', bookId.toString());
+      }
+      if (nextPageCursor) {
+        queryParams.append('pageCursor', nextPageCursor);
+      }
+
       console.info(`Readwise: Fetching ${contentType}`);
       if (lastUpdated) console.info(`Readwise: Checking for new content since ${lastUpdated}`);
       if (bookId) console.info(`Readwise: Checking for all highlights on book ID: ${bookId}`);
-
       let statusBarText = `Readwise: Fetching ${contentType}`;
-      if (data && data['count']) statusBarText += ` (${results.length} / ${data.count})`;
+      if (data && data['count']) statusBarText += ` (${results.length})`;
       this.notify.setStatusBarText(statusBarText);
 
-      const response = await fetch(url, this.headers);
+      const response = await fetch(url + queryParams.toString(), this.headers);
       data = await response.json();
 
       if (response.status === 429) {
@@ -116,79 +124,45 @@ export class ReadwiseApi {
         await new Promise((_) => setTimeout(_, rateLimitedDelayTime));
         console.info('Readwise: Trying to fetch highlights again...');
         this.notify.setStatusBarText(`Readwise: Attempting to retry...`);
-        data.next = url;
       } else {
         results.push(...data.results);
-
-        if (data.next) {
-          const remainingRecords = data.count - results.length;
-          console.info(
-            `Readwise: There are ${remainingRecords} more records left, proceeding to next page:` + data.next
-          );
-          url = `${data.next}`;
+        nextPageCursor = data.nextPageCursor;
+        if (!nextPageCursor) {
+          break;
+        } else {
+          console.info(`Readwise: There are more records left, proceeding to next page: ${data.nextPageCursor}`);
         }
       }
-    } while (data.next);
+    } 
 
     if (results.length > 0) console.info(`Readwise: Processed ${results.length} total ${contentType} results successfully`);
     return results;
   }
 
-  async fetchUpdatedContent(lastUpdated: string): Promise<BooksAndHighlights> {
-    if (!lastUpdated) throw new Error('Date required to fetch updates');
-
-    const updatedHighlights = [];
-    const updatedBooks = (await this.fetchData('books', lastUpdated)) as Book[];
-
-    // Iterate through Newly Updated Books, fetching all of their highlights
-    for (let bookId of updatedBooks.map((book: Book) => book.id)) {
-      const highlights = (await this.fetchData('highlights', null, bookId)) as Highlight[];
-      updatedHighlights.push(...highlights);
-    }
-
-    return {
-      books: updatedBooks as Book[],
-      highlights: updatedHighlights as Highlight[],
-    };
-  }
-
-  async fetchAllHighlightsAndBooks(): Promise<BooksAndHighlights> {
-    const books = (await this.fetchData('books')) as Book[];
-    const highlights = (await this.fetchData('highlights')) as Highlight[];
-
-    return {
-      books,
-      highlights,
-    };
-  }
-
-  async mergeHighlightsWithBooks(books: Book[], highlights: Highlight[]): Promise<Library> {
+  async buildLibrary(results: Export[]): Promise<Library> {
     const library: Library = {
       categories: new Set(),
       books: {},
-      highlightCount: highlights.length,
+      highlightCount: 0,
     };
 
-    for (const book of books) {
-      book['highlights'] = [];
-      library['books'][book['id']] = book;
-      library['categories'].add(book.category);
+    for (const record of results) {
+      library['books'][record['user_book_id']] = record;
+      library['categories'].add(record.category);
+      library['highlightCount'] += record['highlights'].length;
     }
 
-    for (const highlight of highlights) {
-      library['books'][highlight['book_id']]['highlights'].push(highlight);
-    }
 
     return library;
   }
-
   async downloadFullLibrary(): Promise<Library> {
-    const { books, highlights } = await this.fetchAllHighlightsAndBooks();
-    return await this.mergeHighlightsWithBooks(books, highlights);
+    const records = (await this.fetchData('export')) as Export[];
+
+    return this.buildLibrary(records);
   }
 
   async downloadUpdates(lastUpdated: string): Promise<Library> {
-    const { highlights, books } = await this.fetchUpdatedContent(lastUpdated);
-    return await this.mergeHighlightsWithBooks(books, highlights);
+    const records = (await this.fetchData('export', lastUpdated)) as Export[];
+    return this.buildLibrary(records);
   }
 }
