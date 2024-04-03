@@ -52,7 +52,7 @@ Updated: {{ updated }}
 ![]( {{ cover_image_url }})
 
 # About
-Title: [[{{ title }}]]
+Title: [[{{ sanitized_title }}]]
 Authors: {{ authorStr }}
 Category: #{{ category }}
 {%- if tags %}
@@ -264,7 +264,7 @@ export default class ReadwiseMirror extends Plugin {
       const filteredHighlights = this.filterHighlights(highlights);
 
       if (filteredHighlights.length === 0) {
-        console.log(`Readwise: No highlights found for '${sanitizedTitle}'`);
+        console.log(`Readwise: No highlights found for '${title}' (${highlights_url})`);
       } else {
         const formattedHighlights = this.sortHighlights(filteredHighlights)
           .map((highlight: Highlight) => this.formatHighlight(highlight, book))
@@ -286,7 +286,8 @@ export default class ReadwiseMirror extends Plugin {
 
         const metadata = {
           id: id,
-          title: sanitizedTitle,
+          title: title,
+          sanitized_title: sanitizedTitle,
           author: author,
           authorStr: authorStr,
           category: category,
