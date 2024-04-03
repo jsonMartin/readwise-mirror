@@ -251,7 +251,7 @@ export default class ReadwiseMirror extends Plugin {
     const booksTotal = Object.keys(library.books).length;
     let bookCurrent = 1;
     for (let bookId in library['books']) {
-      this.notify.setStatusBarText(`Readwise: Processing. ${Math.floor(bookCurrent/booksTotal *100)}% finished (${bookCurrent}/${booksTotal})`);
+      this.notify.setStatusBarText(`Readwise: Processing - ${Math.floor(bookCurrent/booksTotal *100)}% finished (${bookCurrent}/${booksTotal})`);
       bookCurrent += 1;
       const book = library['books'][bookId];
 
