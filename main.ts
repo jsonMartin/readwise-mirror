@@ -403,6 +403,14 @@ export default class ReadwiseMirror extends Plugin {
     return spacetime.now().since(spacetime(this.settings.lastUpdated)).rounded;
   }
 
+  // Reload settings after external change (e.g. after sync)
+  async onExternalSettingsChange() {
+    console.info(`Reloading settings due to external change`)
+    await this.loadSettings();
+    if (this.settings.lastUpdated)
+        this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()} elsewhere`);
+  }
+  
   async onload() {
     await this.loadSettings();
 
