@@ -263,9 +263,10 @@ export default class ReadwiseMirror extends Plugin {
         author,
         category,
         cover_image_url,
-        readwise_url,
         highlights,
+        readwise_url,
         source_url,
+        unique_url,
         book_tags,
       } = book;
 
@@ -318,6 +319,7 @@ export default class ReadwiseMirror extends Plugin {
           highlights: highlights,
           last_highlight_at: last_highlight_at ? this.formatDate(last_highlight_at) : '', 
           source_url: source_url,
+          unique_url: unique_url,
           tags: this.formatTags(book_tags),
           highlight_tags: this.formatTags(highlightTags),
           tags_nohash: this.formatTags(book_tags, true, "'"),
