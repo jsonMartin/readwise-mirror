@@ -207,8 +207,8 @@ export default class ReadwiseMirror extends Plugin {
     for (let bookId in library['books']) {
       const book = library['books'][bookId];
 
-      const { title } = book;
-      const num_highlights = book['highlights'].length;
+      const { title, highlights } = book;
+      const num_highlights = highlights.length;
       console.warn(`Readwise: Replacing colon with ${this.settings.colonSubstitute}`);
       const sanitizedTitle = `${title.replace(/:/g, this.settings.colonSubstitute).replace(/[<>"'\/\\|?*]+/g, '')}`;
       const contents = `\n- [[${sanitizedTitle}]] *(${num_highlights} highlights)*`;
@@ -270,9 +270,9 @@ export default class ReadwiseMirror extends Plugin {
       } = book;
 
       // Get highlight count
-      const num_highlights = book['highlights'].length;
-      const updated = book['highlights'].map(function(highlight) { return highlight.updated_at; }).sort().reverse()[0]
-      const last_highlight_at = book['highlights'].map(function(highlight) { return highlight.highlighted_at; }).sort().reverse()[0]
+      const num_highlights = highlights.length;
+      const updated = highlights.map(function(highlight) { return highlight.updated_at; }).sort().reverse()[0]
+      const last_highlight_at = highlights.map(function(highlight) { return highlight.highlighted_at; }).sort().reverse()[0]
       
       // Sanitize title, replace colon with substitute from settings
       const sanitizedTitle = `${title
