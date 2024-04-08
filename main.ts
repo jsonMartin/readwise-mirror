@@ -310,18 +310,25 @@ export default class ReadwiseMirror extends Plugin {
         let path = `${this.settings.baseFolderName}/${category.charAt(0).toUpperCase() + category.slice(1)
           }/${sanitizedTitle}.md`;
 
-        const abstractFile = vault.getAbstractFileByPath(path);
+        const abstractFile = vault.getFileByPath(path);
 
-        // Delete old instance of file
+        // Overwrite existing file with remote changes, or
+        // Create new file if not existing
         if (abstractFile) {
+          // File exists
           try {
-            await vault.delete(abstractFile);
+            await vault.process(abstractFile, function(data) {
+              // Simply return new contents to overwrite file
+              return contents;
+            });
           } catch (err) {
-            console.error(`Readwise: Attempted to delete file ${path} but no file was found`, err);
+            console.error(`Readwise: Attempt to overwrite file ${path} failed`, err);
           }
+        } else {
+          // File does not exist
+          vault.create(path, contents);
         }
-
-        vault.create(path, contents);
+        
       }
     }
   }
