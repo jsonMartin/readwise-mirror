@@ -1,9 +1,10 @@
-import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, normalizePath } from 'obsidian';
 import Notify from 'notify';
 import spacetime from 'spacetime';
 import { Environment, Template, ConfigureOptions, lib } from 'nunjucks';
+import * as _ from 'lodash';
 
-import { ReadwiseApi, Library, Highlight, Export, Tag } from 'readwiseApi';
+import { ReadwiseApi, Library, Highlight, Export, Exports, Tag } from 'readwiseApi';
 
 interface PluginSettings {
   baseFolderName: string;
@@ -368,6 +369,22 @@ export default class ReadwiseMirror extends Plugin {
     }
   }
 
+  async saveLibraryCache(records: Exports) {
+    let store = normalizePath(this.manifest.dir + '/library.json');
+    await this.app.vault.adapter.write(store, JSON.stringify(records));
+  }
+
+  async loadLibraryCache(): Promise<Exports> {
+    try {
+      let store = normalizePath(this.manifest.dir + '/library.json');
+      let records = await this.app.vault.adapter.read(store);
+      return JSON.parse(records);
+    } catch(error) {
+      console.error(`Readwise: error loading Library cache: ${error}`);
+      return; 
+    }
+  }
+
   async sync() {
     if (!this.settings.apiToken) {
       this.notify.notice('Readwise: API Token Required');
@@ -380,9 +397,40 @@ export default class ReadwiseMirror extends Plugin {
     if (!lastUpdated) {
       this.notify.notice('Readwise: Previous sync not detected...\nDownloading full Readwise library');
       library = await this.readwiseApi.downloadFullLibrary();
+      await this.saveLibraryCache(library.books);
     } else {
+      // Construct empty library
+      library = {
+        categories: null,
+        books: {},
+        highlightCount: 0
+      }
+
+      // Load Upadtes and cache
       this.notify.notice(`Readwise: Checking for new updates since ${this.lastUpdatedHumanReadableFormat()}`);
-      library = await this.readwiseApi.downloadUpdates(lastUpdated);
+      let cachedBooks: Exports = await this.loadLibraryCache();
+
+      if(!cachedBooks) {
+        console.error("Readwise: No cache available. Will dowload full library.");
+        let fullLibrary = await this.readwiseApi.downloadFullLibrary();
+        cachedBooks = fullLibrary.books;
+      }
+
+      let updated = await this.readwiseApi.downloadUpdates(lastUpdated);
+      
+      library.categories = updated.categories;
+      library.highlightCount = updated.highlightCount;
+
+      // Merge the two JSON to create and save the new, updated cache
+      let mergedBooks: Exports = _.merge(cachedBooks, updated.books);
+      await this.saveLibraryCache(mergedBooks);
+
+      for(let bookId in updated.books) {
+        if(bookId in mergedBooks) {
+          // Add book to the library to be pocessed
+          library.books[bookId] = mergedBooks[bookId];
+        }
+      } 
     }
 
     if (Object.keys(library.books).length > 0) {
