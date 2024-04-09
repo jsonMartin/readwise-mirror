@@ -1,5 +1,7 @@
 import Notify from 'notify';
+import fetchBuilder from 'fetch-retry';
 
+const fetch = fetchBuilder(global.fetch, { retries: 3, retryDelay: 1000 });
 const API_ENDPOINT = 'https://readwise.io/api/v2';
 const API_PAGE_SIZE = 1000; // number of results per page, default 100 / max 1000
 
@@ -130,7 +132,8 @@ export class ReadwiseApi {
       }
     } while (data.next);
 
-    if (results.length > 0) console.info(`Readwise: Processed ${results.length} total ${contentType} results successfully`);
+    if (results.length > 0)
+      console.info(`Readwise: Processed ${results.length} total ${contentType} results successfully`);
     return results;
   }
 
