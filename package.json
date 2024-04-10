@@ -23,7 +23,6 @@
   },
   "dependencies": {
     "@types/nunjucks": "^3.2.0",
-    "lodash": "^4.17.21",
     "nunjucks": "^3.2.3",
     "spacetime": "^6.16.0"
   }
