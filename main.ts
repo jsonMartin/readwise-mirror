@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
 import Notify from 'notify';
 import spacetime from 'spacetime';
 import { Environment, Template, ConfigureOptions } from 'nunjucks';
@@ -310,11 +310,11 @@ export default class ReadwiseMirror extends Plugin {
         let path = `${this.settings.baseFolderName}/${category.charAt(0).toUpperCase() + category.slice(1)
           }/${sanitizedTitle}.md`;
 
-        const abstractFile = vault.getFileByPath(path);
+        const abstractFile = vault.getAbstractFileByPath(path);
 
         // Overwrite existing file with remote changes, or
         // Create new file if not existing
-        if (abstractFile) {
+        if (abstractFile && abstractFile instanceof TFile) {
           // File exists
           try {
             await vault.process(abstractFile, function(data) {
