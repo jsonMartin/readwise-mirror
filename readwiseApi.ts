@@ -4,21 +4,21 @@ const API_ENDPOINT = 'https://readwise.io/api/v2';
 const API_PAGE_SIZE = 1000; // number of results per page, default 100 / max 1000
 
 export interface Export {
-  user_book_id: number,
-  title: string,
-  author: string,
-  readable_title: string,
-  source: string,
-  cover_image_url: string,
-  unique_url:string,
-  book_tags: Tag[],
-  category: string,
-  document_note: string,
-  summary: string,
-  readwise_url: string,
-  source_url: string,
-  asin: string | null,
-  highlights: Highlight[],
+  user_book_id: number;
+  title: string;
+  author: string;
+  readable_title: string;
+  source: string;
+  cover_image_url: string;
+  unique_url: string;
+  book_tags: Tag[];
+  category: string;
+  document_note: string;
+  summary: string;
+  readwise_url: string;
+  source_url: string;
+  asin: string | null;
+  highlights: Highlight[];
 }
 
 export interface Highlight {
@@ -84,17 +84,17 @@ export class ReadwiseApi {
   }
 
   // If lastUpdated or bookID aren't provided, fetch everything.
-  async fetchData(contentType = 'export', lastUpdated?: string, bookId?: Number): Promise<Export[]> {
+  async fetchData(contentType = 'export', lastUpdated?: string, bookId?: Number[]): Promise<Export[]> {
     let url = `${API_ENDPOINT}/${contentType}?`;
     let data;
     let nextPageCursor;
 
     const results = [];
 
-    while(true) {
+    while (true) {
       const queryParams = new URLSearchParams();
       queryParams.append('page_size', API_PAGE_SIZE.toString());
-      if (lastUpdated) {
+      if (lastUpdated && lastUpdated != '') {
         queryParams.append('updatedAfter', lastUpdated);
       }
       if (bookId) {
@@ -132,9 +132,10 @@ export class ReadwiseApi {
           console.info(`Readwise: There are more records left, proceeding to next page: ${data.nextPageCursor}`);
         }
       }
-    } 
+    }
 
-    if (results.length > 0) console.info(`Readwise: Processed ${results.length} total ${contentType} results successfully`);
+    if (results.length > 0)
+      console.info(`Readwise: Processed ${results.length} total ${contentType} results successfully`);
     return results;
   }
 
@@ -151,7 +152,6 @@ export class ReadwiseApi {
       library['highlightCount'] += record['highlights'].length;
     }
 
-
     return library;
   }
   async downloadFullLibrary(): Promise<Library> {
@@ -161,7 +161,17 @@ export class ReadwiseApi {
   }
 
   async downloadUpdates(lastUpdated: string): Promise<Library> {
-    const records = (await this.fetchData('export', lastUpdated)) as Export[];
-    return this.buildLibrary(records);
+    // Fetch updated books and then fetch all their highlights
+    const recordsUpdated = (await this.fetchData('export', lastUpdated)) as Export[];
+    const bookIds = recordsUpdated.map((r) => r.user_book_id);
+
+    if (bookIds.length > 0) {
+      // Build a library which contains *all* highlights only for changed books
+      const records = (await this.fetchData('export', '', bookIds)) as Export[];
+      return this.buildLibrary(records);
+    } else {
+      // Essentially return an empty library
+      return this.buildLibrary(recordsUpdated);
+    }
   }
 }
