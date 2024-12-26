@@ -35,8 +35,16 @@
     "plugins": [
       "@semantic-release/commit-analyzer",
       "@semantic-release/release-notes-generator",
-      "semantic-release-obsidian-plugin"
-    ],
+      "semantic-release-obsidian-plugin", 
+      [
+      "@semantic-release/github",
+      {
+        "assets": [
+          { "path": "main.js", "label": "CSS distribution" },
+          { "path": "manifest.json", "label": "JS distribution" }
+        ]
+      }
+    ]],
     "tagFormat": "${version}"
   }
 }
