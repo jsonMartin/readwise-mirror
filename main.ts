@@ -119,7 +119,7 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   private formatHighlight(highlight: Highlight, book: Export) {
-    const { id, text, note, location, color, url, tags, highlighted_at } = highlight;
+    const { id, text, note, location, color, url, tags, highlighted_at, created_at, updated_at } = highlight;
 
     const locationUrl = `https://readwise.io/to_kindle?action=open&asin=${book['asin']}&location=${location}`;
 
@@ -135,6 +135,8 @@ export default class ReadwiseMirror extends Plugin {
       location_url: locationUrl,
       url, // URL is set for source of highlight (webpage, tweet, etc). null for books
       color: color,
+      created_at: highlighted_at ? this.formatDate(created_at) : '',
+      updated_at: highlighted_at ? this.formatDate(updated_at) : '',
       highlighted_at: highlighted_at ? this.formatDate(highlighted_at) : '',
       tags: formattedTagStr,
 
