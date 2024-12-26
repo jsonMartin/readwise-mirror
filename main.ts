@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting, normalizePath } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
 import Notify from 'notify';
 import spacetime from 'spacetime';
 import { Environment, Template, ConfigureOptions, lib } from 'nunjucks';
@@ -338,16 +338,23 @@ export default class ReadwiseMirror extends Plugin {
 
         const abstractFile = vault.getAbstractFileByPath(path);
 
-        // Delete old instance of file
-        if (abstractFile) {
+        // Overwrite existing file with remote changes, or
+        // Create new file if not existing
+        if (abstractFile && abstractFile instanceof TFile) {
+          // File exists
           try {
-            await vault.delete(abstractFile);
+            await vault.process(abstractFile, function(data) {
+              // Simply return new contents to overwrite file
+              return contents;
+            });
           } catch (err) {
-            console.error(`Readwise: Attempted to delete file ${path} but no file was found`, err);
+            console.error(`Readwise: Attempt to overwrite file ${path} failed`, err);
           }
+        } else {
+          // File does not exist
+          vault.create(path, contents);
         }
-
-        vault.create(path, contents);
+        
       }
     }
   }
