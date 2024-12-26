@@ -88,7 +88,8 @@ The frontmatter template can be turned on and off. If you want to revert to the 
 The template exposes the following variables (they can be used for both the header and frontmatter):
 
 - ```id```: Document id,
-- ```title```: Sanitized title,
+- ```title```: Title,
+- ```sanitized_title```: Sanitized title (Equals the filename, good for use as an alias)
 - ```document_note```: Readwise Reader document note,
 - ```summary```: Readwise Reader summary
 - ```author```: Author (raw),
@@ -127,6 +128,7 @@ The following would print both document and all highlight tags, rolled-up:
 id: {{ id }}
 updated: {{ updated }}
 title: "{{ title }}"
+alias: "{{ sanitized_title }}"
 author: "{{ author }}"
 highlights: {{ num_highlights }}
 last_highlight_at: {{ last_highlight_at }}
