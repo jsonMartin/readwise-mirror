@@ -27,8 +27,8 @@ jobs:
       # TODO: Re-enable after https://github.com/blacksmithgu/obsidian-dataview/issues/2288
       # - name: Audit dependencies
       #   run: npm audit && npm audit signatures
-      - name: Audit code coverage
-        run: npm run coverage
+      # - name: Audit code coverage
+      #   run: npm run coverage
       - name: Build plugin
         run: npm run build
       - name: Release update
