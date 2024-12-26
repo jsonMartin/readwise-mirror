@@ -39,6 +39,7 @@ const DEFAULT_SETTINGS: PluginSettings = {
   frontMatter: false,
   frontMatterTemplate: `---
 id: {{ id }}
+created: {{ created }}
 updated: {{ updated }}
 title: {{ title }}
 author: {{ author }}
@@ -64,7 +65,7 @@ Readwise URL: {{ highlights_url }}
 {%- if source_url %}
 Source URL: {{ source_url }}
 {%- endif %}
-Date: [[{{ updated }}]]
+Date: [[{{ created }}]]
 Last Highlighted: *{{ last_highlight_at }}*
 {%- if summary %}
 Summary: {{ summary }}
@@ -277,6 +278,11 @@ export default class ReadwiseMirror extends Plugin {
 
       // Get highlight count
       const num_highlights = highlights.length;
+      const created = highlights
+        .map(function (highlight) {
+          return highlight.created_at;
+        })
+        .sort()[0]; // No reverse sort: we want the oldest entry
       const updated = highlights
         .map(function (highlight) {
           return highlight.updated_at;
@@ -329,6 +335,7 @@ export default class ReadwiseMirror extends Plugin {
           summary: summary,
           category: category,
           num_highlights: num_highlights,
+          created: created ? this.formatDate(created) : '',
           updated: updated ? this.formatDate(updated) : '',
           cover_image_url: cover_image_url.replace('SL200', 'SL500').replace('SY160', 'SY500'),
           highlights_url: readwise_url,
