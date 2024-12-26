@@ -827,13 +827,18 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setName('Highlight Template')
       .setDesc(
         this.createTemplateDocumentation('Controls individual highlight formatting.', [
-          ['text', 'Highlight content'],
-          ['note', 'Associated notes'],
+          // Content fields
+          ['text', 'Highlight content (supports bq filter for blockquotes)'],
+          ['note', 'Associated notes (supports qa filter for Q&A format)'],
+
+          // Location fields
           ['location', 'Book location'],
-          ['url', 'Source URL'],
+          ['locationUrl', 'Direct link to highlight location'],
+
+          // Reference fields
           ['id', 'Highlight ID'],
-          ['tags', 'Associated tags'],
-          ['color', 'Highlight color'],
+          ['url', 'Source URL'],
+          ['category', 'Content type (e.g., books)'],
         ])
       )
       .addTextArea((text) => {
