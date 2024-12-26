@@ -1,11 +1,12 @@
 {
-  "name": "readwise-mirror",
+  "name": "readwise-mirror-ng",
   "version": "0.12.0",
-  "description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+  "description": "This is a plugin for Obsidian (https://obsidian.md)",
   "main": "main.js",
   "scripts": {
     "dev": "rollup --config rollup.config.js -w",
-    "build": "rollup --config rollup.config.js --environment BUILD:production"
+    "build": "rollup --config rollup.config.js --environment BUILD:production",
+    "deploy:local": "npm run build && echo 'Obsidian root: $OBSIDIAN_PLUGIN_ROOT' && cp main.js $OBSIDIAN_PLUGIN_ROOT/.obsidian/plugins/$npm_package_name/main.js && cp manifest.json $OBSIDIAN_PLUGIN_ROOT/.obsidian/plugins/$npm_package_name/manifest.json && touch $OBSIDIAN_PLUGIN_ROOT/.obsidian/plugins/$npm_package_name/.hotreload"
   },
   "keywords": [],
   "author": "",
