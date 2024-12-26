@@ -758,7 +758,7 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
       )
       .addTextArea((text) => {
         text.inputEl.addClass('settings-template-input');
-        text.inputEl.rows = 10;
+        text.inputEl.rows = 15;
         text.inputEl.cols = 50;
         text.setValue(this.plugin.settings.headerTemplate).onChange(async (value) => {
           if (!value) {
@@ -805,7 +805,7 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
       )
       .addTextArea((text) => {
         text.inputEl.addClass('settings-template-input');
-        text.inputEl.rows = 10;
+        text.inputEl.rows = 15;
         text.inputEl.cols = 50;
         return text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
           if (!value) {
@@ -827,23 +827,23 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setName('Highlight Template')
       .setDesc(
         this.createTemplateDocumentation('Controls individual highlight formatting.', [
-          // Content fields
           ['text', 'Highlight content (supports bq filter for blockquotes)'],
           ['note', 'Associated notes (supports qa filter for Q&A format)'],
-
-          // Location fields
+          ['color', 'Highlight color'],
           ['location', 'Book location'],
           ['locationUrl', 'Direct link to highlight location'],
-
-          // Reference fields
-          ['id', 'Highlight ID'],
           ['url', 'Source URL'],
+          ['id', 'Highlight ID'],
           ['category', 'Content type (e.g., books)'],
+          ['tags', 'Tags with # prefix'],
+          ['created_at', 'Creation timestamp'],
+          ['updated_at', 'Last update timestamp'],
+          ['highlighted_at', 'Highlight timestamp'],
         ])
       )
       .addTextArea((text) => {
         text.inputEl.addClass('settings-template-input');
-        text.inputEl.rows = 10;
+        text.inputEl.rows = 12;
         text.inputEl.cols = 50;
         return text.setValue(this.plugin.settings.highlightTemplate).onChange(async (value) => {
           if (!value) {
