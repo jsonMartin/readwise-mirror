@@ -40,8 +40,8 @@
       "@semantic-release/github",
       {
         "assets": [
-          { "path": "main.js", "label": "Obisidian Plugin" },
-          { "path": "manifest.json", "label": "Obsidian Plugin Manifest" }
+          { "path": "main.js"},
+          { "path": "manifest.json" }
         ]
       }
     ]],
