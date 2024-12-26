@@ -222,6 +222,29 @@ Tags: {{ tags }}
 ---
 ```
 
+### Q & A Filter
+
+If you want to render [notes with the `.qa` action tag](https://docs.readwise.io/reader/docs/faqs/action-tags#how-can-i-create-a-q-and-a-mastery-card-while-reading) properly, the plugin makes several nunjucks filters available for that:  
+
+- `is_qa`: this filter returns `true` if the string it is applied to contains the `.qa` action tag
+- `qa`: this filter extracts the question and answer and returns them as a rendered string
+
+Using both filters, you could for example format Q&A notes differently from regular notes.
+
+```nunjucks
+{# Example template using both filters #}
+{% if note | is_qa %}
+  {{ note | qa }}
+  **Original Highlight:** 
+  {{ text | replace('__', '==') }}  
+  ***
+{% else %}
+  > [!quote]
+  > {{ text | bq | replace('__', '==') }}  
+  {{ note }}
+{% endif %}
+```
+
 ### Limitations
 
 - The templating is based on the [`nunjucks`](https://mozilla.github.io/nunjucks/templating.html) templating library and thus shares its limitations;

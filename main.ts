@@ -480,6 +480,16 @@ export default class ReadwiseMirror extends Plugin {
       return str.replace(/\r|\n|\r\n/g, '\r\n> ');
     });
 
+    // Add a nunjukcs filter to test whether we are a ".qa" note
+    this.env.addFilter('is_qa', function (str) {
+      return str.includes('.qa');
+    });
+
+    // Add a nunjucks filter to convert ".qa" notes to Q& A
+    this.env.addFilter('qa', function (str) {
+      return str.replace(/\.qa(.*)\?(.*)/g, '\r\n**Q:**$1?\r\n\r\n**A:**$2');
+    });
+
     this.frontMatterTemplate = new Template(this.settings.frontMatterTemplate, this.env, null, true);
     this.headerTemplate = new Template(this.settings.headerTemplate, this.env, null, true);
     this.highlightTemplate = new Template(this.settings.highlightTemplate, this.env, null, true);
