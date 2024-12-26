@@ -1,10 +1,10 @@
 {
-  "id": "readwise-mirror-ng",
-  "name": "Readwise Mirror NG",
-  "version": "1.4.12-alpha",
-  "minAppVersion": "1.1.1",
-  "description": "Mirror your Readwise library directly to an Obsidian vault",
-  "author": "jsonmartin, johannrichard",
-  "authorUrl": "https://github.com/johannrichard/",
-  "isDesktopOnly": false
+    "id": "readwise-mirror-ng",
+    "name": "Readwise Mirror NG",
+    "version": "1.4.3",
+    "minAppVersion": "1.1.1",
+    "description": "Mirror your Readwise library directly to an Obsidian vault",
+    "author": "jsonmartin, johannrichard",
+    "authorUrl": "https://github.com/johannrichard/",
+    "isDesktopOnly": false
 }
