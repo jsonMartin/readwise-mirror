@@ -234,25 +234,29 @@ export default class ReadwiseMirror extends Plugin {
 
   async writeLibraryToMarkdown(library: Library) {
     const vault = this.app.vault;
-    
+
     // Create parent directories for all categories, if they do not exist
     library['categories'].forEach(async (category: string) => {
       category = category.charAt(0).toUpperCase() + category.slice(1); // Title Case the directory name
-      
+
       const path = `${this.settings.baseFolderName}/${category}`;
       const abstractFolder = vault.getAbstractFileByPath(path);
-      
+
       if (!abstractFolder) {
         vault.createFolder(path);
         console.info('Readwise: Successfully created folder', path);
       }
     });
-    
+
     // Get total number of records
     const booksTotal = Object.keys(library.books).length;
     let bookCurrent = 1;
     for (let bookId in library['books']) {
-      this.notify.setStatusBarText(`Readwise: Processing - ${Math.floor(bookCurrent/booksTotal *100)}% finished (${bookCurrent}/${booksTotal})`);
+      this.notify.setStatusBarText(
+        `Readwise: Processing - ${Math.floor(
+          (bookCurrent / booksTotal) * 100
+        )}% finished (${bookCurrent}/${booksTotal})`
+      );
       bookCurrent += 1;
       const book = library['books'][bookId];
 
@@ -273,9 +277,19 @@ export default class ReadwiseMirror extends Plugin {
 
       // Get highlight count
       const num_highlights = highlights.length;
-      const updated = highlights.map(function(highlight) { return highlight.updated_at; }).sort().reverse()[0]
-      const last_highlight_at = highlights.map(function(highlight) { return highlight.highlighted_at; }).sort().reverse()[0]
-      
+      const updated = highlights
+        .map(function (highlight) {
+          return highlight.updated_at;
+        })
+        .sort()
+        .reverse()[0];
+      const last_highlight_at = highlights
+        .map(function (highlight) {
+          return highlight.highlighted_at;
+        })
+        .sort()
+        .reverse()[0];
+
       // Sanitize title, replace colon with substitute from settings
       const sanitizedTitle = `${title
         .replace(/:/g, this.settings.colonSubstitute ?? '-')
@@ -285,7 +299,7 @@ export default class ReadwiseMirror extends Plugin {
       const filteredHighlights = this.filterHighlights(highlights);
 
       if (filteredHighlights.length === 0) {
-        console.log(`Readwise: No highlights found for '${title}' (${highlights_url})`);
+        console.log(`Readwise: No highlights found for '${title}' (${source_url})`);
       } else {
         const formattedHighlights = this.sortHighlights(filteredHighlights)
           .map((highlight: Highlight) => this.formatHighlight(highlight, book))
@@ -298,18 +312,17 @@ export default class ReadwiseMirror extends Plugin {
         let authorStr =
           authors[0] && authors?.length > 1
             ? authors
-              .filter((authorName: string) => authorName.trim() != '')
-              .map((authorName: string) => `[[${authorName.trim()}]]`)
-              .join(', ')
+                .filter((authorName: string) => authorName.trim() != '')
+                .map((authorName: string) => `[[${authorName.trim()}]]`)
+                .join(', ')
             : author
-              ? `[[${author}]]`
-              : ``;
+            ? `[[${author}]]`
+            : ``;
 
         const metadata = {
           id: user_book_id,
           title: title,
           sanitized_title: sanitizedTitle,
-          title: sanitizedTitle,
           author: author,
           authorStr: authorStr,
           document_note: document_note,
@@ -320,7 +333,7 @@ export default class ReadwiseMirror extends Plugin {
           cover_image_url: cover_image_url.replace('SL200', 'SL500').replace('SY160', 'SY500'),
           highlights_url: readwise_url,
           highlights: highlights,
-          last_highlight_at: last_highlight_at ? this.formatDate(last_highlight_at) : '', 
+          last_highlight_at: last_highlight_at ? this.formatDate(last_highlight_at) : '',
           source_url: source_url,
           unique_url: unique_url,
           tags: this.formatTags(book_tags),
@@ -333,8 +346,9 @@ export default class ReadwiseMirror extends Plugin {
         const headerContents = this.headerTemplate.render(metadata);
         const contents = `${frontMatterContents}${headerContents}${formattedHighlights}`;
 
-        let path = `${this.settings.baseFolderName}/${category.charAt(0).toUpperCase() + category.slice(1)
-          }/${sanitizedTitle}.md`;
+        let path = `${this.settings.baseFolderName}/${
+          category.charAt(0).toUpperCase() + category.slice(1)
+        }/${sanitizedTitle}.md`;
 
         const abstractFile = vault.getAbstractFileByPath(path);
 
@@ -343,7 +357,7 @@ export default class ReadwiseMirror extends Plugin {
         if (abstractFile && abstractFile instanceof TFile) {
           // File exists
           try {
-            await vault.process(abstractFile, function(data) {
+            await vault.process(abstractFile, function (data) {
               // Simply return new contents to overwrite file
               return contents;
             });
@@ -354,7 +368,6 @@ export default class ReadwiseMirror extends Plugin {
           // File does not exist
           vault.create(path, contents);
         }
-        
       }
     }
   }
@@ -439,12 +452,12 @@ export default class ReadwiseMirror extends Plugin {
 
   // Reload settings after external change (e.g. after sync)
   async onExternalSettingsChange() {
-    console.info(`Reloading settings due to external change`)
+    console.info(`Reloading settings due to external change`);
     await this.loadSettings();
     if (this.settings.lastUpdated)
-        this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()} elsewhere`);
+      this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()} elsewhere`);
   }
-  
+
   async onload() {
     await this.loadSettings();
 
