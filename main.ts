@@ -1,9 +1,10 @@
-import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, normalizePath } from 'obsidian';
 import Notify from 'notify';
 import spacetime from 'spacetime';
-import { Environment, Template, ConfigureOptions } from 'nunjucks';
+import { Environment, Template, ConfigureOptions, lib } from 'nunjucks';
+import * as _ from 'lodash';
 
-import { ReadwiseApi, Library, Highlight, Book, Tag } from 'readwiseApi';
+import { ReadwiseApi, Library, Highlight, Export, Exports, Tag } from 'readwiseApi';
 
 interface PluginSettings {
   baseFolderName: string;
@@ -65,8 +66,17 @@ Source URL: {{ source_url }}
 {%- endif %}
 Date: [[{{ updated }}]]
 Last Highlighted: *{{ last_highlight_at }}*
+{%- if summary %}
+Summary: {{ summary }}
+{%- endif %}
 
 ---
+
+{%- if document_note %}
+# Document Note
+
+{{ document_note }}
+{%- endif %}
 
 # Highlights
 
@@ -107,7 +117,7 @@ export default class ReadwiseMirror extends Plugin {
     }
   }
 
-  private formatHighlight(highlight: Highlight, book: Book) {
+  private formatHighlight(highlight: Highlight, book: Export) {
     const { id, text, note, location, color, url, tags, highlighted_at } = highlight;
 
     const locationUrl = `https://readwise.io/to_kindle?action=open&asin=${book['asin']}&location=${location}`;
@@ -198,7 +208,8 @@ export default class ReadwiseMirror extends Plugin {
     for (let bookId in library['books']) {
       const book = library['books'][bookId];
 
-      const { title, num_highlights } = book;
+      const { title, highlights } = book;
+      const num_highlights = highlights.length;
       console.warn(`Readwise: Replacing colon with ${this.settings.colonSubstitute}`);
       const sanitizedTitle = `${title.replace(/:/g, this.settings.colonSubstitute).replace(/[<>"'\/\\|?*]+/g, '')}`;
       const contents = `\n- [[${sanitizedTitle}]] *(${num_highlights} highlights)*`;
@@ -223,38 +234,48 @@ export default class ReadwiseMirror extends Plugin {
 
   async writeLibraryToMarkdown(library: Library) {
     const vault = this.app.vault;
-
+    
     // Create parent directories for all categories, if they do not exist
     library['categories'].forEach(async (category: string) => {
       category = category.charAt(0).toUpperCase() + category.slice(1); // Title Case the directory name
-
+      
       const path = `${this.settings.baseFolderName}/${category}`;
       const abstractFolder = vault.getAbstractFileByPath(path);
-
+      
       if (!abstractFolder) {
         vault.createFolder(path);
         console.info('Readwise: Successfully created folder', path);
       }
     });
-
+    
+    // Get total number of records
+    const booksTotal = Object.keys(library.books).length;
+    let bookCurrent = 1;
     for (let bookId in library['books']) {
+      this.notify.setStatusBarText(`Readwise: Processing - ${Math.floor(bookCurrent/booksTotal *100)}% finished (${bookCurrent}/${booksTotal})`);
+      bookCurrent += 1;
       const book = library['books'][bookId];
 
       const {
-        id,
+        user_book_id,
         title,
+        document_note,
+        summary,
         author,
         category,
-        num_highlights,
-        updated,
         cover_image_url,
-        highlights_url,
         highlights,
-        last_highlight_at,
+        readwise_url,
         source_url,
-        tags,
+        unique_url,
+        book_tags,
       } = book;
 
+      // Get highlight count
+      const num_highlights = highlights.length;
+      const updated = highlights.map(function(highlight) { return highlight.updated_at; }).sort().reverse()[0]
+      const last_highlight_at = highlights.map(function(highlight) { return highlight.highlighted_at; }).sort().reverse()[0]
+      
       // Sanitize title, replace colon with substitute from settings
       const sanitizedTitle = `${title
         .replace(/:/g, this.settings.colonSubstitute ?? '-')
@@ -285,22 +306,26 @@ export default class ReadwiseMirror extends Plugin {
               : ``;
 
         const metadata = {
-          id: id,
+          id: user_book_id,
           title: title,
           sanitized_title: sanitizedTitle,
+          title: sanitizedTitle,
           author: author,
           authorStr: authorStr,
+          document_note: document_note,
+          summary: summary,
           category: category,
           num_highlights: num_highlights,
-          updated: this.formatDate(updated),
+          updated: updated ? this.formatDate(updated) : '',
           cover_image_url: cover_image_url.replace('SL200', 'SL500').replace('SY160', 'SY500'),
-          highlights_url: highlights_url,
+          highlights_url: readwise_url,
           highlights: highlights,
-          last_highlight_at: last_highlight_at ? this.formatDate(last_highlight_at) : '',
+          last_highlight_at: last_highlight_at ? this.formatDate(last_highlight_at) : '', 
           source_url: source_url,
-          tags: this.formatTags(tags),
+          unique_url: unique_url,
+          tags: this.formatTags(book_tags),
           highlight_tags: this.formatTags(highlightTags),
-          tags_nohash: this.formatTags(tags, true, "'"),
+          tags_nohash: this.formatTags(book_tags, true, "'"),
           hl_tags_nohash: this.formatTags(highlightTags, true, "'"),
         };
 
@@ -359,6 +384,7 @@ export default class ReadwiseMirror extends Plugin {
       this.notify.notice('Readwise: Previous sync not detected...\nDownloading full Readwise library');
       library = await this.readwiseApi.downloadFullLibrary();
     } else {
+      // Load Upadtes and cache
       this.notify.notice(`Readwise: Checking for new updates since ${this.lastUpdatedHumanReadableFormat()}`);
       library = await this.readwiseApi.downloadUpdates(lastUpdated);
     }
@@ -404,6 +430,14 @@ export default class ReadwiseMirror extends Plugin {
     return spacetime.now().since(spacetime(this.settings.lastUpdated)).rounded;
   }
 
+  // Reload settings after external change (e.g. after sync)
+  async onExternalSettingsChange() {
+    console.info(`Reloading settings due to external change`)
+    await this.loadSettings();
+    if (this.settings.lastUpdated)
+        this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()} elsewhere`);
+  }
+  
   async onload() {
     await this.loadSettings();
 
