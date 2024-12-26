@@ -487,7 +487,7 @@ export default class ReadwiseMirror extends Plugin {
 
     // Add a nunjucks filter to convert ".qa" notes to Q& A
     this.env.addFilter('qa', function (str) {
-      return str.replace(/\.qa(.*)\?(.*)/g, '\r\n**Q:**$1?\r\n\r\n**A:**$2');
+      return str.replace(/\.qa(.*)\?(.*)/g, '**Q:**$1?\r\n\r\n**A:**$2');
     });
 
     this.frontMatterTemplate = new Template(this.settings.frontMatterTemplate, this.env, null, true);
