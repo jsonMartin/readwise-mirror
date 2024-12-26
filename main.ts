@@ -567,6 +567,32 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
     this.notify = notify;
   }
 
+  private createTemplateDocumentation(title: string, variables: [string, string][]) {
+    return createFragment((fragment) => {
+      fragment.createEl('div', {
+        text: title,
+        cls: 'setting-item-description',
+      });
+
+      fragment.createEl('div', {
+        cls: 'setting-item-description',
+        attr: { style: 'margin-top: 10px' },
+      }).innerHTML = `
+        Available variables:<br>
+        <ul class="template-vars-list">
+          ${variables
+            .map(
+              ([key, desc]) => `
+            <li><code>{{ ${key} }}</code>: ${desc}</li>
+          `
+            )
+            .join('')}
+        </ul>
+        <div class="template-syntax-note">Supports Nunjucks templating syntax</div>
+      `;
+    });
+  }
+
   display(): void {
     let { containerEl } = this;
 
@@ -711,8 +737,29 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Header Template')
-      .setDesc('')
-      .addTextArea((text) =>
+      .setDesc(
+        this.createTemplateDocumentation('Controls document metadata and structure.', [
+          ['id', 'Document ID'],
+          ['title', 'Document title'],
+          ['sanitized_title', 'Title safe for file system'],
+          ['author/authorStr', 'Author name(s), authorStr includes wiki links'],
+          ['category', 'Content type (books, articles, etc)'],
+          ['cover_image_url', 'Book/article cover'],
+          ['summary', 'Document summary'],
+          ['document_note', 'Additional notes'],
+          ['num_highlights', 'Number of highlights'],
+          ['highlights_url', 'Readwise URL'],
+          ['source_url', 'Original content URL'],
+          ['unique_url', 'Unique identifier URL'],
+          ['created/updated/last_highlight_at', 'Timestamps'],
+          ['tags/tags_nohash', 'Tags (with/without # prefix)'],
+          ['highlight_tags/hl_tags_nohash', 'Tags from highlights (with/without # prefix)'],
+        ])
+      )
+      .addTextArea((text) => {
+        text.inputEl.addClass('settings-template-input');
+        text.inputEl.rows = 10;
+        text.inputEl.cols = 50;
         text.setValue(this.plugin.settings.headerTemplate).onChange(async (value) => {
           if (!value) {
             this.plugin.settings.headerTemplate = DEFAULT_SETTINGS.headerTemplate;
@@ -721,8 +768,8 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
           }
           this.plugin.headerTemplate = new Template(this.plugin.settings.headerTemplate, this.plugin.env, null, true);
           await this.plugin.saveSettings();
-        })
-      );
+        });
+      });
 
     new Setting(containerEl)
       .setName('Frontmatter')
@@ -736,9 +783,31 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Frontmatter Template')
-      .setDesc('')
-      .addTextArea((text) =>
-        text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
+      .setDesc(
+        this.createTemplateDocumentation('Controls YAML frontmatter metadata.', [
+          ['id', 'Document ID'],
+          ['created', 'Creation timestamp'],
+          ['updated', 'Last update timestamp'],
+          ['last_highlight_at', 'Last highlight timestamp'],
+          ['title', 'Document title'],
+          ['sanitized_title', 'Title safe for file system'],
+          ['author', 'Author name(s)'],
+          ['authorStr', 'Author names with wiki links'],
+          ['category', 'Content type'],
+          ['num_highlights', 'Number of highlights'],
+          ['source_url', 'Original content URL'],
+          ['unique_url', 'Unique identifier URL'],
+          ['tags', 'Tags with # prefix'],
+          ['tags_nohash', 'Tags without # prefix'],
+          ['highlight_tags', 'Tags from highlights with # prefix'],
+          ['hl_tags_nohash', 'Tags from highlights without # prefix'],
+        ])
+      )
+      .addTextArea((text) => {
+        text.inputEl.addClass('settings-template-input');
+        text.inputEl.rows = 10;
+        text.inputEl.cols = 50;
+        return text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
           if (!value) {
             this.plugin.settings.frontMatterTemplate = DEFAULT_SETTINGS.frontMatterTemplate;
           } else {
@@ -751,14 +820,27 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
             true
           );
           await this.plugin.saveSettings();
-        })
-      );
+        });
+      });
 
     new Setting(containerEl)
       .setName('Highlight Template')
-      .setDesc('')
-      .addTextArea((text) =>
-        text.setValue(this.plugin.settings.highlightTemplate).onChange(async (value) => {
+      .setDesc(
+        this.createTemplateDocumentation('Controls individual highlight formatting.', [
+          ['text', 'Highlight content'],
+          ['note', 'Associated notes'],
+          ['location', 'Book location'],
+          ['url', 'Source URL'],
+          ['id', 'Highlight ID'],
+          ['tags', 'Associated tags'],
+          ['color', 'Highlight color'],
+        ])
+      )
+      .addTextArea((text) => {
+        text.inputEl.addClass('settings-template-input');
+        text.inputEl.rows = 10;
+        text.inputEl.cols = 50;
+        return text.setValue(this.plugin.settings.highlightTemplate).onChange(async (value) => {
           if (!value) {
             this.plugin.settings.highlightTemplate = DEFAULT_SETTINGS.highlightTemplate;
           } else {
@@ -771,7 +853,7 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
             true
           );
           await this.plugin.saveSettings();
-        })
-      );
+        });
+      });
   }
 }

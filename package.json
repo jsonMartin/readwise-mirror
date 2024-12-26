@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "rollup --config rollup.config.js -w",
     "build": "rollup --config rollup.config.js --environment BUILD:production",
-    "deploy:local": "npm run build && echo 'Obsidian root: $OBSIDIAN_PLUGIN_ROOT' && cp main.js $OBSIDIAN_PLUGIN_ROOT/.obsidian/plugins/$npm_package_name/main.js && cp manifest.json $OBSIDIAN_PLUGIN_ROOT/.obsidian/plugins/$npm_package_name/manifest.json && touch $OBSIDIAN_PLUGIN_ROOT/.obsidian/plugins/$npm_package_name/.hotreload"
+    "deploy:local": "npm run build && echo 'Obsidian root: $OBSIDIAN_PLUGIN_ROOT' && cp main.js $OBSIDIAN_PLUGIN_ROOT/.obsidian/plugins/$npm_package_name/main.js && cp manifest.json $OBSIDIAN_PLUGIN_ROOT/.obsidian/plugins/$npm_package_name/manifest.json && cp styles.css $OBSIDIAN_PLUGIN_ROOT/.obsidian/plugins/$npm_package_name/styles.css && touch $OBSIDIAN_PLUGIN_ROOT/.obsidian/plugins/$npm_package_name/.hotreload"
   },
   "keywords": [],
   "author": "",
@@ -42,12 +42,9 @@
         "@semantic-release/github",
         {
           "assets": [
-            {
-              "path": "main.js"
-            },
-            {
-              "path": "manifest.json"
-            }
+            { "path": "main.js" },
+            { "path": "manifest.json" },
+            {"path": "styles.css" }
           ]
         }
       ],
