@@ -37,14 +37,22 @@
       "@semantic-release/release-notes-generator",
       "semantic-release-obsidian-plugin", 
       [
-      "@semantic-release/github",
-      {
-        "assets": [
-          { "path": "main.js"},
-          { "path": "manifest.json" }
-        ]
-      }
-    ]],
+        "@semantic-release/github",
+        {
+          "assets": [
+            { "path": "main.js"},
+            { "path": "manifest.json" }
+          ]
+        }
+      ], 
+      [
+        "@semantic-release/git",
+        {
+          "assets": ["manifest.json", "versions.json"],
+          "message": "chore(release): set `manifest.json` and `versions.json` to ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+        }
+      ]
+    ],
     "tagFormat": "${version}"
   }
 }
