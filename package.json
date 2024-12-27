@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "rollup --config rollup.config.js -w",
     "build": "rollup --config rollup.config.js --environment BUILD:production",
-    "deploy:local": "npm run build && echo 'Obsidian root: $OBSIDIAN_PLUGIN_ROOT' && cp main.js $OBSIDIAN_PLUGIN_ROOT/.obsidian/plugins/$npm_package_name/main.js && cp manifest.json $OBSIDIAN_PLUGIN_ROOT/.obsidian/plugins/$npm_package_name/manifest.json && cp styles.css $OBSIDIAN_PLUGIN_ROOT/.obsidian/plugins/$npm_package_name/styles.css && touch $OBSIDIAN_PLUGIN_ROOT/.obsidian/plugins/$npm_package_name/.hotreload"
+    "deploy:local": "npm run build && cross-env PACKAGE_NAME=$npm_package_name node deploy-local.js"
   },
   "keywords": [],
   "author": "",
@@ -18,6 +18,8 @@
     "@semantic-release/git": "^10.0.1",
     "@types/lodash": "^4.17.0",
     "@types/node": "^14.14.37",
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.4.7",
     "obsidian": "^1.1.1",
     "rollup": "^2.32.1",
     "semantic-release-obsidian-plugin": "github:brianrodri/semantic-release-obsidian-plugin",
@@ -58,9 +60,11 @@
         {
           "assets": [
             "manifest.json",
-            "versions.json"
+            "versions.json",
+            "package.json",
+            "package-lock.json"
           ],
-          "message": "chore(release): set `manifest.json` and `versions.json` to ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+          "message": "chore(release): set `package.json`, `manifest.json`,`versions.json` and `package-lock.json` to ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
         }
       ]
     ],
