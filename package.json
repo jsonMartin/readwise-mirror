@@ -22,7 +22,7 @@
     "dotenv": "^16.4.7",
     "obsidian": "^1.1.1",
     "rollup": "^2.32.1",
-    "semantic-release-obsidian-plugin": "github:brianrodri/semantic-release-obsidian-plugin",
+    "semantic-release-obsidian-plugin": "github:johannrichard/semantic-release-obsidian-plugin#brat-prerelease",
     "tslib": "^2.2.0",
     "typescript": "^4.2.4"
   },
@@ -33,7 +33,12 @@
   },
   "release": {
     "branches": [
-      "master", "next"
+      "master",
+      "next",
+      {
+        "name": "readwise-mirror-ng",
+        "prerelease": true
+      }
     ],
     "plugins": [
       "@semantic-release/commit-analyzer",
@@ -60,6 +65,7 @@
         {
           "assets": [
             "manifest.json",
+            "manifest-beta.json",
             "versions.json",
             "package.json",
             "package-lock.json"

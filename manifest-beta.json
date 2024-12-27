@@ -1,0 +1,10 @@
+{
+    "id": "readwise-mirror",
+    "name": "Readwise Mirror Beta",
+    "version": "1.5.1",
+    "minAppVersion": "1.1.1",
+    "description": "Mirror your Readwise library directly to an Obsidian vault (Beta Versions)",
+    "author": "jsonmartin, johannrichard",
+    "authorUrl": "https://github.com/jsonmartin/",
+    "isDesktopOnly": false
+}
