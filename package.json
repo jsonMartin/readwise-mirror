@@ -32,14 +32,6 @@
         "spacetime": "^6.16.0"
     },
     "release": {
-        "branches": [
-            "master",
-            "next",
-            {
-                "name": "readwise-mirror-ng",
-                "prerelease": true
-            }
-        ],
         "plugins": [
             "@semantic-release/commit-analyzer",
             "@semantic-release/release-notes-generator",
