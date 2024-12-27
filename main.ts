@@ -784,24 +784,27 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Frontmatter Template')
       .setDesc(
-        this.createTemplateDocumentation('Controls YAML frontmatter metadata.', [
-          ['id', 'Document ID'],
-          ['created', 'Creation timestamp'],
-          ['updated', 'Last update timestamp'],
-          ['last_highlight_at', 'Last highlight timestamp'],
-          ['title', 'Document title'],
-          ['sanitized_title', 'Title safe for file system'],
-          ['author', 'Author name(s)'],
-          ['authorStr', 'Author names with wiki links'],
-          ['category', 'Content type'],
-          ['num_highlights', 'Number of highlights'],
-          ['source_url', 'Original content URL'],
-          ['unique_url', 'Unique identifier URL'],
-          ['tags', 'Tags with # prefix'],
-          ['tags_nohash', 'Tags without # prefix'],
-          ['highlight_tags', 'Tags from highlights with # prefix'],
-          ['hl_tags_nohash', 'Tags from highlights without # prefix'],
-        ])
+        this.createTemplateDocumentation(
+          'Controls YAML frontmatter metadata. The same variables are available as for the Header template, with specific versions optimised for YAML frontmatter (tags)',
+          [
+            ['id', 'Document ID'],
+            ['created', 'Creation timestamp'],
+            ['updated', 'Last update timestamp'],
+            ['last_highlight_at', 'Last highlight timestamp'],
+            ['title', 'Document title'],
+            ['sanitized_title', 'Title safe for file system'],
+            ['author', 'Author name(s)'],
+            ['authorStr', 'Author names with wiki links'],
+            ['category', 'Content type'],
+            ['num_highlights', 'Number of highlights'],
+            ['source_url', 'Original content URL'],
+            ['unique_url', 'Unique identifier URL'],
+            ['tags', 'Tags with # prefix'],
+            ['tags_nohash', 'Tags without # prefix'],
+            ['highlight_tags', 'Tags from highlights with # prefix'],
+            ['hl_tags_nohash', 'Tags from highlights without # prefix'],
+          ]
+        )
       )
       .addTextArea((text) => {
         text.inputEl.addClass('settings-template-input');
