@@ -1,5 +1,5 @@
 {
-  "name": "readwise-mirror-ng",
+  "name": "readwise-mirror",
   "version": "0.12.0",
   "description": "This is a plugin for Obsidian (https://obsidian.md)",
   "main": "main.js",
@@ -31,7 +31,7 @@
   },
   "release": {
     "branches": [
-      "readwise-mirror-ng"
+      "master", "next"
     ],
     "plugins": [
       "@semantic-release/commit-analyzer",
