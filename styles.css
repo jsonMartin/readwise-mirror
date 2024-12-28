@@ -1,0 +1,28 @@
+.settings-template-input {
+  width: 100%;
+  height: 300px;
+  font-family: var(--font-monospace);
+  font-size: smaller;
+  resize: vertical;
+}
+
+.template-vars-list {
+  margin-left: 20px;
+  margin-top: 10px;
+}
+
+.template-vars-list li {
+  margin-bottom: 5px;
+}
+
+.template-vars-list code {
+  color: var(--text-accent);
+  background-color: var(--background-modifier-border);
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.template-syntax-note {
+  margin-top: 10px;
+  font-style: italic;
+}

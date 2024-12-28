@@ -1,9 +1,10 @@
 import { App, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
 import Notify from 'notify';
 import spacetime from 'spacetime';
-import { Environment, Template, ConfigureOptions } from 'nunjucks';
+import { Environment, Template, ConfigureOptions, lib } from 'nunjucks';
+import * as _ from 'lodash';
 
-import { ReadwiseApi, Library, Highlight, Book, Tag } from 'readwiseApi';
+import { ReadwiseApi, Library, Highlight, Export, Exports, Tag } from 'readwiseApi';
 
 interface PluginSettings {
   baseFolderName: string;
@@ -38,6 +39,7 @@ const DEFAULT_SETTINGS: PluginSettings = {
   frontMatter: false,
   frontMatterTemplate: `---
 id: {{ id }}
+created: {{ created }}
 updated: {{ updated }}
 title: {{ title }}
 author: {{ author }}
@@ -52,7 +54,7 @@ Updated: {{ updated }}
 ![]( {{ cover_image_url }})
 
 # About
-Title: [[{{ title }}]]
+Title: [[{{ sanitized_title }}]]
 Authors: {{ authorStr }}
 Category: #{{ category }}
 {%- if tags %}
@@ -63,10 +65,19 @@ Readwise URL: {{ highlights_url }}
 {%- if source_url %}
 Source URL: {{ source_url }}
 {%- endif %}
-Date: [[{{ updated }}]]
+Date: [[{{ created }}]]
 Last Highlighted: *{{ last_highlight_at }}*
+{%- if summary %}
+Summary: {{ summary }}
+{%- endif %}
 
 ---
+
+{%- if document_note %}
+# Document Note
+
+{{ document_note }}
+{%- endif %}
 
 # Highlights
 
@@ -107,8 +118,8 @@ export default class ReadwiseMirror extends Plugin {
     }
   }
 
-  private formatHighlight(highlight: Highlight, book: Book) {
-    const { id, text, note, location, color, url, tags, highlighted_at } = highlight;
+  private formatHighlight(highlight: Highlight, book: Export) {
+    const { id, text, note, location, color, url, tags, highlighted_at, created_at, updated_at } = highlight;
 
     const locationUrl = `https://readwise.io/to_kindle?action=open&asin=${book['asin']}&location=${location}`;
 
@@ -124,6 +135,8 @@ export default class ReadwiseMirror extends Plugin {
       location_url: locationUrl,
       url, // URL is set for source of highlight (webpage, tweet, etc). null for books
       color: color,
+      created_at: highlighted_at ? this.formatDate(created_at) : '',
+      updated_at: highlighted_at ? this.formatDate(updated_at) : '',
       highlighted_at: highlighted_at ? this.formatDate(highlighted_at) : '',
       tags: formattedTagStr,
 
@@ -198,7 +211,8 @@ export default class ReadwiseMirror extends Plugin {
     for (let bookId in library['books']) {
       const book = library['books'][bookId];
 
-      const { title, num_highlights } = book;
+      const { title, highlights } = book;
+      const num_highlights = highlights.length;
       console.warn(`Readwise: Replacing colon with ${this.settings.colonSubstitute}`);
       const sanitizedTitle = `${title.replace(/:/g, this.settings.colonSubstitute).replace(/[<>"'\/\\|?*]+/g, '')}`;
       const contents = `\n- [[${sanitizedTitle}]] *(${num_highlights} highlights)*`;
@@ -237,23 +251,52 @@ export default class ReadwiseMirror extends Plugin {
       }
     });
 
+    // Get total number of records
+    const booksTotal = Object.keys(library.books).length;
+    let bookCurrent = 1;
     for (let bookId in library['books']) {
+      this.notify.setStatusBarText(
+        `Readwise: Processing - ${Math.floor(
+          (bookCurrent / booksTotal) * 100
+        )}% finished (${bookCurrent}/${booksTotal})`
+      );
+      bookCurrent += 1;
       const book = library['books'][bookId];
 
       const {
-        id,
+        user_book_id,
         title,
+        document_note,
+        summary,
         author,
         category,
-        num_highlights,
-        updated,
         cover_image_url,
-        highlights_url,
         highlights,
-        last_highlight_at,
+        readwise_url,
         source_url,
-        tags,
+        unique_url,
+        book_tags,
       } = book;
+
+      // Get highlight count
+      const num_highlights = highlights.length;
+      const created = highlights
+        .map(function (highlight) {
+          return highlight.created_at;
+        })
+        .sort()[0]; // No reverse sort: we want the oldest entry
+      const updated = highlights
+        .map(function (highlight) {
+          return highlight.updated_at;
+        })
+        .sort()
+        .reverse()[0];
+      const last_highlight_at = highlights
+        .map(function (highlight) {
+          return highlight.highlighted_at;
+        })
+        .sort()
+        .reverse()[0];
 
       // Sanitize title, replace colon with substitute from settings
       const sanitizedTitle = `${title
@@ -264,7 +307,7 @@ export default class ReadwiseMirror extends Plugin {
       const filteredHighlights = this.filterHighlights(highlights);
 
       if (filteredHighlights.length === 0) {
-        console.log(`Readwise: No highlights found for '${sanitizedTitle}'`);
+        console.log(`Readwise: No highlights found for '${title}' (${source_url})`);
       } else {
         const formattedHighlights = this.sortHighlights(filteredHighlights)
           .map((highlight: Highlight) => this.formatHighlight(highlight, book))
@@ -277,29 +320,34 @@ export default class ReadwiseMirror extends Plugin {
         let authorStr =
           authors[0] && authors?.length > 1
             ? authors
-              .filter((authorName: string) => authorName.trim() != '')
-              .map((authorName: string) => `[[${authorName.trim()}]]`)
-              .join(', ')
+                .filter((authorName: string) => authorName.trim() != '')
+                .map((authorName: string) => `[[${authorName.trim()}]]`)
+                .join(', ')
             : author
-              ? `[[${author}]]`
-              : ``;
+            ? `[[${author}]]`
+            : ``;
 
         const metadata = {
-          id: id,
-          title: sanitizedTitle,
+          id: user_book_id,
+          title: title,
+          sanitized_title: sanitizedTitle,
           author: author,
           authorStr: authorStr,
+          document_note: document_note,
+          summary: summary,
           category: category,
           num_highlights: num_highlights,
-          updated: this.formatDate(updated),
+          created: created ? this.formatDate(created) : '',
+          updated: updated ? this.formatDate(updated) : '',
           cover_image_url: cover_image_url.replace('SL200', 'SL500').replace('SY160', 'SY500'),
-          highlights_url: highlights_url,
+          highlights_url: readwise_url,
           highlights: highlights,
           last_highlight_at: last_highlight_at ? this.formatDate(last_highlight_at) : '',
           source_url: source_url,
-          tags: this.formatTags(tags),
+          unique_url: unique_url,
+          tags: this.formatTags(book_tags),
           highlight_tags: this.formatTags(highlightTags),
-          tags_nohash: this.formatTags(tags, true, "'"),
+          tags_nohash: this.formatTags(book_tags, true, "'"),
           hl_tags_nohash: this.formatTags(highlightTags, true, "'"),
         };
 
@@ -307,8 +355,9 @@ export default class ReadwiseMirror extends Plugin {
         const headerContents = this.headerTemplate.render(metadata);
         const contents = `${frontMatterContents}${headerContents}${formattedHighlights}`;
 
-        let path = `${this.settings.baseFolderName}/${category.charAt(0).toUpperCase() + category.slice(1)
-          }/${sanitizedTitle}.md`;
+        let path = `${this.settings.baseFolderName}/${
+          category.charAt(0).toUpperCase() + category.slice(1)
+        }/${sanitizedTitle}.md`;
 
         const abstractFile = vault.getAbstractFileByPath(path);
 
@@ -317,7 +366,7 @@ export default class ReadwiseMirror extends Plugin {
         if (abstractFile && abstractFile instanceof TFile) {
           // File exists
           try {
-            await vault.process(abstractFile, function(data) {
+            await vault.process(abstractFile, function (data) {
               // Simply return new contents to overwrite file
               return contents;
             });
@@ -328,7 +377,6 @@ export default class ReadwiseMirror extends Plugin {
           // File does not exist
           vault.create(path, contents);
         }
-        
       }
     }
   }
@@ -365,6 +413,7 @@ export default class ReadwiseMirror extends Plugin {
       this.notify.notice('Readwise: Previous sync not detected...\nDownloading full Readwise library');
       library = await this.readwiseApi.downloadFullLibrary();
     } else {
+      // Load Upadtes and cache
       this.notify.notice(`Readwise: Checking for new updates since ${this.lastUpdatedHumanReadableFormat()}`);
       library = await this.readwiseApi.downloadUpdates(lastUpdated);
     }
@@ -412,12 +461,12 @@ export default class ReadwiseMirror extends Plugin {
 
   // Reload settings after external change (e.g. after sync)
   async onExternalSettingsChange() {
-    console.info(`Reloading settings due to external change`)
+    console.info(`Reloading settings due to external change`);
     await this.loadSettings();
     if (this.settings.lastUpdated)
-        this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()} elsewhere`);
+      this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()} elsewhere`);
   }
-  
+
   async onload() {
     await this.loadSettings();
 
@@ -429,6 +478,16 @@ export default class ReadwiseMirror extends Plugin {
     // Add a nunjucks filter to convert newlines to "newlines + >" for quotes
     this.env.addFilter('bq', function (str) {
       return str.replace(/\r|\n|\r\n/g, '\r\n> ');
+    });
+
+    // Add a nunjukcs filter to test whether we are a ".qa" note
+    this.env.addFilter('is_qa', function (str) {
+      return str.includes('.qa');
+    });
+
+    // Add a nunjucks filter to convert ".qa" notes to Q& A
+    this.env.addFilter('qa', function (str) {
+      return str.replace(/\.qa(.*)\?(.*)/g, '**Q:**$1?\r\n\r\n**A:**$2');
     });
 
     this.frontMatterTemplate = new Template(this.settings.frontMatterTemplate, this.env, null, true);
@@ -506,6 +565,32 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
     super(app, plugin);
     this.plugin = plugin;
     this.notify = notify;
+  }
+
+  private createTemplateDocumentation(title: string, variables: [string, string][]) {
+    return createFragment((fragment) => {
+      fragment.createEl('div', {
+        text: title,
+        cls: 'setting-item-description',
+      });
+
+      fragment.createEl('div', {
+        cls: 'setting-item-description',
+        attr: { style: 'margin-top: 10px' },
+      }).innerHTML = `
+        Available variables:<br>
+        <ul class="template-vars-list">
+          ${variables
+            .map(
+              ([key, desc]) => `
+            <li><code>{{ ${key} }}</code>: ${desc}</li>
+          `
+            )
+            .join('')}
+        </ul>
+        <div class="template-syntax-note">Supports Nunjucks templating syntax</div>
+      `;
+    });
   }
 
   display(): void {
@@ -652,8 +737,29 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Header Template')
-      .setDesc('')
-      .addTextArea((text) =>
+      .setDesc(
+        this.createTemplateDocumentation('Controls document metadata and structure.', [
+          ['id', 'Document ID'],
+          ['title', 'Document title'],
+          ['sanitized_title', 'Title safe for file system'],
+          ['author/authorStr', 'Author name(s), authorStr includes wiki links'],
+          ['category', 'Content type (books, articles, etc)'],
+          ['cover_image_url', 'Book/article cover'],
+          ['summary', 'Document summary'],
+          ['document_note', 'Additional notes'],
+          ['num_highlights', 'Number of highlights'],
+          ['highlights_url', 'Readwise URL'],
+          ['source_url', 'Original content URL'],
+          ['unique_url', 'Unique identifier URL'],
+          ['created/updated/last_highlight_at', 'Timestamps'],
+          ['tags/tags_nohash', 'Tags (with/without # prefix)'],
+          ['highlight_tags/hl_tags_nohash', 'Tags from highlights (with/without # prefix)'],
+        ])
+      )
+      .addTextArea((text) => {
+        text.inputEl.addClass('settings-template-input');
+        text.inputEl.rows = 15;
+        text.inputEl.cols = 50;
         text.setValue(this.plugin.settings.headerTemplate).onChange(async (value) => {
           if (!value) {
             this.plugin.settings.headerTemplate = DEFAULT_SETTINGS.headerTemplate;
@@ -662,8 +768,8 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
           }
           this.plugin.headerTemplate = new Template(this.plugin.settings.headerTemplate, this.plugin.env, null, true);
           await this.plugin.saveSettings();
-        })
-      );
+        });
+      });
 
     new Setting(containerEl)
       .setName('Frontmatter')
@@ -677,9 +783,34 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Frontmatter Template')
-      .setDesc('')
-      .addTextArea((text) =>
-        text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
+      .setDesc(
+        this.createTemplateDocumentation(
+          'Controls YAML frontmatter metadata. The same variables are available as for the Header template, with specific versions optimised for YAML frontmatter (tags)',
+          [
+            ['id', 'Document ID'],
+            ['created', 'Creation timestamp'],
+            ['updated', 'Last update timestamp'],
+            ['last_highlight_at', 'Last highlight timestamp'],
+            ['title', 'Document title'],
+            ['sanitized_title', 'Title safe for file system'],
+            ['author', 'Author name(s)'],
+            ['authorStr', 'Author names with wiki links'],
+            ['category', 'Content type'],
+            ['num_highlights', 'Number of highlights'],
+            ['source_url', 'Original content URL'],
+            ['unique_url', 'Unique identifier URL'],
+            ['tags', 'Tags with # prefix'],
+            ['tags_nohash', 'Tags without # prefix'],
+            ['highlight_tags', 'Tags from highlights with # prefix'],
+            ['hl_tags_nohash', 'Tags from highlights without # prefix'],
+          ]
+        )
+      )
+      .addTextArea((text) => {
+        text.inputEl.addClass('settings-template-input');
+        text.inputEl.rows = 15;
+        text.inputEl.cols = 50;
+        return text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
           if (!value) {
             this.plugin.settings.frontMatterTemplate = DEFAULT_SETTINGS.frontMatterTemplate;
           } else {
@@ -692,14 +823,32 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
             true
           );
           await this.plugin.saveSettings();
-        })
-      );
+        });
+      });
 
     new Setting(containerEl)
       .setName('Highlight Template')
-      .setDesc('')
-      .addTextArea((text) =>
-        text.setValue(this.plugin.settings.highlightTemplate).onChange(async (value) => {
+      .setDesc(
+        this.createTemplateDocumentation('Controls individual highlight formatting.', [
+          ['text', 'Highlight content (supports bq filter for blockquotes)'],
+          ['note', 'Associated notes (supports qa filter for Q&A format)'],
+          ['color', 'Highlight color'],
+          ['location', 'Book location'],
+          ['locationUrl', 'Direct link to highlight location'],
+          ['url', 'Source URL'],
+          ['id', 'Highlight ID'],
+          ['category', 'Content type (e.g., books)'],
+          ['tags', 'Tags with # prefix'],
+          ['created_at', 'Creation timestamp'],
+          ['updated_at', 'Last update timestamp'],
+          ['highlighted_at', 'Highlight timestamp'],
+        ])
+      )
+      .addTextArea((text) => {
+        text.inputEl.addClass('settings-template-input');
+        text.inputEl.rows = 12;
+        text.inputEl.cols = 50;
+        return text.setValue(this.plugin.settings.highlightTemplate).onChange(async (value) => {
           if (!value) {
             this.plugin.settings.highlightTemplate = DEFAULT_SETTINGS.highlightTemplate;
           } else {
@@ -712,7 +861,7 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
             true
           );
           await this.plugin.saveSettings();
-        })
-      );
+        });
+      });
   }
 }

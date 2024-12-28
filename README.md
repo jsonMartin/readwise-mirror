@@ -18,6 +18,7 @@ The first time this plugin is ran, it will do a full sync downloading all conten
   - Automatically creates `[[Links]]` for book titles and authors
   - Contains block level link references *(using the Highlight ID)*. Allows to automatically link/transclude any highlight without needing to modify the Readwise note.
 - Supports tags, both within highlights as well as sources (books, articles, etc)
+- Supports Readwise Reader fields, notably the summary and document note
 
 ## Usage
 
@@ -72,36 +73,68 @@ A lot of the value of Readwise highlights lies in the notes associated with them
 
 The option "Only sync highlights with notes" will do exactly that: it will only sync highlights with notes. If an item in your library has only highlights without notes, it will not be synced.
 
-## Templating
+## Templates
 
-The plugin allows for simple templating. Similarly to Readwise's templating, it allows to define
+The plugin uses three template types to format content, all using Nunjucks templating syntax:
 
-- a header template,
-- a highlight template, and
-- a template for frontmatter
+### Template Types
 
-The frontmatter template can be turned on and off. If you want to revert to the default template, you can just empty the template completely and the plugin will restore the default.
+- **Header Template**: Controls document structure and metadata display
+- **Highlight Template**: Controls individual highlight formatting
+- **Frontmatter Template**: Controls YAML metadata (optional)
 
-### Header and frontmatter template
+### Available Variables
 
-The template exposes the following variables (they can be used for both the header and frontmatter):
+#### Document Metadata
 
-- ```id```: Document id,
-- ```title```: Sanitized title,
-- ```author```: Author (raw),
-- ```authorStr```: Author (formatted, as Wiki Links ```[[Author Name]]```),
-- ```category```: Document category,
-- ```num_highlights```: Number of highlights,
-- ```updated```: Date of last update,
-- ```cover_image_url```: Cover image,
-- ```highlights_url```: Readwise URL,
-- ```highlights```: Highlights,
-- ```last_highlight_at```: Date of last highlight,
-- ```source_url```: Source URL,
-- ```tags```: Document tags,
-- ```highlight_tags```: Rolled-up list of highlight tags,
-- ```tags_nohash```: Document tags withough "#",  but with single quotes "'" to avoid issues with tags that are valid in readwise but require special care when used in Obsidian frontmatter (e.g. tags using '@'). To be used in an array in frontmatter (use `tags: [ {{ tags_nohash }}]` in your frontmatter template)
-- ```hl_tags_nohash```: List of all highlight tags to be used in an array in frontmatter (withouth "#", similar to `tags_nohash`)
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `id` | Document ID | `12345` |
+| `title` | Original title | `"My Book"` |
+| `sanitized_title` | Filesystem-safe title | `"My-Book"` |
+| `author` | Author name(s) | `"John Smith"` |
+| `authorStr` | Author with wiki links | `"[[John Smith]]"` |
+| `category` | Content type | `"books"` |
+
+#### Header / Frontmatter Content
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `document_note` | Reader document note | `"My reading notes..."` |
+| `summary` | Reader summary | `"Book summary..."` |
+| `num_highlights` | Number of highlights | `42` |
+| `cover_image_url` | Cover image URL | `"https://..."` |
+
+#### URLs
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `highlights_url` | Readwise URL | `"https://readwise.io/..."` |
+| `source_url` | Original content URL | `"https://..."` |
+| `unique_url` | Reader URL (if available) | `"https://reader.readwise.io/..."` |
+
+#### Tags
+
+| Variable | Description | Example |
+|----------|-------------|--------|
+| `tags` | Document tags with # | `"#tag1, #tag2"` |
+| `tags_nohash` | Tags for frontmatter | `"'tag1', 'tag2'"` |
+| `highlight_tags` | Highlight tags with # | `"#note, #important"` |
+| `hl_tags_nohash` | Highlight tags for frontmatter | `"'note', 'important'"` |
+
+#### Timestamps
+
+| Variable | Description |
+|----------|-------------|
+| `created` | Creation date |
+| `updated` | Last update |
+| `last_highlight_at` | Last highlight date |
+
+### Template Filters
+
+- `bq`: Add blockquote markers
+- `is_qa`: Check for Q&A format
+- `qa`: Convert to Q&A format
 
 #### Default frontmatter template
 
@@ -123,6 +156,7 @@ The following would print both document and all highlight tags, rolled-up:
 id: {{ id }}
 updated: {{ updated }}
 title: "{{ title }}"
+alias: "{{ sanitized_title }}"
 author: "{{ author }}"
 highlights: {{ num_highlights }}
 last_highlight_at: {{ last_highlight_at }}
@@ -155,27 +189,58 @@ Source URL: {{ source_url }}
 {%- endif %}
 Date: [[{{ updated }}]]
 Last Highlighted: *{{ last_highlight_at }}*
+{%- if summary %}
+Summary: {{ summary }}
+{%- endif %}
 
 ---
+
+{%- if document_note %}
+# Document Note
+
+{{ document_note }}
+{%- endif %}
 
 # Highlights
 
 ```
 
-### Highlights
+### Highlight Template Variables
 
-The highlight template exposes the following variables:
+#### Highlight Content
 
-- ```id```: The id of the highlight
-- ```text```: The highlighted text
-- ```note```: Your nore
-- ```location```: The location
-- ```location_url```: The url of the location
-- ```url```: Unique highlight link (Open in Readwise)
-- ```color```: The color
-- ```highlighted_at```: Date highlighted (empty if none)
-- ```tags```: A formatted string of tags
-- ```category```: Category of the source item (book, article, etc.)
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `text` | Highlighted text | `"This is the highlight"` |
+| `note` | Your annotation | `"My thoughts on this..."` |
+| `color` | Highlight color | `"yellow"` |
+
+#### Location
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `location` | Position reference | `"Page 42"` |
+| `location_url` | Direct link to location | `"https://readwise.io/to_kindle?..."` |
+| `url` | Source URL | `"https://readwise.io/open/..."` |
+
+#### Metadata
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `id` | Highlight ID | `"abc123"` |
+| `category` | Content type | `"books"` |
+| `tags` | Associated tags | `"#important, #todo"` |
+| `highlighted_at` | Creation date | `"2024-01-20"` |
+| `created_at` | Creation timestamp | `"2024-01-20T10:00:00Z"` |
+| `updated_at` | Last update timestamp | `"2024-01-21T15:30:00Z"` |
+
+#### Available Filters
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| `bq` | Add blockquote markers | `{{ text \| bq }}` |
+| `is_qa` | Check for Q&A format | `{% if note \| is_qa %}` |
+| `qa` | Convert to Q&A format | `{{ note \| qa }}` |
 
 #### Default highlight template
 
@@ -205,6 +270,29 @@ Note: {{ note }}
 Tags: {{ tags }}
 {%- endif %}
 ---
+```
+
+### Q & A Filter
+
+If you want to render [notes with the `.qa` action tag](https://docs.readwise.io/reader/docs/faqs/action-tags#how-can-i-create-a-q-and-a-mastery-card-while-reading) properly, the plugin makes several nunjucks filters available for that:  
+
+- `is_qa`: this filter returns `true` if the string it is applied to contains the `.qa` action tag
+- `qa`: this filter extracts the question and answer and returns them as a rendered string
+
+Using both filters, you could for example format Q&A notes differently from regular notes.
+
+```nunjucks
+{# Example template using both filters #}
+{% if note | is_qa %}
+  {{ note | qa }}
+  **Original Highlight:** 
+  {{ text | replace('__', '==') }}  
+  ***
+{% else %}
+  > [!quote]
+  > {{ text | bq | replace('__', '==') }}  
+  {{ note }}
+{% endif %}
 ```
 
 ### Limitations
