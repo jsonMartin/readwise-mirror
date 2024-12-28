@@ -800,9 +800,9 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
             ['source_url', 'Original content URL'],
             ['unique_url', 'Unique identifier URL'],
             ['tags', 'Tags with # prefix'],
-            ['tags_nohash', 'Tags without # prefix'],
+            ['tags_nohash', 'Tags without # prefix (compatible with frontmatter)'],
             ['highlight_tags', 'Tags from highlights with # prefix'],
-            ['hl_tags_nohash', 'Tags from highlights without # prefix'],
+            ['hl_tags_nohash', 'Tags from highlights without # prefix (compatible with frontmatter)'],
           ]
         )
       )
