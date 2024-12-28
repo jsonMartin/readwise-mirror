@@ -26,8 +26,7 @@
  */
 
 require('dotenv').config();
-import { readFileSync, writeFileSync, copyFile } from 'fs';
-
+const fs = require('fs');
 // Validate environment
 if (!process.env.OBSIDIAN_PLUGIN_ROOT || !process.env.PACKAGE_NAME) {
   console.error('OBSIDIAN_PLUGIN_ROOT and/or NPM_PACKAGE_NAME are not defined');
@@ -44,13 +43,13 @@ const DEPLOY_FILES = ['main.js', 'manifest.json', 'styles.css'];
 for (const file of DEPLOY_FILES) {
   switch (file) {
     case 'manifest.json':
-      json = JSON.parse(readFileSync(file));
+      json = JSON.parse(fs.readFileSync(file));
       json.version = `${json.version}-${new Date().toISOString()}`;
       console.log(`Written ${file} to ${DEPLOY_PATH}/${file} with updated version ${json.version}`);
-      writeFileSync(`${DEPLOY_PATH}/${file}`, JSON.stringify(json, null, 4) + '\n');
+      fs.writeFileSync(`${DEPLOY_PATH}/${file}`, JSON.stringify(json, null, 4) + '\n');
       break;
     default:
-      copyFile(file, `${DEPLOY_PATH}/${file}`, (err) => {
+      fs.copyFile(file, `${DEPLOY_PATH}/${file}`, (err) => {
         if (err) {
           console.error(`Failed to copy ${file} to ${DEPLOY_PATH}/${file}`);
         } else {
