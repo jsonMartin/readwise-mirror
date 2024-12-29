@@ -29,7 +29,7 @@ require('dotenv').config();
 const fs = require('fs');
 // Validate environment
 if (!process.env.OBSIDIAN_PLUGIN_ROOT || !process.env.PACKAGE_NAME) {
-  console.error('OBSIDIAN_PLUGIN_ROOT and/or NPM_PACKAGE_NAME are not defined');
+  console.error('OBSIDIAN_PLUGIN_ROOT and/or PACKAGE_NAME are not defined');
   console.log(`$OBSIDIAN_PLUGIN_ROOT: ${process.env.OBSIDIAN_PLUGIN_ROOT}`);
   console.log(`$PACKAGE_NAME: ${process.env.PACKAGE_NAME}`);
   process.exit(1);

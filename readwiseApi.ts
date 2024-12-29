@@ -46,7 +46,7 @@ export interface Exports {
 }
 
 export interface Library {
-  categories: Set<String>;
+  categories: Set<string>;
   books: Exports;
   highlightCount: number;
 }
@@ -84,7 +84,7 @@ export class ReadwiseApi {
   }
 
   // If lastUpdated or bookID aren't provided, fetch everything.
-  async fetchData(contentType = 'export', lastUpdated?: string, bookId?: Number[]): Promise<Export[]> {
+  async fetchData(contentType = 'export', lastUpdated?: string, bookId?: number[]): Promise<Export[]> {
     let url = `${API_ENDPOINT}/${contentType}?`;
     let data;
     let nextPageCursor;
@@ -108,7 +108,7 @@ export class ReadwiseApi {
       if (lastUpdated) console.info(`Readwise: Checking for new content since ${lastUpdated}`);
       if (bookId) console.info(`Readwise: Checking for all highlights on book ID: ${bookId}`);
       let statusBarText = `Readwise: Fetching ${contentType}`;
-      if (data && data['count']) statusBarText += ` (${results.length})`;
+      if (data?.count) statusBarText += ` (${results.length})`;
       this.notify.setStatusBarText(statusBarText);
 
       const response = await fetch(url + queryParams.toString(), this.headers);
