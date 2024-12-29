@@ -44,7 +44,7 @@ for (const file of DEPLOY_FILES) {
   switch (file) {
     case 'manifest.json':
       json = JSON.parse(fs.readFileSync(file));
-      json.version = `${json.version}-${new Date().toISOString()}`;
+      json.version = `${json.version}-${new Date().toISOString().replace(/[-:\.TZ]/g, '')}`;
       console.log(`Written ${file} to ${DEPLOY_PATH}/${file} with updated version ${json.version}`);
       fs.writeFileSync(`${DEPLOY_PATH}/${file}`, JSON.stringify(json, null, 4) + '\n');
       break;
