@@ -132,9 +132,9 @@ The plugin uses three template types to format content, all using Nunjucks templ
 
 ### Template Filters
 
-- `bq`: Add blockquote markers
-- `is_qa`: Check for Q&A format
-- `qa`: Convert to Q&A format
+- `bq`: Add blockquote markers.
+- `is_qa`: Check for Q&A format.
+- `qa`: Convert to Q&A format.
 
 #### Default frontmatter template
 
@@ -294,6 +294,17 @@ Using both filters, you could for example format Q&A notes differently from regu
   {{ note }}
 {% endif %}
 ```
+
+### Example Q&A Output
+
+Input note with `.qa` tag:
+
+> .qa What is the capital of France? Paris is the capital of France.
+
+Rendered output:
+> **Q:** What is the capital of France?
+>
+> **A:** Paris is the capital of France.
 
 ### Limitations
 
