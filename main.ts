@@ -574,22 +574,26 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
         cls: 'setting-item-description',
       });
 
-      fragment.createEl('div', {
+      const container = fragment.createDiv({
         cls: 'setting-item-description',
         attr: { style: 'margin-top: 10px' },
-      }).innerHTML = `
-        Available variables:<br>
-        <ul class="template-vars-list">
-          ${variables
-            .map(
-              ([key, desc]) => `
-            <li><code>{{ ${key} }}</code>: ${desc}</li>
-          `
-            )
-            .join('')}
-        </ul>
-        <div class="template-syntax-note">Supports Nunjucks templating syntax</div>
-      `;
+      });
+
+      container.createSpan({ text: 'Available variables:' });
+      container.createEl('br');
+
+      const list = container.createEl('ul', { cls: 'template-vars-list' });
+
+      variables.forEach(([key, desc]) => {
+        const item = list.createEl('li');
+        item.createEl('code', { text: `{{ ${key} }}` });
+        item.appendText(`: ${desc}`);
+      });
+
+      container.createDiv({
+        cls: 'template-syntax-note',
+        text: 'Supports Nunjucks templating syntax',
+      });
     });
   }
 
