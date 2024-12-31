@@ -1,10 +1,10 @@
 import { App, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
 import Notify from 'notify';
 import spacetime from 'spacetime';
-import { Environment, Template, ConfigureOptions, lib } from 'nunjucks';
+import { Environment, Template, ConfigureOptions} from 'nunjucks';
 import * as _ from 'lodash';
 
-import { ReadwiseApi, Library, Highlight, Export, Exports, Tag } from 'readwiseApi';
+import { ReadwiseApi, Library, Highlight, Export, Tag } from 'readwiseApi';
 
 interface PluginSettings {
   baseFolderName: string;
