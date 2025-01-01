@@ -853,16 +853,16 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setName('Frontmatter Template')
       .setDesc(
         this.createTemplateDocumentation(
-          'Controls YAML frontmatter metadata. The same variables are available as for the Header template, with specific versions optimised for YAML frontmatter (tags)',
+          'Controls YAML frontmatter metadata. The same variables are available as for the Header template, with specific versions optimised for YAML frontmatter (tags), and escaped values for YAML compatibility.',
           [
             ['id', 'Document ID'],
             ['created', 'Creation timestamp'],
             ['updated', 'Last update timestamp'],
             ['last_highlight_at', 'Last highlight timestamp'],
-            ['title', 'Document title'],
-            ['sanitized_title', 'Title safe for file system'],
-            ['author', 'Author name(s)'],
-            ['authorStr', 'Author names with wiki links'],
+            ['title', 'Document title (escaped for YAML)'],
+            ['sanitized_title', 'Title safe for file system (escaped for YAML)'],
+            ['author', 'Author name(s) (escaped for YAML)'],
+            ['authorStr', 'Author names with wiki links (escaped for YAML)'],
             ['category', 'Content type'],
             ['num_highlights', 'Number of highlights'],
             ['source_url', 'Original content URL'],
