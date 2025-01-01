@@ -1,7 +1,7 @@
 import { App, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
 import Notify from 'notify';
 import spacetime from 'spacetime';
-import { Environment, Template, ConfigureOptions} from 'nunjucks';
+import { Environment, Template, ConfigureOptions } from 'nunjucks';
 import * as _ from 'lodash';
 
 import { ReadwiseApi, Library, Highlight, Export, Tag } from 'readwiseApi';
@@ -97,6 +97,12 @@ Tags: {{ tags }}
 `,
 };
 
+interface YamlStringState {
+  hasSingleQuotes: boolean;
+  hasDoubleQuotes: boolean;
+  isValueEscapedAlready: boolean;
+}
+
 export default class ReadwiseMirror extends Plugin {
   settings: PluginSettings;
   readwiseApi: ReadwiseApi;
@@ -105,6 +111,55 @@ export default class ReadwiseMirror extends Plugin {
   frontMatterTemplate: Template;
   headerTemplate: Template;
   highlightTemplate: Template;
+
+  private analyzeStringForFrontmatter(value: string): YamlStringState {
+    return {
+      hasSingleQuotes: value.includes("'"),
+      hasDoubleQuotes: value.includes('"'),
+      isValueEscapedAlready:
+        value.length > 1 &&
+        ((value.startsWith("'") && value.endsWith("'")) || (value.startsWith('"') && value.endsWith('"'))), // Basic YAML escape validation
+    };
+  }
+
+  // Before metadata is used
+  private escapeFrontmatter(metadata: any, fieldsToProcess: Array<string>): any {
+    // Copy the metadata object to avoid modifying the original
+    const processedMetadata = {... metadata};
+    fieldsToProcess.forEach((field) => {
+      if (field in processedMetadata && processedMetadata[field] && typeof processedMetadata[field] === 'string') {
+        processedMetadata[field] = this.escapeYamlValue(processedMetadata[field]);
+    }});
+
+    return processedMetadata;
+  }
+
+  private escapeYamlValue(value: string): string {
+    if (!value) return '""';
+
+    const state = this.analyzeStringForFrontmatter(value);
+
+    // Already properly quoted and valid YAML
+    if (state.isValueEscapedAlready) return value;
+
+    // No quotes in string - use simple double quotes to catch other special characters
+    if (!state.hasSingleQuotes && !state.hasDoubleQuotes) {
+      return `"${value}"`;
+    }
+
+    // Has double quotes but no single quotes - use single quotes
+    if (state.hasDoubleQuotes && !state.hasSingleQuotes) {
+      return `'${value}'`;
+    }
+
+    // Has single quotes but no double quotes - use double quotes
+    if (state.hasSingleQuotes && !state.hasDoubleQuotes) {
+      return `"${value}"`;
+    }
+
+    // Has both types of quotes - escape double quotes and use double quotes
+    return `"${value.replace(/"/g, '\\"')}"`;
+  }
 
   private formatTags(tags: Tag[], nohash: boolean = false, q: string = '') {
     // use unique list of tags
@@ -351,7 +406,11 @@ export default class ReadwiseMirror extends Plugin {
           hl_tags_nohash: this.formatTags(highlightTags, true, "'"),
         };
 
-        const frontMatterContents = this.settings.frontMatter ? this.frontMatterTemplate.render(metadata) : '';
+        // Escape specific fields used in frontmatter
+        const fieldsToProcess = ['title', 'sanitized_title', 'author', 'authorStr'];
+        const frontMatterContents = this.settings.frontMatter
+          ? this.frontMatterTemplate.render(this.escapeFrontmatter(metadata, fieldsToProcess))
+          : '';
         const headerContents = this.headerTemplate.render(metadata);
         const contents = `${frontMatterContents}${headerContents}${formattedHighlights}`;
 
@@ -488,6 +547,11 @@ export default class ReadwiseMirror extends Plugin {
     // Add a nunjucks filter to convert ".qa" notes to Q& A
     this.env.addFilter('qa', function (str) {
       return str.replace(/\.qa(.*)\?(.*)/g, '**Q:**$1?\r\n\r\n**A:**$2');
+    });
+
+    // Add filter to nunjucks environment
+    this.env.addFilter('yaml', function (str) {
+      return this.escapeForYaml(str);
     });
 
     this.frontMatterTemplate = new Template(this.settings.frontMatterTemplate, this.env, null, true);
