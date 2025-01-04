@@ -73,6 +73,17 @@ A lot of the value of Readwise highlights lies in the notes associated with them
 
 The option "Only sync highlights with notes" will do exactly that: it will only sync highlights with notes. If an item in your library has only highlights without notes, it will not be synced.
 
+## Slugify Filenames
+
+The plugin provides an option to "slugify" filenames. This means converting the filenames into a URL-friendly format by replacing spaces and special characters with hyphens or other safe characters. This is useful for ensuring compatibility across different filesystems and avoiding issues with special characters.
+
+### Options
+
+- **Default**: The default behavior does not modify filenames.
+- **Slugify**: Converts filenames to a slugified format. For example, `My Book Title` becomes `my-book-title`. You can select a separator and whether the filename will be all lowercase
+
+To enable slugifying filenames, go to the plugin settings and toggle the "Slugify Filenames" option. Please note that this is a major change. You will end up with duplicate files unless you delete and sync the entire library.
+
 ## Templates
 
 The plugin uses three template types to format content, all using Nunjucks templating syntax:
