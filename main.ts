@@ -1,11 +1,13 @@
-import { App, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
+import * as yaml from 'js-yaml';
 import Notify from 'notify';
+import { ConfigureOptions, Environment, Template } from 'nunjucks';
+import { App, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
 import spacetime from 'spacetime';
-import { Environment, Template, ConfigureOptions } from 'nunjucks';
-import * as _ from 'lodash';
 import slugify from '@sindresorhus/slugify';
 
-import { ReadwiseApi, Library, Highlight, Export, Tag } from 'readwiseApi';
+import { DataviewApi, getAPI as getDVAPI, Literal } from 'obsidian-dataview';
+import { Export, Highlight, Library, ReadwiseApi, Tag } from 'readwiseApi';
+import { sampleMetadata } from 'test-data/sampleData';
 
 interface PluginSettings {
   baseFolderName: string;
@@ -26,6 +28,9 @@ interface PluginSettings {
   useSlugify: boolean;
   slugifySeparator: string;
   slugifyLowercase: boolean;
+  deduplicateFiles: boolean;
+  deduplicateProperty: string;
+  deleteDuplicates: boolean;
 }
 
 const DEFAULT_SETTINGS: PluginSettings = {
@@ -102,6 +107,9 @@ Tags: {{ tags }}
   useSlugify: false,
   slugifySeparator: '-',
   slugifyLowercase: true,
+  deduplicateFiles: false,
+  deduplicateProperty: 'uri',
+  deleteDuplicates: true,
 };
 
 interface YamlStringState {
@@ -110,6 +118,7 @@ interface YamlStringState {
   isValueEscapedAlready: boolean;
 }
 
+const FRONTMATTER_TO_ESCAPE = ['title', 'sanitized_title', 'author', 'authorStr'];
 export default class ReadwiseMirror extends Plugin {
   settings: PluginSettings;
   readwiseApi: ReadwiseApi;
@@ -130,13 +139,14 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   // Before metadata is used
-  private escapeFrontmatter(metadata: any, fieldsToProcess: Array<string>): any {
+  public escapeFrontmatter(metadata: any, fieldsToProcess: Array<string>): any {
     // Copy the metadata object to avoid modifying the original
-    const processedMetadata = {... metadata};
+    const processedMetadata = { ...metadata };
     fieldsToProcess.forEach((field) => {
       if (field in processedMetadata && processedMetadata[field] && typeof processedMetadata[field] === 'string') {
         processedMetadata[field] = this.escapeYamlValue(processedMetadata[field]);
-    }});
+      }
+    });
 
     return processedMetadata;
   }
@@ -297,6 +307,79 @@ export default class ReadwiseMirror extends Plugin {
     }
   }
 
+  /**
+   * Update frontmatter of a file with new values
+   * @param file TFile to update
+   * @param updates Record of key-value pairs to update/add in frontmatter
+   * @returns Promise<void>
+   *
+   * Example:
+   * ```typescript
+   * await updateFrontmatter(file, {
+   *   duplicate: true,
+   *   lastUpdated: '2024-03-15'
+   * });
+   * ```
+   *
+   * - If file has no frontmatter, creates new frontmatter section
+   * - If key exists, updates value
+   * - If key doesn't exist, adds new key-value pair
+   * - Preserves existing frontmatter formatting and other values
+   * - Maintains file content after frontmatter unchanged
+   */
+  private async updateFrontmatter(file: TFile, updates: Record<string, any>): Promise<void> {
+    const content = await this.app.vault.read(file);
+
+    // Split content into frontmatter and body
+    const frontmatterRegex = /^(---\n[\s\S]*?\n---)/;
+    const match = content.match(frontmatterRegex);
+
+    let frontmatter = '';
+    let body = content;
+
+    if (match) {
+      frontmatter = match[1];
+      body = content.slice(match[0].length);
+
+      // Parse existing frontmatter
+      const currentFrontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter || {};
+
+      // Create new frontmatter
+      const newFrontmatter = {
+        ...currentFrontmatter,
+        ...updates,
+      };
+
+      // Format as YAML block
+      frontmatter = ['---', yaml.dump(newFrontmatter), '---'].join('\n');
+    } else {
+      // No existing frontmatter, create new
+      frontmatter = ['---', yaml.dump(updates), '---'].join('\n');
+    }
+
+    // Combine and write back
+    await this.app.vault.modify(file, `${frontmatter}\n${body}`);
+  }
+
+  private async findDuplicates(book: Export): Promise<TFile[]> {
+    const dataviewApi: DataviewApi | undefined = getDVAPI(this.app);
+    const canDeduplicate = this.settings.deduplicateFiles && dataviewApi;
+
+    if (canDeduplicate) {
+      const existingPages = dataviewApi
+        .pages('')
+        .where((p: Record<string, Literal>) => p[this.settings.deduplicateProperty] === book.readwise_url);
+
+      const duplicateFiles: TFile[] = [];
+      existingPages.forEach((duplicate: { file: { path: string } }) => {
+        const existingFile = this.app.vault.getAbstractFileByPath(duplicate.file.path) as TFile;
+        duplicateFiles.push(existingFile);
+      });
+      return duplicateFiles;
+    }
+    return Promise.reject('Deduplication not enabled or Dataview API not available');
+  }
+
   async writeLibraryToMarkdown(library: Library) {
     const vault = this.app.vault;
 
@@ -323,7 +406,7 @@ export default class ReadwiseMirror extends Plugin {
         )}% finished (${bookCurrent}/${booksTotal})`
       );
       bookCurrent += 1;
-      const book = library['books'][bookId];
+      const book: Export = library['books'][bookId];
 
       const {
         user_book_id,
@@ -419,9 +502,8 @@ export default class ReadwiseMirror extends Plugin {
         };
 
         // Escape specific fields used in frontmatter
-        const fieldsToProcess = ['title', 'sanitized_title', 'author', 'authorStr'];
         const frontMatterContents = this.settings.frontMatter
-          ? this.frontMatterTemplate.render(this.escapeFrontmatter(metadata, fieldsToProcess))
+          ? this.frontMatterTemplate.render(this.escapeFrontmatter(metadata, FRONTMATTER_TO_ESCAPE))
           : '';
         const headerContents = this.headerTemplate.render(metadata);
         const contents = `${frontMatterContents}${headerContents}${formattedHighlights}`;
@@ -430,14 +512,70 @@ export default class ReadwiseMirror extends Plugin {
           category.charAt(0).toUpperCase() + category.slice(1)
         }/${sanitizedTitle}.md`;
 
+        const duplicates = await this.findDuplicates(book);
         const abstractFile = vault.getAbstractFileByPath(path);
 
+        // Deduplicate files
+        if (duplicates.length > 0) {
+          let deduplicated = false;
+          let filesToDeleteOrLabel: TFile[] = [];
+
+          // First: Check if target file is in duplicates
+          const targetFileIndex = duplicates.findIndex((f) => f.path === path);
+          if (targetFileIndex >= 0 && abstractFile instanceof TFile) {
+            deduplicated = true;
+            // Remove target file from duplicates
+            duplicates.splice(targetFileIndex, 1);
+            // Update target file
+            try {
+              await vault.process(abstractFile, () => contents);
+            } catch (err) {
+              console.error(`Readwise: Attempt to overwrite file ${path} failed`, err);
+            }
+          }
+
+          // Second: Handle remaining duplicates (if any)
+          if (duplicates.length > 0) {
+            // Keep first duplicate if we haven't updated a file yet, and write it
+            if (!deduplicated && duplicates[0]) {
+              try {
+                // Rename the duplicate first and then write the new contents
+                await this.app.fileManager.renameFile(duplicates[0], path).then(() => {
+                  vault
+                    .process(duplicates[0], () => contents)
+                    .then(() => {
+                      deduplicated = true;
+                    });
+                });
+                // Remove the file we just updated from duplicates
+                duplicates.shift();
+              } catch (err) {
+                console.error(`Readwise: Failed to update duplicate ${duplicates[0].path}`, err);
+              }
+            }
+            // Add remaining duplicates to deletion list
+            filesToDeleteOrLabel.push(...duplicates);
+          }
+
+          // Delete extra duplicates or mark as "duplicate" in the Vault
+          for (const file of filesToDeleteOrLabel) {
+            try {
+              if (this.settings.deleteDuplicates) {
+                await vault.trash(file, true);
+              } else {
+                await this.updateFrontmatter(file, { duplicate: true });
+              }
+            } catch (err) {
+              console.error(`Readwise: Failed to delete duplicate ${file.path}`, err);
+            }
+          }
+        }
         // Overwrite existing file with remote changes, or
         // Create new file if not existing
-        if (abstractFile && abstractFile instanceof TFile) {
+        else if (abstractFile && abstractFile instanceof TFile) {
           // File exists
           try {
-            await vault.process(abstractFile, function (data) {
+            await vault.process(abstractFile, function () {
               // Simply return new contents to overwrite file
               return contents;
             });
@@ -538,6 +676,34 @@ export default class ReadwiseMirror extends Plugin {
       this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()} elsewhere`);
   }
 
+  public ensureDedupPropertyInTemplate(template: string): string {
+    if (!this.settings.deduplicateFiles) return template;
+
+    const propertyName = this.settings.deduplicateProperty;
+    const propertyValue = `${propertyName}: {{ highlights_url }}`;
+
+    const lines = template.split('\n');
+    const frontmatterStart = lines.findIndex((line) => line.trim() === '---');
+    const frontmatterEnd =
+      lines.slice(frontmatterStart + 1).findIndex((line) => line.trim() === '---') + frontmatterStart + 1;
+
+    if (frontmatterStart === -1 || frontmatterEnd <= frontmatterStart) return template;
+
+    // Check for existing property
+    const propertyIndex = lines.findIndex((line) => line.trim().startsWith(`${propertyName}:`));
+
+    if (propertyIndex > -1 && propertyIndex < frontmatterEnd) {
+      // Replace existing property
+      console.warn(`Readwise: Replacing existing property '${propertyName}' in frontmatter template for deduplication`);
+      lines[propertyIndex] = propertyValue;
+    } else {
+      // Add new property before closing ---
+      lines.splice(frontmatterEnd, 0, propertyValue);
+    }
+
+    return lines.join('\n');
+  }
+
   async onload() {
     await this.loadSettings();
 
@@ -566,7 +732,12 @@ export default class ReadwiseMirror extends Plugin {
       return this.escapeForYaml(str);
     });
 
-    this.frontMatterTemplate = new Template(this.settings.frontMatterTemplate, this.env, null, true);
+    this.frontMatterTemplate = new Template(
+      this.ensureDedupPropertyInTemplate(this.settings.frontMatterTemplate),
+      this.env,
+      null,
+      true
+    );
     this.headerTemplate = new Template(this.settings.headerTemplate, this.env, null, true);
     this.highlightTemplate = new Template(this.settings.highlightTemplate, this.env, null, true);
 
@@ -643,6 +814,29 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
     this.notify = notify;
   }
 
+  private validateFrontmatterTemplate(template: string): { isValid: boolean; error?: string; preview?: string } {
+    const renderedTemplate = new Template(template, this.plugin.env, null, true).render(
+      this.plugin.escapeFrontmatter(sampleMetadata, FRONTMATTER_TO_ESCAPE)
+    );
+    const yamlContent = renderedTemplate.replace(/^---\n/, '').replace(/\n---$/, '');
+    try {
+      yaml.load(yamlContent);
+      return { isValid: true };
+    } catch (error) {
+      if (error instanceof yaml.YAMLException) {
+        return {
+          isValid: false,
+          error: `Invalid YAML at line ${error.mark?.line + 1}: ${error.reason}`,
+          preview: yamlContent,
+        };
+      }
+      return {
+        isValid: false,
+        error: `Template error: ${error.message}`,
+      };
+    }
+  }
+
   private createTemplateDocumentation(title: string, variables: [string, string][]) {
     return createFragment((fragment) => {
       fragment.createEl('div', {
@@ -673,8 +867,9 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
     });
   }
 
-  display(): void {
+  async display(): Promise<void> {
     let { containerEl } = this;
+    const dataviewApi = getDVAPI(this.app);
 
     containerEl.empty();
 
@@ -857,48 +1052,141 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setDesc('Add frontmatter (defined with the following Template)')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.frontMatter).onChange(async (value) => {
-          this.plugin.settings.frontMatter = value;
-          await this.plugin.saveSettings();
+          // Test template with sample data
+          const { isValid, error } = this.validateFrontmatterTemplate(this.plugin.settings.frontMatterTemplate);
+          if (value && isValid || !value) {
+            this.plugin.settings.frontMatter = value;
+            await this.plugin.saveSettings();
+          } else if (value && !isValid) {
+            this.plugin.notify.notice(`Invalid frontmatter template: ${error}`);
+            toggle.setValue(false);
+            // Trigger re-render to show/hide property selector
+            this.display();
+          }
         })
       );
 
     new Setting(containerEl)
       .setName('Frontmatter Template')
       .setDesc(
-        this.createTemplateDocumentation(
-          'Controls YAML frontmatter metadata. The same variables are available as for the Header template, with specific versions optimised for YAML frontmatter (tags), and escaped values for YAML compatibility.',
-          [
-            ['id', 'Document ID'],
-            ['created', 'Creation timestamp'],
-            ['updated', 'Last update timestamp'],
-            ['last_highlight_at', 'Last highlight timestamp'],
-            ['title', 'Document title (escaped for YAML)'],
-            ['sanitized_title', 'Title safe for file system (escaped for YAML)'],
-            ['author', 'Author name(s) (escaped for YAML)'],
-            ['authorStr', 'Author names with wiki links (escaped for YAML)'],
-            ['category', 'Content type'],
-            ['num_highlights', 'Number of highlights'],
-            ['source_url', 'Original content URL'],
-            ['unique_url', 'Unique identifier URL'],
-            ['tags', 'Tags with # prefix'],
-            ['tags_nohash', 'Tags without # prefix (compatible with frontmatter)'],
-            ['highlight_tags', 'Tags from highlights with # prefix'],
-            ['hl_tags_nohash', 'Tags from highlights without # prefix (compatible with frontmatter)'],
-          ]
-        )
+        createFragment((fragment) => {
+          fragment.append(
+            this.createTemplateDocumentation(
+              'Controls YAML frontmatter metadata. The same variables are available as for the Header template, with specific versions optimised for YAML frontmatter (tags), and escaped values for YAML compatibility.',
+              [
+                ['id', 'Document ID'],
+                ['created', 'Creation timestamp'],
+                ['updated', 'Last update timestamp'],
+                ['last_highlight_at', 'Last highlight timestamp'],
+                ['title', 'Document title (escaped for YAML)'],
+                ['sanitized_title', 'Title safe for file system (escaped for YAML)'],
+                ['author', 'Author name(s) (escaped for YAML)'],
+                ['authorStr', 'Author names with wiki links (escaped for YAML)'],
+                ['category', 'Content type'],
+                ['num_highlights', 'Number of highlights'],
+                ['source_url', 'Original content URL'],
+                ['unique_url', 'Unique identifier URL'],
+                ['tags', 'Tags with # prefix'],
+                ['tags_nohash', 'Tags without # prefix (compatible with frontmatter)'],
+                ['highlight_tags', 'Tags from highlights with # prefix'],
+                ['hl_tags_nohash', 'Tags from highlights without # prefix (compatible with frontmatter)'],
+                ['highlights_url', 'Readwise URL (auto-injected if deduplication enabled)'],
+                [
+                  'Note:',
+                  'If deduplication is enabled, the specified property will be automatically added or updated in the frontmatter template.',
+                ],
+              ]
+            )
+          );
+        })
       )
       .addTextArea((text) => {
+        const container = containerEl.createDiv();
+
         text.inputEl.addClass('settings-template-input');
-        text.inputEl.rows = 15;
+        text.inputEl.rows = 12;
         text.inputEl.cols = 50;
+
+        // Create preview elements below textarea
+        const previewContainer = container.createDiv('template-preview');
+        const previewTitle = previewContainer.createDiv({
+          text: 'Template Preview:',
+          cls: 'template-preview-title',
+        });
+        previewTitle.style.fontWeight = 'bold';
+        previewTitle.style.marginTop = '1em';
+
+        const previewContent = previewContainer.createEl('pre', {
+          cls: ['template-preview-content', 'settings-template-input'],
+          attr: {
+            style: 'background-color: var(--background-secondary); padding: 1em; border-radius: 4px; overflow-x: auto;',
+          },
+        });
+
+        const errorNotice = previewContainer.createDiv({
+          cls: 'validation-notice',
+          attr: {
+            style: 'color: var(--text-error); margin-top: 1em;',
+          },
+        });
+
+        const errorDetails = previewContainer.createEl('pre', {
+          cls: ['error-details', 'settings-template-input'],
+          attr: {
+            style:
+              'color: var(--text-error) background-color: var(--background-primary-alt); padding: 0.5em; border-radius: 4px; margin-top: 0.5em; font-family: monospace; white-space: pre-wrap;',
+          },
+        });
+
+        errorDetails.hide();
+
+        // Update preview on template changes
+        const updatePreview = (template: string) => {
+          const rendered = new Template(template, this.plugin.env, null, true).render(
+            this.plugin.escapeFrontmatter(sampleMetadata, FRONTMATTER_TO_ESCAPE)
+          );
+          const yamlContent = rendered.replace(/^---\n/, '').replace(/\n---$/, '');
+
+          try {
+            const preview = yaml.load(yamlContent);
+            errorNotice.setText('');
+            errorDetails.hide();
+            previewContent.setText(yaml.dump(preview, { schema: yaml.DEFAULT_SCHEMA }));
+          } catch (error) {
+            // Turn Frontmatter toggle off 
+            if (error instanceof yaml.YAMLException) {
+              errorNotice.setText(`Invalid YAML at line ${error.mark?.line + 1}: ${error.reason}`);
+              errorDetails.setText(error.message);
+              errorDetails.show();
+            } else {
+              errorNotice.setText(`Template error: ${error.message}`);
+              errorDetails.hide();
+            }
+            previewContent.setText(yamlContent);
+          }
+        };
+
+        // Display rendered template on load
+        updatePreview(this.plugin.settings.frontMatterTemplate);
         return text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
+          const validation = this.validateFrontmatterTemplate(value);
+
+          // Update validation notice
+          const noticeEl = containerEl.querySelector('.validation-notice');
+          if (noticeEl) {
+            noticeEl.setText(validation.isValid ? '' : validation.error);
+          }
+
           if (!value) {
             this.plugin.settings.frontMatterTemplate = DEFAULT_SETTINGS.frontMatterTemplate;
           } else {
             this.plugin.settings.frontMatterTemplate = value;
           }
+
+          updatePreview(value);
+
           this.plugin.frontMatterTemplate = new Template(
-            this.plugin.settings.frontMatterTemplate,
+            this.plugin.ensureDedupPropertyInTemplate(this.plugin.settings.frontMatterTemplate),
             this.plugin.env,
             null,
             true
@@ -995,5 +1283,62 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
+
+    new Setting(containerEl)
+      .setName('Deduplicate Files')
+      .setDesc(
+        createFragment((fragment) => {
+          fragment.appendText('Use Dataview to check for duplicate files based on Readwise URL.');
+          fragment.createEl('br');
+          fragment.appendText(
+            'This prevents creating duplicate files when articles are updated, even if the file name separator or the title in Readwise change. The Dataview plugin must be installed and enabled.'
+          );
+        })
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.deduplicateFiles && dataviewApi !== undefined)
+          .setDisabled(!dataviewApi)
+          .onChange(async (value) => {
+            this.plugin.settings.deduplicateFiles = value;
+            await this.plugin.saveSettings();
+            // Trigger re-render to show/hide property selector
+            this.display();
+          })
+      );
+
+    if (this.plugin.settings.deduplicateFiles) {
+      new Setting(containerEl)
+        .setName('Deduplication Property')
+        .setDesc(
+          'Frontmatter property to use for deduplication (default: uri). This field will be set in the frontmatter template. If it exists in your frontmatter template, its value will be updated automatically when processing highlights.'
+        )
+        .addText((text) =>
+          text.setValue(this.plugin.settings.deduplicateProperty).onChange(async (value) => {
+            this.plugin.settings.deduplicateProperty = value || 'uri';
+            await this.plugin.saveSettings();
+          })
+        );
+    }
+
+    if (this.plugin.settings.deduplicateFiles) {
+      new Setting(containerEl)
+        .setName('Delete Duplicates')
+        .setDesc(
+          createFragment((fragment) => {
+            fragment.appendText(
+              'When enabled, duplicate files will be deleted. Otherwise, they will be marked with duplicate: true in frontmatter.'
+            );
+            fragment.createEl('br');
+            fragment.createEl('blockquote', { text: 'Default: Delete duplicates' });
+          })
+        )
+        .addToggle((toggle) =>
+          toggle.setValue(this.plugin.settings.deleteDuplicates).onChange(async (value) => {
+            this.plugin.settings.deleteDuplicates = value;
+            await this.plugin.saveSettings();
+          })
+        );
+    }
   }
 }
