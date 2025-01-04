@@ -106,7 +106,7 @@ export class ReadwiseApi {
 
       console.info(`Readwise: Fetching ${contentType}`);
       if (lastUpdated) console.info(`Readwise: Checking for new content since ${lastUpdated}`);
-      if (bookId) console.info(`Readwise: Checking for all highlights on book ID: ${bookId}`);
+      if (bookId) console.debug(`Readwise: Checking for all highlights on book ID: ${bookId}`);
       let statusBarText = `Readwise: Fetching ${contentType}`;
       if (data?.count) statusBarText += ` (${results.length})`;
       this.notify.setStatusBarText(statusBarText);
@@ -129,7 +129,7 @@ export class ReadwiseApi {
         if (!nextPageCursor) {
           break;
         } else {
-          console.info(`Readwise: There are more records left, proceeding to next page: ${data.nextPageCursor}`);
+          console.debug(`Readwise: There are more records left, proceeding to next page: ${data.nextPageCursor}`);
         }
       }
     }

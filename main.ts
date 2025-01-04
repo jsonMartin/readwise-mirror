@@ -220,7 +220,7 @@ export default class ReadwiseMirror extends Plugin {
 
       // Check if is discarded
       if (this.settings.highlightDiscard && this.highlightIsDiscarded(highlight)) {
-        console.log('Readwise: Found discarded highlight, removing', highlight);
+        console.debug('Readwise: Found discarded highlight, removing', highlight);
         return false;
       }
 
@@ -374,7 +374,7 @@ export default class ReadwiseMirror extends Plugin {
       const filteredHighlights = this.filterHighlights(highlights);
 
       if (filteredHighlights.length === 0) {
-        console.log(`Readwise: No highlights found for '${title}' (${source_url})`);
+        console.debug(`Readwise: No highlights found for '${title}' (${source_url})`);
       } else {
         const formattedHighlights = this.sortHighlights(filteredHighlights)
           .map((highlight: Highlight) => this.formatHighlight(highlight, book))
