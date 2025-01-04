@@ -3,6 +3,7 @@ import Notify from 'notify';
 import spacetime from 'spacetime';
 import { Environment, Template, ConfigureOptions } from 'nunjucks';
 import * as _ from 'lodash';
+import slugify from '@sindresorhus/slugify';
 
 import { ReadwiseApi, Library, Highlight, Export, Tag } from 'readwiseApi';
 
@@ -22,6 +23,9 @@ interface PluginSettings {
   frontMatterTemplate: string;
   headerTemplate: string;
   highlightTemplate: string;
+  useSlugify: boolean;
+  slugifySeparator: string;
+  slugifyLowercase: boolean;
 }
 
 const DEFAULT_SETTINGS: PluginSettings = {
@@ -95,6 +99,9 @@ Tags: {{ tags }}
 
 ---
 `,
+  useSlugify: false,
+  slugifySeparator: '-',
+  slugifyLowercase: true,
 };
 
 interface YamlStringState {
@@ -354,9 +361,14 @@ export default class ReadwiseMirror extends Plugin {
         .reverse()[0];
 
       // Sanitize title, replace colon with substitute from settings
-      const sanitizedTitle = `${title
-        .replace(/:/g, this.settings.colonSubstitute ?? '-')
-        .replace(/[<>"'\/\\|?*#]+/g, '')}`;
+      const sanitizedTitle = this.settings.useSlugify
+        ? slugify(title, {
+            separator: this.settings.slugifySeparator,
+            lowercase: this.settings.slugifyLowercase,
+          })
+        : `${title
+            .replace(/:/g, this.settings.colonSubstitute ?? '-')
+            .replace(/[<>"'\/\\|?*#]+/g, '')}`;
 
       // Filter highlights
       const filteredHighlights = this.filterHighlights(highlights);
@@ -779,6 +791,7 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
           })
       );
 
+      
     new Setting(containerEl)
       .setName('Sync Log')
       .setDesc('Save sync log to file in Library')
@@ -931,5 +944,56 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         });
       });
+
+    new Setting(containerEl)
+      .setName('Use Slugify for filenames')
+      .setDesc(createFragment(fragment => {
+        fragment.appendText('Use slugify to create clean filenames. This removes diacritics and other special characters, including emojis.');
+        fragment.createEl('br');
+        fragment.createEl('br');
+        fragment.appendText('Example filename: "Déjà Vu with a 🦄"');
+        fragment.createEl('br');
+        fragment.createEl('blockquote', {
+          text: 'Slugify disabled: "Deja Vu with a "'
+        });
+        fragment.createEl('blockquote', {
+          text: 'Slugify enabled (default settings): "deja-vu-with-a"'
+        });
+        fragment.createEl('blockquote', {
+          text: 'Slugify + custom separator "_": "deja_vu_with_a"'
+        });
+        fragment.createEl('blockquote', {
+          text: 'Slugify + lowercase disabled: "Deja-Vu-With-A"'
+        });
+      }))
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.useSlugify).onChange(async (value) => {
+          this.plugin.settings.useSlugify = value;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName('Slugify Separator')
+      .setDesc('Character to use as separator in slugified filenames (default: -)')
+      .addText((text) =>
+        text
+          .setPlaceholder('-')
+          .setValue(this.plugin.settings.slugifySeparator)
+          .onChange(async (value) => {
+            this.plugin.settings.slugifySeparator = value || '-';
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName('Slugify Lowercase')
+      .setDesc('Convert slugified filenames to lowercase')
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.slugifyLowercase).onChange(async (value) => {
+          this.plugin.settings.slugifyLowercase = value;
+          await this.plugin.saveSettings();
+        })
+      );
   }
 }
