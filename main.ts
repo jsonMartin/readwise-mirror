@@ -365,6 +365,7 @@ export default class ReadwiseMirror extends Plugin {
     const dataviewApi: DataviewApi | undefined = getDVAPI(this.app);
     const canDeduplicate = this.settings.deduplicateFiles && dataviewApi;
 
+    // TODO: If Dataview is not available, we should attempt to deduplicate with MetadataCache (which is presumably slower)
     if (canDeduplicate) {
       const existingPages = dataviewApi
         .pages('')
