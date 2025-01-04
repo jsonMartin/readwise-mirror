@@ -94,6 +94,15 @@ The plugin uses three template types to format content, all using Nunjucks templ
 - **Highlight Template**: Controls individual highlight formatting
 - **Frontmatter Template**: Controls YAML metadata (optional)
 
+### Frontmatter Validation
+
+Real-time template validation for the frontmatter ensures:
+
+- Valid YAML syntax
+- Proper field escaping
+- Correct template variables
+- Preview with sample data
+
 ### Available Variables
 
 #### Document Metadata
@@ -166,9 +175,9 @@ The following would print both document and all highlight tags, rolled-up:
 ---
 id: {{ id }}
 updated: {{ updated }}
-title: "{{ title }}"
-alias: "{{ sanitized_title }}"
-author: "{{ author }}"
+title: {{ title }}
+alias: {{ sanitized_title }}
+author: {{ author }}
 highlights: {{ num_highlights }}
 last_highlight_at: {{ last_highlight_at }}
 source: {{ source_url }}
@@ -321,4 +330,67 @@ Rendered output:
 
 - The templating is based on the [`nunjucks`](https://mozilla.github.io/nunjucks/templating.html) templating library and thus shares its limitations;
 - Certain strings (e.g. date, tags, authors) are currently preformatted
-- If you have frontmatter and items with `@` in the title or author's name (typically this happens with highlights imported from Twitter), the frontmatter will be invalid. You can add quotes in your frontmatter template to try to work around these cases: `title: "{{ title }}" but any quotes already present in the title will break your frontmatter too.
+
+## Deduplication
+
+The plugin prevents duplicate files when articles are re-imported from Readwise, maintaining link consistency in your vault. This can be useful if you plan to change the character used to escape the colon `:` in your titles. 
+
+### How It Works
+
+1. **File Matching**
+   - Uses Dataview to find files with matching `readwise_url`
+   - Checks all vault locations, not just the Readwise folder
+   - Honors existing file structure
+
+2. **Update Strategy**
+   - If exact filename match exists: Updates content in place
+   - If different filename exists: Updates first matching file
+   - Additional matches: Either deleted or marked as duplicates
+
+3. **Link Preservation**
+   - Maintains existing internal links
+   - Preserves file locations in vault
+   - Updates content while keeping references intact
+
+### Configuration
+
+```yaml
+# Example Settings
+deduplicateFiles: true
+deduplicateProperty: readwise_url
+deleteDuplicates: true  # or false to mark duplicates
+```
+
+### Duplicate Handling
+
+When duplicates are found:
+
+1. **Exact Match**
+
+   ```
+   📄 "My Article.md" (existing)
+   └── Updates content in place
+   ```
+
+2. **Different Filename**
+
+   ```
+   📄 "Article (2024).md" (existing)
+   └── Updates content, changes filename to "My Article.md"
+   ```
+
+3. **Multiple Matches**
+
+   ```
+   📄 "My Article.md" (primary)
+   └── Updated with new content
+   📄 "Same Article.md" (duplicate)
+   └── Deleted or marked with duplicate: true
+   ```
+
+### Deduplication limitations
+
+Currently, the following limitations apply to deduplication:
+
+- Readwise items with the exact same title will be detected, the first one in the export will be used to write to your vault
+- In order to make sure all your files can be deduplicated, you have to run a full sync, meaning any changes you made to your local files will be lost
