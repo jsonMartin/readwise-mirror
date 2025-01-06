@@ -23,7 +23,7 @@ export const testTags: Tag[] = [
 
 export const sampleMetadata = {
   id: "12345",
-  title: "My Book: A Subtitle's Journey",
+  title: "My Book:\nA Subtitle's Journey",
   sanitized_title: "My Book - A Subtitle's Journey",
   author: 'O\'Reilly, Tim & "Doc" Smith',
   authorStr: "[[O'Reilly, Tim]] and [[\"Doc\" Smith]]",

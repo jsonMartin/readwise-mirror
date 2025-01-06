@@ -3,6 +3,7 @@ import { ConfigureOptions, Environment, Template } from 'nunjucks';
 import { App, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
 import spacetime from 'spacetime';
 import slugify from '@sindresorhus/slugify';
+import filenamify from 'filenamify';
 
 import { DataviewApi, getAPI as getDVAPI, Literal } from 'obsidian-dataview';
 import { Export, Highlight, Library, ReadwiseApi, Tag } from 'readwiseApi';
@@ -150,13 +151,22 @@ export default class ReadwiseMirror extends Plugin {
     return processedMetadata;
   }
 
-  private escapeYamlValue(value: string): string {
+  private escapeYamlValue(value: string, multiline: boolean = false ): string {
     if (!value) return '""';
 
     const state = this.analyzeStringForFrontmatter(value);
 
     // Already properly quoted and valid YAML
     if (state.isValueEscapedAlready) return value;
+
+    // Handle multi-line strings
+    if (value.includes('\n') && multiline) {
+      // Use folded block style (>) for titles, preserve single line ending
+      const indent = '  ';
+      return `>-\n${indent}${value.replace(/\n/g, `\n${indent}`)}`;
+    }
+
+    value = value.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
 
     // No quotes in string - use simple double quotes to catch other special characters
     if (!state.hasSingleQuotes && !state.hasDoubleQuotes) {
@@ -443,13 +453,11 @@ export default class ReadwiseMirror extends Plugin {
 
       // Sanitize title, replace colon with substitute from settings
       const sanitizedTitle = this.settings.useSlugify
-        ? slugify(title, {
+        ? slugify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
             separator: this.settings.slugifySeparator,
             lowercase: this.settings.slugifyLowercase,
           })
-        : `${title
-            .replace(/:/g, this.settings.colonSubstitute ?? '-')
-            .replace(/[<>"'\/\\|?*#]+/g, '')}`;
+        : `${filenamify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), { replacement: ' ' })}`;
 
       // Filter highlights
       const filteredHighlights = this.filterHighlights(highlights);
@@ -500,6 +508,7 @@ export default class ReadwiseMirror extends Plugin {
         };
 
         // Escape specific fields used in frontmatter
+        // TODO: Tidy up code. It doesn't make sense to remove the frontmatter markers and then add them back
         const frontmatterYaml = YAML.parse(
           this.frontMatterTemplate
             .render(this.escapeFrontmatter(metadata, FRONTMATTER_TO_ESCAPE))
@@ -990,7 +999,6 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
           })
       );
 
-      
     new Setting(containerEl)
       .setName('Sync Log')
       .setDesc('Save sync log to file in Library')
@@ -1058,7 +1066,7 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
         toggle.setValue(this.plugin.settings.frontMatter).onChange(async (value) => {
           // Test template with sample data
           const { isValid, error } = this.validateFrontmatterTemplate(this.plugin.settings.frontMatterTemplate);
-          if (value && isValid || !value) {
+          if ((value && isValid) || !value) {
             this.plugin.settings.frontMatter = value;
             await this.plugin.saveSettings();
           } else if (value && !isValid) {
@@ -1114,18 +1122,14 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
         // Create preview elements below textarea
         const previewContainer = container.createDiv('template-preview');
         const previewTitle = previewContainer.createDiv({
-          text: 'Template Preview:',
+          text: 'Template Preview (Error):',
           cls: 'template-preview-title',
+          attr: {
+            style: 'color: var(--text-error);',
+          },
         });
         previewTitle.style.fontWeight = 'bold';
         previewTitle.style.marginTop = '1em';
-
-        const previewContent = previewContainer.createEl('pre', {
-          cls: ['template-preview-content', 'settings-template-input'],
-          attr: {
-            style: 'background-color: var(--background-secondary); padding: 1em; border-radius: 4px; overflow-x: auto;',
-          },
-        });
 
         const errorNotice = previewContainer.createDiv({
           cls: 'validation-notice',
@@ -1134,14 +1138,21 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
           },
         });
 
-        const errorDetails = previewContainer.createEl('pre', {
-          cls: ['error-details', 'settings-template-input'],
+        const previewContent = previewContainer.createEl('pre', {
+          cls: ['template-preview-content', 'settings-template-input'],
           attr: {
-            style:
-              'color: var(--text-error) background-color: var(--background-primary-alt); padding: 0.5em; border-radius: 4px; margin-top: 0.5em; font-family: monospace; white-space: pre-wrap;',
+            style: 'background-color: var(--background-secondary); padding: 1em; border-radius: 4px; overflow-x: auto;',
           },
         });
-
+        
+        const errorDetails = previewContainer.createEl('pre', {
+          cls: ['error-details'],
+          attr: {
+            style:
+              'color: var(--text-error); background-color: var(--background-primary-alt); padding: 0.5em; border-radius: 4px; margin-top: 0.5em; font-family: monospace; white-space: pre-wrap;',
+          },
+        });
+        
         errorDetails.hide();
 
         // Update preview on template changes
@@ -1238,25 +1249,29 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Use Slugify for filenames')
-      .setDesc(createFragment(fragment => {
-        fragment.appendText('Use slugify to create clean filenames. This removes diacritics and other special characters, including emojis.');
-        fragment.createEl('br');
-        fragment.createEl('br');
-        fragment.appendText('Example filename: "Déjà Vu with a 🦄"');
-        fragment.createEl('br');
-        fragment.createEl('blockquote', {
-          text: 'Slugify disabled: "Deja Vu with a "'
-        });
-        fragment.createEl('blockquote', {
-          text: 'Slugify enabled (default settings): "deja-vu-with-a"'
-        });
-        fragment.createEl('blockquote', {
-          text: 'Slugify + custom separator "_": "deja_vu_with_a"'
-        });
-        fragment.createEl('blockquote', {
-          text: 'Slugify + lowercase disabled: "Deja-Vu-With-A"'
-        });
-      }))
+      .setDesc(
+        createFragment((fragment) => {
+          fragment.appendText(
+            'Use slugify to create clean filenames. This removes diacritics and other special characters, including emojis.'
+          );
+          fragment.createEl('br');
+          fragment.createEl('br');
+          fragment.appendText('Example filename: "Déjà Vu with a 🦄"');
+          fragment.createEl('br');
+          fragment.createEl('blockquote', {
+            text: 'Slugify disabled: "Deja Vu with a "',
+          });
+          fragment.createEl('blockquote', {
+            text: 'Slugify enabled (default settings): "deja-vu-with-a"',
+          });
+          fragment.createEl('blockquote', {
+            text: 'Slugify + custom separator "_": "deja_vu_with_a"',
+          });
+          fragment.createEl('blockquote', {
+            text: 'Slugify + lowercase disabled: "Deja-Vu-With-A"',
+          });
+        })
+      )
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.useSlugify).onChange(async (value) => {
           this.plugin.settings.useSlugify = value;
