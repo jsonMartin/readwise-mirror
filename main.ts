@@ -1163,6 +1163,7 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
           const yamlContent = rendered.replace(/^---\n/, '').replace(/\n---$/, '');
 
           try {
+            YAML.parse(yamlContent);
             errorNotice.setText('');
             previewContainer.hide();
           } catch (error) {
