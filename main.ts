@@ -1,4 +1,3 @@
-import * as yaml from 'js-yaml';
 import Notify from 'notify';
 import { ConfigureOptions, Environment, Template } from 'nunjucks';
 import { App, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
@@ -8,7 +7,7 @@ import slugify from '@sindresorhus/slugify';
 import { DataviewApi, getAPI as getDVAPI, Literal } from 'obsidian-dataview';
 import { Export, Highlight, Library, ReadwiseApi, Tag } from 'readwiseApi';
 import { sampleMetadata } from 'test-data/sampleData';
-
+import * as YAML from 'yaml';
 interface PluginSettings {
   baseFolderName: string;
   apiToken: string | null;
@@ -350,11 +349,9 @@ export default class ReadwiseMirror extends Plugin {
         ...updates,
       };
 
-      // Format as YAML block
-      frontmatter = ['---', yaml.dump(newFrontmatter), '---'].join('\n');
+      frontmatter = ['---', YAML.stringify(newFrontmatter), '---'].join('\n');
     } else {
-      // No existing frontmatter, create new
-      frontmatter = ['---', yaml.dump(updates), '---'].join('\n');
+      frontmatter = ['---', YAML.stringify(updates), '---'].join('\n');
     }
 
     // Combine and write back
@@ -503,8 +500,14 @@ export default class ReadwiseMirror extends Plugin {
         };
 
         // Escape specific fields used in frontmatter
+        const frontmatterYaml = YAML.parse(
+          this.frontMatterTemplate
+            .render(this.escapeFrontmatter(metadata, FRONTMATTER_TO_ESCAPE))
+            .replace(/^---\n/, '')
+            .replace(/\n---$/, '')
+        );
         const frontMatterContents = this.settings.frontMatter
-          ? this.frontMatterTemplate.render(this.escapeFrontmatter(metadata, FRONTMATTER_TO_ESCAPE))
+          ? ['---', YAML.stringify(frontmatterYaml), '---'].join('\n')
           : '';
         const headerContents = this.headerTemplate.render(metadata);
         const contents = `${frontMatterContents}${headerContents}${formattedHighlights}`;
@@ -821,13 +824,13 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
     );
     const yamlContent = renderedTemplate.replace(/^---\n/, '').replace(/\n---$/, '');
     try {
-      yaml.load(yamlContent);
+      YAML.parse(yamlContent);
       return { isValid: true };
     } catch (error) {
-      if (error instanceof yaml.YAMLException) {
+      if (error instanceof YAML.YAMLParseError) {
         return {
           isValid: false,
-          error: `Invalid YAML at line ${error.mark?.line + 1}: ${error.reason}`,
+          error: `Invalid YAML: ${error.message}`,
           preview: yamlContent,
         };
       }
@@ -1149,14 +1152,12 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
           const yamlContent = rendered.replace(/^---\n/, '').replace(/\n---$/, '');
 
           try {
-            const preview = yaml.load(yamlContent);
             errorNotice.setText('');
-            errorDetails.hide();
-            previewContent.setText(yaml.dump(preview, { schema: yaml.DEFAULT_SCHEMA }));
+            previewContainer.hide();
           } catch (error) {
-            // Turn Frontmatter toggle off 
-            if (error instanceof yaml.YAMLException) {
-              errorNotice.setText(`Invalid YAML at line ${error.mark?.line + 1}: ${error.reason}`);
+            // Turn Frontmatter toggle off
+            if (error instanceof YAML.YAMLParseError) {
+              errorNotice.setText(`Invalid YAML:`);
               errorDetails.setText(error.message);
               errorDetails.show();
             } else {
@@ -1164,6 +1165,7 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
               errorDetails.hide();
             }
             previewContent.setText(yamlContent);
+            previewContainer.show();
           }
         };
 
