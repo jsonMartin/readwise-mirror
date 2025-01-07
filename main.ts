@@ -457,7 +457,7 @@ export default class ReadwiseMirror extends Plugin {
             separator: this.settings.slugifySeparator,
             lowercase: this.settings.slugifyLowercase,
           })
-        : `${filenamify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), { replacement: ' ' })}`;
+        : `${filenamify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), { replacement: ' ', maxLength: 255 })}`;
 
       // Filter highlights
       const filteredHighlights = this.filterHighlights(highlights);
