@@ -413,7 +413,8 @@ export default class ReadwiseMirror extends Plugin {
       });
       return duplicateFiles;
     }
-    return Promise.reject('Deduplication not enabled or Dataview API not available');
+
+    return Promise.resolve([]);
   }
 
   async writeLibraryToMarkdown(library: Library) {
@@ -556,21 +557,76 @@ export default class ReadwiseMirror extends Plugin {
           category.charAt(0).toUpperCase() + category.slice(1)
         }/${sanitizedTitle}.md`;
 
-        const duplicates = await this.findDuplicates(book);
         const abstractFile = vault.getAbstractFileByPath(path);
 
-        // Deduplicate files
-        if (duplicates.length > 0) {
-          let deduplicated = false;
-          let filesToDeleteOrLabel: TFile[] = [];
+        // Try to find duplicates
+        try {
+          const duplicates = await this.findDuplicates(book);
 
-          // First: Check if target file is in duplicates
-          const targetFileIndex = duplicates.findIndex((f) => f.path === path);
-          if (targetFileIndex >= 0 && abstractFile instanceof TFile) {
-            deduplicated = true;
-            // Remove target file from duplicates
-            duplicates.splice(targetFileIndex, 1);
-            // Update target file
+          // Deduplicate files
+          if (duplicates.length > 0) {
+            let deduplicated = false;
+            let filesToDeleteOrLabel: TFile[] = [];
+
+            // First: Check if target file is in duplicates
+            const targetFileIndex = duplicates.findIndex((f) => f.path === path);
+            if (targetFileIndex >= 0 && abstractFile instanceof TFile) {
+              deduplicated = true;
+              // Remove target file from duplicates
+              duplicates.splice(targetFileIndex, 1);
+              // Update target file
+              try {
+                // Update frontmatter if enabled
+                if (this.settings.updateFrontmatter) {
+                  const { frontmatter } = await this.updateFrontmatter(abstractFile, frontmatterYaml);
+                  const contents = `${frontmatter}${headerContents}${formattedHighlights}`;
+                  await vault.process(abstractFile, () => contents);
+                } else await vault.process(abstractFile, () => contents);
+              } catch (err) {
+                console.error(`Readwise: Attempt to overwrite file ${path} failed`, err);
+              }
+            }
+
+            // Second: Handle remaining duplicates (if any)
+            if (duplicates.length > 0) {
+              // Keep first duplicate if we haven't updated a file yet, and write it
+              if (!deduplicated && duplicates[0]) {
+                try {
+                  // Rename the duplicate first and then write the new contents
+                  await this.app.fileManager.renameFile(duplicates[0], path).then(() => {
+                    vault
+                      .process(duplicates[0], () => contents)
+                      .then(() => {
+                        deduplicated = true;
+                      });
+                  });
+                  // Remove the file we just updated from duplicates
+                  duplicates.shift();
+                } catch (err) {
+                  console.error(`Readwise: Failed to update duplicate ${duplicates[0].path}`, err);
+                }
+              }
+              // Add remaining duplicates to deletion list
+              filesToDeleteOrLabel.push(...duplicates);
+            }
+
+            // Delete extra duplicates or mark as "duplicate" in the Vault
+            for (const file of filesToDeleteOrLabel) {
+              try {
+                if (this.settings.deleteDuplicates) {
+                  await vault.trash(file, true);
+                } else {
+                  await this.writeUpdatedFrontmatter(file, { duplicate: true });
+                }
+              } catch (err) {
+                console.error(`Readwise: Failed to delete duplicate ${file.path}`, err);
+              }
+            }
+          } 
+          // Overwrite existing file with remote changes, or
+          // Create new file if not existing
+          else if (abstractFile && abstractFile instanceof TFile) {
+            // File exists
             try {
               // Update frontmatter if enabled
               if (this.settings.updateFrontmatter) {
@@ -581,59 +637,12 @@ export default class ReadwiseMirror extends Plugin {
             } catch (err) {
               console.error(`Readwise: Attempt to overwrite file ${path} failed`, err);
             }
+          } else {
+            // File does not exist
+            vault.create(path, contents);
           }
-
-          // Second: Handle remaining duplicates (if any)
-          if (duplicates.length > 0) {
-            // Keep first duplicate if we haven't updated a file yet, and write it
-            if (!deduplicated && duplicates[0]) {
-              try {
-                // Rename the duplicate first and then write the new contents
-                await this.app.fileManager.renameFile(duplicates[0], path).then(() => {
-                  vault
-                    .process(duplicates[0], () => contents)
-                    .then(() => {
-                      deduplicated = true;
-                    });
-                });
-                // Remove the file we just updated from duplicates
-                duplicates.shift();
-              } catch (err) {
-                console.error(`Readwise: Failed to update duplicate ${duplicates[0].path}`, err);
-              }
-            }
-            // Add remaining duplicates to deletion list
-            filesToDeleteOrLabel.push(...duplicates);
-          }
-
-          // Delete extra duplicates or mark as "duplicate" in the Vault
-          for (const file of filesToDeleteOrLabel) {
-            try {
-              if (this.settings.deleteDuplicates) {
-                await vault.trash(file, true);
-              } else {
-                await this.writeUpdatedFrontmatter(file, { duplicate: true });
-              }
-            } catch (err) {
-              console.error(`Readwise: Failed to delete duplicate ${file.path}`, err);
-            }
-          }
-        }
-        // Overwrite existing file with remote changes, or
-        // Create new file if not existing
-        else if (abstractFile && abstractFile instanceof TFile) {
-          // File exists
-          try {
-            await vault.process(abstractFile, function () {
-              // Simply return new contents to overwrite file
-              return contents;
-            });
-          } catch (err) {
-            console.error(`Readwise: Attempt to overwrite file ${path} failed`, err);
-          }
-        } else {
-          // File does not exist
-          vault.create(path, contents);
+        } catch (err) {
+          console.error(`Readwise: Attempt to create file ${path} failed`, err);
         }
       }
     }
