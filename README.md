@@ -387,22 +387,13 @@ The plugin prevents duplicate files when articles are re-imported from Readwise,
 
 2. **Update Strategy**
    - If exact filename match exists: Updates content in place
-   - If different filename exists: Updates first matching file
+   - If different filename exists: Updates first matching file, and changes this file's filename to the new filename
    - Additional matches: Either deleted or marked as duplicates
 
 3. **Link Preservation**
    - Maintains existing internal links
    - Preserves file locations in vault
    - Updates content while keeping references intact
-
-### Configuration
-
-```yaml
-# Example Settings
-deduplicateFiles: true
-deduplicateProperty: readwise_url
-deleteDuplicates: true  # or false to mark duplicates
-```
 
 ### Duplicate Handling
 
@@ -436,4 +427,4 @@ When duplicates are found:
 Currently, the following limitations apply to deduplication:
 
 - Readwise items with the exact same title will be detected, the first one in the export will be used to write to your vault
-- In order to make sure all your files can be deduplicated, you have to run a full sync, meaning any changes you made to your local files will be lost
+- To start using deduplication, you have to run a full sync to make sure all your files have the deduplication frontmatter property and can thus be deduplicated. This means any changes you made to your local files will be lost (this is not a new behaviour though, but you should be aware of it)
