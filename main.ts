@@ -31,6 +31,9 @@ interface PluginSettings {
   deduplicateFiles: boolean;
   deduplicateProperty: string;
   deleteDuplicates: boolean;
+  protectFrontmatter: boolean;
+  protectedFields: string;
+  updateFrontmatter: boolean;
 }
 
 const DEFAULT_SETTINGS: PluginSettings = {
@@ -110,6 +113,9 @@ Tags: {{ tags }}
   deduplicateFiles: false,
   deduplicateProperty: 'uri',
   deleteDuplicates: true,
+  protectFrontmatter: false,
+  protectedFields: 'connections\nstatus\ntags',
+  updateFrontmatter: true,
 };
 
 interface YamlStringState {
@@ -151,7 +157,7 @@ export default class ReadwiseMirror extends Plugin {
     return processedMetadata;
   }
 
-  private escapeYamlValue(value: string, multiline: boolean = false ): string {
+  private escapeYamlValue(value: string, multiline: boolean = false): string {
     if (!value) return '""';
 
     const state = this.analyzeStringForFrontmatter(value);
@@ -317,7 +323,7 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   /**
-   * Update frontmatter of a file with new values
+   * Writes updated frontmatter of a file with new values
    * @param file TFile to update
    * @param updates Record of key-value pairs to update/add in frontmatter
    * @returns Promise<void>
@@ -330,16 +336,28 @@ export default class ReadwiseMirror extends Plugin {
    * });
    * ```
    *
+   * Behavior:
    * - If file has no frontmatter, creates new frontmatter section
-   * - If key exists, updates value
+   * - If key exists, updates value (unless protected)
    * - If key doesn't exist, adds new key-value pair
-   * - Preserves existing frontmatter formatting and other values
+   * - Preserves existing frontmatter formatting and values
    * - Maintains file content after frontmatter unchanged
+   *
+   * Protection:
+   * - When frontmatter protection is enabled, specified fields are preserved
+   * - Protected fields are not updated even if included in updates
+   * - Protection is configured in plugin settings
+   * - Example protected fields: status, tags, categories
    */
-  private async updateFrontmatter(file: TFile, updates: Record<string, any>): Promise<void> {
-    const content = await this.app.vault.read(file);
+  private async writeUpdatedFrontmatter(file: TFile, updates: Record<string, any>): Promise<void> {
+    let { frontmatter, body } = await this.updateFrontmatter(file, updates);
 
-    // Split content into frontmatter and body
+    // Combine and write back
+    await this.app.vault.modify(file, `${frontmatter}\n${body}`);
+  }
+
+  private async updateFrontmatter(file: TFile, updates: Record<string, any>) {
+    const content = await this.app.vault.read(file);
     const frontmatterRegex = /^(---\n[\s\S]*?\n---)/;
     const match = content.match(frontmatterRegex);
 
@@ -353,6 +371,18 @@ export default class ReadwiseMirror extends Plugin {
       // Parse existing frontmatter
       const currentFrontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter || {};
 
+      // Remove protected fields from updates
+      if (this.settings.protectFrontmatter) {
+        const protectedFields = this.settings.protectedFields
+          .split('\n')
+          .map((f) => f.trim())
+          .filter((f) => f.length > 0);
+
+        for (const field of protectedFields) {
+          delete updates[field];
+        }
+      }
+
       // Create new frontmatter
       const newFrontmatter = {
         ...currentFrontmatter,
@@ -363,9 +393,7 @@ export default class ReadwiseMirror extends Plugin {
     } else {
       frontmatter = ['---', YAML.stringify(updates), '---'].join('\n');
     }
-
-    // Combine and write back
-    await this.app.vault.modify(file, `${frontmatter}\n${body}`);
+    return { frontmatter, body };
   }
 
   private async findDuplicates(book: Export): Promise<TFile[]> {
@@ -457,7 +485,10 @@ export default class ReadwiseMirror extends Plugin {
             separator: this.settings.slugifySeparator,
             lowercase: this.settings.slugifyLowercase,
           })
-        : `${filenamify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), { replacement: ' ', maxLength: 255 })}`;
+        : `${filenamify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
+            replacement: ' ',
+            maxLength: 255,
+          })}`;
 
       // Filter highlights
       const filteredHighlights = this.filterHighlights(highlights);
@@ -541,7 +572,12 @@ export default class ReadwiseMirror extends Plugin {
             duplicates.splice(targetFileIndex, 1);
             // Update target file
             try {
-              await vault.process(abstractFile, () => contents);
+              // Update frontmatter if enabled
+              if (this.settings.updateFrontmatter) {
+                const { frontmatter } = await this.updateFrontmatter(abstractFile, frontmatterYaml);
+                const contents = `${frontmatter}${headerContents}${formattedHighlights}`;
+                await vault.process(abstractFile, () => contents);
+              } else await vault.process(abstractFile, () => contents);
             } catch (err) {
               console.error(`Readwise: Attempt to overwrite file ${path} failed`, err);
             }
@@ -576,7 +612,7 @@ export default class ReadwiseMirror extends Plugin {
               if (this.settings.deleteDuplicates) {
                 await vault.trash(file, true);
               } else {
-                await this.updateFrontmatter(file, { duplicate: true });
+                await this.writeUpdatedFrontmatter(file, { duplicate: true });
               }
             } catch (err) {
               console.error(`Readwise: Failed to delete duplicate ${file.path}`, err);
@@ -1069,6 +1105,8 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
           if ((value && isValid) || !value) {
             this.plugin.settings.frontMatter = value;
             await this.plugin.saveSettings();
+            // Trigger re-render to show/hide frontmatter settings
+            this.display();
           } else if (value && !isValid) {
             this.plugin.notify.notice(`Invalid frontmatter template: ${error}`);
             toggle.setValue(false);
@@ -1077,6 +1115,96 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
           }
         })
       );
+
+    if (this.plugin.settings.frontMatter) {
+      new Setting(containerEl)
+        .setName('Update Frontmatter')
+        .setDesc(
+          createFragment((fragment) => {
+            fragment.appendText('Update frontmatter when syncing existing files');
+            fragment.createEl('br');
+            fragment.appendText(
+              'When enabled, frontmatter of existing files will be updated, keeping additional fields that are not present in the template. Works best with Deduplication enabled.'
+            );
+          })
+        )
+        .addToggle((toggle) =>
+          toggle.setValue(this.plugin.settings.updateFrontmatter).onChange(async (value) => {
+            this.plugin.settings.updateFrontmatter = value;
+            await this.plugin.saveSettings();
+            // Trigger re-render to show/hide protection settings
+            this.display();
+          })
+        );
+
+      if (this.plugin.settings.updateFrontmatter) {
+        new Setting(containerEl)
+          .setName('Protect Frontmatter Fields')
+          .setDesc(
+            createFragment((fragment) => {
+              fragment.appendText('Prevent specific frontmatter fields from being overwritten during sync');
+              fragment.createEl('br');
+              if (this.plugin.settings.deduplicateFiles) {
+                fragment.createEl('br');
+                fragment.appendText('Note: The deduplication field ');
+                fragment.createEl('strong', { text: this.plugin.settings.deduplicateProperty });
+                fragment.appendText(' cannot be protected');
+              }
+            })
+          )
+          .addToggle((toggle) =>
+            toggle.setValue(this.plugin.settings.protectFrontmatter).onChange(async (value) => {
+              this.plugin.settings.protectFrontmatter = value;
+              await this.plugin.saveSettings();
+              this.display();
+            })
+          );
+
+        if (this.plugin.settings.protectFrontmatter) {
+          const validateProtectedFields = (value: string): { isValid: boolean; error?: string } => {
+            if (!this.plugin.settings.deduplicateFiles) return { isValid: true };
+
+            const fields = value
+              .split('\n')
+              .map((f) => f.trim())
+              .filter((f) => f.length > 0);
+            const dedupField = this.plugin.settings.deduplicateProperty;
+
+            if (fields.includes(dedupField)) {
+              return {
+                isValid: false,
+                error: `Cannot protect deduplication field '${dedupField}'`,
+              };
+            }
+            return { isValid: true };
+          };
+
+          const container = containerEl.createDiv();
+          new Setting(container)
+            .setName('Protected Fields')
+            .setDesc('Enter one field name per line')
+            .addTextArea((text) => {
+              const errorDiv = container.createDiv({
+                cls: 'validation-error',
+                attr: { style: 'color: var(--text-error); margin-top: 0.5em;' },
+              });
+
+              return text
+                .setValue(this.plugin.settings.protectedFields)
+                .setPlaceholder('status\ntags')
+                .onChange(async (value) => {
+                  const validation = validateProtectedFields(value);
+                  errorDiv.setText(validation.error || '');
+
+                  if (validation.isValid) {
+                    this.plugin.settings.protectedFields = value;
+                    await this.plugin.saveSettings();
+                  }
+                });
+            });
+        }
+      }
+    }
 
     new Setting(containerEl)
       .setName('Frontmatter Template')
@@ -1144,7 +1272,7 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
             style: 'background-color: var(--background-secondary); padding: 1em; border-radius: 4px; overflow-x: auto;',
           },
         });
-        
+
         const errorDetails = previewContainer.createEl('pre', {
           cls: ['error-details'],
           attr: {
@@ -1152,7 +1280,7 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
               'color: var(--text-error); background-color: var(--background-primary-alt); padding: 0.5em; border-radius: 4px; margin-top: 0.5em; font-family: monospace; white-space: pre-wrap;',
           },
         });
-        
+
         errorDetails.hide();
 
         // Update preview on template changes
