@@ -103,6 +103,49 @@ Real-time template validation for the frontmatter ensures:
 - Correct template variables
 - Preview with sample data
 
+## Frontmatter Management
+
+### Updating Frontmatter
+
+The plugin provides granular control over how frontmatter is handled in existing files:
+
+- **Update Frontmatter**: When enabled, updates frontmatter in existing files during sync, overwriting values defined in the frontmatter template and keeping additional fields you might have added since the last sync.
+- When disabled, existing frontmatter will always completely be overwritten
+- Works best with Deduplication enabled to ensure consistent file handling
+
+### Frontmatter Protection
+
+Protect specific frontmatter fields from being overwritten during sync:
+
+1. Enable "Protect Frontmatter Fields"
+2. Enter field names to protect (one per line), for example:
+
+   ```yaml
+   status
+   tags
+   categories
+   ```
+
+3. Protected fields will retain their values during sync
+4. Note: If deduplication is enabled, the deduplication field (e.g., `uri`) cannot be protected
+
+#### Example
+
+If you have an existing note:
+
+```yaml
+---
+title: My Article
+status: in-progress
+tags: [research, important]
+uri: https://readwise.io/article/123
+---
+```
+
+And protect `status` and `tags`, these fields will keep their values during sync, while other fields may be updated with new content from Readwise.
+
+>**Note**: Frontmatter protection only works when "Update Frontmatter" is enabled.
+
 ### Available Variables
 
 #### Document Metadata
@@ -333,7 +376,7 @@ Rendered output:
 
 ## Deduplication
 
-The plugin prevents duplicate files when articles are re-imported from Readwise, maintaining link consistency in your vault. This can be useful if you plan to change the character used to escape the colon `:` in your titles. 
+The plugin prevents duplicate files when articles are re-imported from Readwise, maintaining link consistency in your vault. This can be useful if you plan to change the character used to escape the colon `:` in your titles.
 
 ### How It Works
 
