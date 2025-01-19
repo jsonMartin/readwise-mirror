@@ -483,11 +483,22 @@ export default class ReadwiseMirror extends Plugin {
                 try {
                   // Rename the duplicate first and then write the new contents
                   await this.app.fileManager.renameFile(duplicates[0], path).then(() => {
-                    vault
-                      .process(duplicates[0], () => contents)
-                      .then(() => {
-                        deduplicated = true;
+                    // Update frontmatter if enabled
+                    if (this.settings.updateFrontmatter) {
+                      this.updateFrontmatter(duplicates[0], frontmatterYaml).then(({ frontmatter }) => {
+                        const contents = `${frontmatter}${headerContents}${formattedHighlights}`;
+                        vault
+                          .process(duplicates[0], () => contents)
+                          .then(() => {
+                            deduplicated = true;
+                          });
                       });
+                    } else
+                      vault
+                        .process(duplicates[0], () => contents)
+                        .then(() => {
+                          deduplicated = true;
+                        });
                   });
                   // Remove the file we just updated from duplicates
                   duplicates.shift();
