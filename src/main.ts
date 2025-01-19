@@ -2,7 +2,6 @@ import slugify from '@sindresorhus/slugify';
 import filenamify from 'filenamify';
 import { ConfigureOptions, Environment, Template } from 'nunjucks';
 import { Plugin, TFile } from 'obsidian';
-import { DataviewApi, getAPI as getDVAPI, Literal } from 'obsidian-dataview';
 import spacetime from 'spacetime';
 import * as YAML from 'yaml';
 
@@ -287,24 +286,24 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   private async findDuplicates(book: Export): Promise<TFile[]> {
-    const dataviewApi: DataviewApi | undefined = getDVAPI(this.app);
-    const canDeduplicate = this.settings.deduplicateFiles && dataviewApi;
+    const canDeduplicate = this.settings.deduplicateFiles;
 
-    // TODO: If Dataview is not available, we should attempt to deduplicate with MetadataCache (which is presumably slower)
-    if (canDeduplicate) {
-      const existingPages = dataviewApi
-        .pages('')
-        .where((p: Record<string, Literal>) => p[this.settings.deduplicateProperty] === book.readwise_url);
-
-      const duplicateFiles: TFile[] = [];
-      existingPages.forEach((duplicate: { file: { path: string } }) => {
-        const existingFile = this.app.vault.getAbstractFileByPath(duplicate.file.path) as TFile;
-        duplicateFiles.push(existingFile);
-      });
-      return duplicateFiles;
+    if (!canDeduplicate) {
+      return Promise.resolve([]);
     }
 
-    return Promise.resolve([]);
+    // Fallback to MetadataCache if Dataview is not available
+    const duplicateFiles: TFile[] = [];
+    const files = this.app.vault.getMarkdownFiles();
+    
+    for (const file of files) {
+        const metadata = this.app.metadataCache.getFileCache(file);
+        if (metadata?.frontmatter?.[this.settings.deduplicateProperty] === book.readwise_url) {
+            duplicateFiles.push(file);
+        }
+    }
+    
+    return duplicateFiles;
   }
 
   async writeLibraryToMarkdown(library: Library) {

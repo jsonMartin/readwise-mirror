@@ -393,7 +393,7 @@ The plugin prevents duplicate files when articles are re-imported from Readwise,
 ### How It Works
 
 1. **File Matching**
-   - Uses Dataview to find files with matching `readwise_url`
+   - Uses MetadataCache to find files with matching `readwise_url`
    - Checks all vault locations, not just the Readwise folder
    - Honors existing file structure
 

@@ -2,7 +2,6 @@ import { DEFAULT_SETTINGS, FRONTMATTER_TO_ESCAPE } from 'constants/index';
 import ReadwiseMirror from 'main';
 import { Template } from 'nunjucks';
 import { App, PluginSettingTab, Setting } from 'obsidian';
-import { getAPI as getDVAPI } from 'obsidian-dataview';
 import ReadwiseApi from 'services/readwise-api';
 import { sampleMetadata } from 'test/sample-data';
 import Notify from 'ui/notify';
@@ -114,7 +113,6 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
   async display(): Promise<void> {
     let { containerEl } = this;
-    const dataviewApi = getDVAPI(this.app);
 
     containerEl.empty();
 
@@ -693,17 +691,16 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setName('Deduplicate Files')
       .setDesc(
         createFragment((fragment) => {
-          fragment.appendText('Use Dataview to check for duplicate files based on Readwise URL.');
+          fragment.appendText('Check for duplicate files based on Readwise URL.');
           fragment.createEl('br');
           fragment.appendText(
-            'This prevents creating duplicate files when articles are updated, even if the file name separator or the title in Readwise change. The Dataview plugin must be installed and enabled.'
+            'This prevents creating duplicate files when articles are updated, even if the file name separator or the title in Readwise change.'
           );
         })
       )
       .addToggle((toggle) =>
         toggle
-          .setValue(this.plugin.settings.deduplicateFiles && dataviewApi !== undefined)
-          .setDisabled(!dataviewApi)
+          .setValue(this.plugin.settings.deduplicateFiles)
           .onChange(async (value) => {
             this.plugin.settings.deduplicateFiles = value;
             await this.plugin.saveSettings();
