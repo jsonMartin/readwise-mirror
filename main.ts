@@ -547,7 +547,7 @@ export default class ReadwiseMirror extends Plugin {
           this.frontMatterTemplate
             .render(this.escapeFrontmatter(metadata, FRONTMATTER_TO_ESCAPE))
             .replace(/^---\n/, '')
-            .replace(/\n---$/, '')
+            .replace(/\n---\n*$/, '')
         );
         const frontMatterContents = this.settings.frontMatter
           ? ['---', YAML.stringify(frontmatterYaml), '---'].join('\n')
@@ -874,11 +874,48 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
     this.notify = notify;
   }
 
+  /**
+   * Adjusts the number of rows in a textarea based on content and wrapping
+   *
+   * @param textEl - The textarea element to adjust
+   * @param minRows - Minimum number of rows to show (default: 3)
+   *
+   * Behavior:
+   * - Calculates total lines needed based on content
+   * - Accounts for line wrapping based on textarea width
+   * - Maintains minimum row count
+   * - Adds one extra row for editing
+   *
+   * Example:
+   * For a textarea with cols=50:
+   * - "Short line" -> 1 line
+   * - "Very long line..." (>50 chars) -> 2 lines
+   * - "Line 1\nLine 2" -> 2 lines
+   * - "" (empty) -> minRows
+   */
+  private adjustTextareaRows = (textEl: HTMLTextAreaElement, minRows: number = 3) => {
+    const content = textEl.value;
+    const width = textEl.cols;
+
+    // Calculate wrapped lines
+    let totalLines = 0;
+    content.split('\n').forEach((line) => {
+      // Calculate how many times the line wraps
+      const wrappedLines = Math.ceil(line.length / width);
+      totalLines += Math.max(1, wrappedLines);
+    });
+
+    // Add 1 to account for the last line and set minimum
+    textEl.rows = Math.max(minRows, totalLines + 1);
+  };
+
   private validateFrontmatterTemplate(template: string): { isValid: boolean; error?: string; preview?: string } {
     const renderedTemplate = new Template(template, this.plugin.env, null, true).render(
       this.plugin.escapeFrontmatter(sampleMetadata, FRONTMATTER_TO_ESCAPE)
     );
-    const yamlContent = renderedTemplate.replace(/^---\n/, '').replace(/\n---$/, '');
+    const yamlContent = renderedTemplate
+      .replace(/^---\n/, '') // Remove opening ---
+      .replace(/\n---\n*$/, ''); // Remove closing --- and any trailing newlines
     try {
       YAML.parse(yamlContent);
       return { isValid: true };
@@ -898,13 +935,18 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
   }
 
   private createTemplateDocumentation(title: string, variables: [string, string][]) {
+    
     return createFragment((fragment) => {
-      fragment.createEl('div', {
+      const documentationContainer = fragment.createDiv({
+        cls: 'setting-documentation-container',
+      });
+
+      documentationContainer.createDiv({
         text: title,
         cls: 'setting-item-description',
       });
 
-      const container = fragment.createDiv({
+      const container = documentationContainer.createDiv({
         cls: 'setting-item-description',
         attr: { style: 'margin-top: 10px' },
       });
@@ -1092,8 +1134,9 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
         ])
       )
       .addTextArea((text) => {
+        const initialRows = 15;
         text.inputEl.addClass('settings-template-input');
-        text.inputEl.rows = 15;
+        text.inputEl.rows = initialRows;
         text.inputEl.cols = 50;
         text.setValue(this.plugin.settings.headerTemplate).onChange(async (value) => {
           if (!value) {
@@ -1104,6 +1147,16 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
           this.plugin.headerTemplate = new Template(this.plugin.settings.headerTemplate, this.plugin.env, null, true);
           await this.plugin.saveSettings();
         });
+
+        // Initial row adjustment
+        this.adjustTextareaRows(text.inputEl, initialRows);
+
+        // Adjust on content change
+        text.inputEl.addEventListener('input', () => {
+          this.adjustTextareaRows(text.inputEl, initialRows);
+        });
+
+        return text;
       });
 
     new Setting(containerEl)
@@ -1156,7 +1209,9 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
               fragment.appendText('Prevent existing frontmatter fields from being overwritten during sync');
               fragment.createEl('br');
               fragment.createEl('br');
-              fragment.appendText('Note: Only fields that already exist in the file will be protected. A field marked for protection which is not present yet in the original field will be written normally at the first write/update, and will be protected henceforth.');
+              fragment.appendText(
+                'Note: Only fields that already exist in the file will be protected. A field marked for protection which is not present yet in the original field will be written normally at the first write/update, and will be protected henceforth.'
+              );
               if (this.plugin.settings.deduplicateFiles) {
                 fragment.createEl('br');
                 fragment.appendText('The deduplication field ');
@@ -1202,7 +1257,12 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
                 attr: { style: 'color: var(--text-error); margin-top: 0.5em;' },
               });
 
-              return text
+              const initialRows = 3;
+              text.inputEl.addClass('settings-template-input');
+              text.inputEl.rows = initialRows;
+              text.inputEl.cols = 25;
+
+              text
                 .setValue(this.plugin.settings.protectedFields)
                 .setPlaceholder('status\ntags')
                 .onChange(async (value) => {
@@ -1214,6 +1274,16 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                   }
                 });
+
+              // Initial row adjustment
+              this.adjustTextareaRows(text.inputEl, initialRows);
+
+              // Adjust on content change
+              text.inputEl.addEventListener('input', () => {
+                this.adjustTextareaRows(text.inputEl, initialRows);
+              });
+
+              return text;
             });
         }
       }
@@ -1254,6 +1324,11 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
         })
       )
       .addTextArea((text) => {
+        const initialRows = 12;
+        text.inputEl.addClass('settings-template-input');
+        text.inputEl.rows = initialRows;
+        text.inputEl.cols = 50;
+
         const container = containerEl.createDiv();
 
         text.inputEl.addClass('settings-template-input');
@@ -1301,7 +1376,9 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
           const rendered = new Template(template, this.plugin.env, null, true).render(
             this.plugin.escapeFrontmatter(sampleMetadata, FRONTMATTER_TO_ESCAPE)
           );
-          const yamlContent = rendered.replace(/^---\n/, '').replace(/\n---$/, '');
+          const yamlContent = rendered
+            .replace(/^---\n/, '') // Remove opening ---
+            .replace(/\n---\n*$/, ''); // Remove closing --- and any trailing newlines
 
           try {
             YAML.parse(yamlContent);
@@ -1324,7 +1401,7 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
         // Display rendered template on load
         updatePreview(this.plugin.settings.frontMatterTemplate);
-        return text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
+        text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
           const validation = this.validateFrontmatterTemplate(value);
 
           // Update validation notice
@@ -1336,7 +1413,7 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
           if (!value) {
             this.plugin.settings.frontMatterTemplate = DEFAULT_SETTINGS.frontMatterTemplate;
           } else {
-            this.plugin.settings.frontMatterTemplate = value;
+            this.plugin.settings.frontMatterTemplate = value.replace(/\n*$/, '\n');
           }
 
           updatePreview(value);
@@ -1349,6 +1426,16 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
           );
           await this.plugin.saveSettings();
         });
+
+        // Initial row adjustment
+        this.adjustTextareaRows(text.inputEl, initialRows);
+
+        // Adjust on content change
+        text.inputEl.addEventListener('input', () => {
+          this.adjustTextareaRows(text.inputEl, initialRows);
+        });
+
+        return text;
       });
 
     new Setting(containerEl)
@@ -1370,10 +1457,11 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
         ])
       )
       .addTextArea((text) => {
+        const initialRows = 12;
         text.inputEl.addClass('settings-template-input');
-        text.inputEl.rows = 12;
+        text.inputEl.rows = initialRows;
         text.inputEl.cols = 50;
-        return text.setValue(this.plugin.settings.highlightTemplate).onChange(async (value) => {
+        text.setValue(this.plugin.settings.highlightTemplate).onChange(async (value) => {
           if (!value) {
             this.plugin.settings.highlightTemplate = DEFAULT_SETTINGS.highlightTemplate;
           } else {
@@ -1387,6 +1475,16 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
           );
           await this.plugin.saveSettings();
         });
+
+        // Initial row adjustment
+        this.adjustTextareaRows(text.inputEl, initialRows);
+
+        // Adjust on content change
+        text.inputEl.addEventListener('input', () => {
+          this.adjustTextareaRows(text.inputEl, initialRows);
+        });
+
+        return text;
       });
 
     new Setting(containerEl)
