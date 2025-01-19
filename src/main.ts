@@ -295,14 +295,14 @@ export default class ReadwiseMirror extends Plugin {
     // Fallback to MetadataCache if Dataview is not available
     const duplicateFiles: TFile[] = [];
     const files = this.app.vault.getMarkdownFiles();
-    
+
     for (const file of files) {
-        const metadata = this.app.metadataCache.getFileCache(file);
-        if (metadata?.frontmatter?.[this.settings.deduplicateProperty] === book.readwise_url) {
-            duplicateFiles.push(file);
-        }
+      const metadata = this.app.metadataCache.getFileCache(file);
+      if (metadata?.frontmatter?.[this.settings.deduplicateProperty] === book.readwise_url) {
+        duplicateFiles.push(file);
+      }
     }
-    
+
     return duplicateFiles;
   }
 

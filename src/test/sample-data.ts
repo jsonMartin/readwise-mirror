@@ -3,7 +3,7 @@
 // The data is synthetic and inteded to stress-test
 // the validity of the generated YAML
 // TODO: Add more sample data for testing
-// TODO: base it on Readwise API and not internal metadata
+// TODO: Base it on Readwise API and not internal metadata
 //
 
 import { Tag } from 'models/readwise';
