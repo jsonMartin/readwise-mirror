@@ -126,8 +126,11 @@ Protect specific frontmatter fields from being overwritten during sync:
    categories
    ```
 
-3. Protected fields will retain their values during sync
-4. Note: If deduplication is enabled, the deduplication field (e.g., `uri`) cannot be protected
+3. Protected fields will retain their values during sync **only if they already exist** in the file
+4. Fields listed for protection but not present in the file will be:
+   - Added normally on first sync
+   - Protected in subsequent updates once they exist
+5. Note: If deduplication is enabled, the deduplication field (e.g., `uri`) cannot be protected
 
 #### Example
 
@@ -136,15 +139,24 @@ If you have an existing note:
 ```yaml
 ---
 title: My Article
-status: in-progress
-tags: [research, important]
+status: in-progress  # Will be protected
+tags: [research]     # Will be protected
 uri: https://readwise.io/article/123
 ---
 ```
 
-And protect `status` and `tags`, these fields will keep their values during sync, while other fields may be updated with new content from Readwise.
+And protect `status`, `tags`, and `category`:
 
->**Note**: Frontmatter protection only works when "Update Frontmatter" is enabled.
+- `status` and `tags` will keep their values
+- `category` would:
+  - Be added if present in the first sync
+  - Be protected in future syncs once it exists
+
+>**Note**:
+>
+> - Frontmatter protection only works when "Update Frontmatter" is enabled.
+> - Fields must exist in the file to be protected
+> - Non-existent protected fields will be written once, then protected
 
 ### Available Variables
 
