@@ -364,6 +364,7 @@ export default class ReadwiseMirror extends Plugin {
     let frontmatter = '';
     let body = content;
 
+    // If frontmatter exists, update it
     if (match) {
       frontmatter = match[1];
       body = content.slice(match[0].length);
@@ -371,7 +372,7 @@ export default class ReadwiseMirror extends Plugin {
       // Parse existing frontmatter
       const currentFrontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter || {};
 
-      // Remove protected fields from updates
+      // Remove protected fields from updates (but only if they exist)
       if (this.settings.protectFrontmatter) {
         const protectedFields = this.settings.protectedFields
           .split('\n')
@@ -379,7 +380,8 @@ export default class ReadwiseMirror extends Plugin {
           .filter((f) => f.length > 0);
 
         for (const field of protectedFields) {
-          delete updates[field];
+          // only delete if the field is not present in currentFrontmatter
+          if (field in currentFrontmatter) delete updates[field];
         }
       }
 
@@ -622,7 +624,7 @@ export default class ReadwiseMirror extends Plugin {
                 console.error(`Readwise: Failed to delete duplicate ${file.path}`, err);
               }
             }
-          } 
+          }
           // Overwrite existing file with remote changes, or
           // Create new file if not existing
           else if (abstractFile && abstractFile instanceof TFile) {
@@ -1151,11 +1153,13 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
           .setName('Protect Frontmatter Fields')
           .setDesc(
             createFragment((fragment) => {
-              fragment.appendText('Prevent specific frontmatter fields from being overwritten during sync');
+              fragment.appendText('Prevent existing frontmatter fields from being overwritten during sync');
               fragment.createEl('br');
+              fragment.createEl('br');
+              fragment.appendText('Note: Only fields that already exist in the file will be protected. A field marked for protection which is not present yet in the original field will be written normally at the first write/update, and will be protected henceforth.');
               if (this.plugin.settings.deduplicateFiles) {
                 fragment.createEl('br');
-                fragment.appendText('Note: The deduplication field ');
+                fragment.appendText('The deduplication field ');
                 fragment.createEl('strong', { text: this.plugin.settings.deduplicateProperty });
                 fragment.appendText(' cannot be protected');
               }
