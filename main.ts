@@ -935,7 +935,6 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
   }
 
   private createTemplateDocumentation(title: string, variables: [string, string][]) {
-    
     return createFragment((fragment) => {
       const documentationContainer = fragment.createDiv({
         cls: 'setting-documentation-container',
@@ -1516,31 +1515,35 @@ class ReadwiseMirrorSettingTab extends PluginSettingTab {
         toggle.setValue(this.plugin.settings.useSlugify).onChange(async (value) => {
           this.plugin.settings.useSlugify = value;
           await this.plugin.saveSettings();
+          // Trigger re-render to show/hide property selector
+          this.display();
         })
       );
 
-    new Setting(containerEl)
-      .setName('Slugify Separator')
-      .setDesc('Character to use as separator in slugified filenames (default: -)')
-      .addText((text) =>
-        text
-          .setPlaceholder('-')
-          .setValue(this.plugin.settings.slugifySeparator)
-          .onChange(async (value) => {
-            this.plugin.settings.slugifySeparator = value || '-';
+    if (this.plugin.settings.useSlugify) {
+      new Setting(containerEl)
+        .setName('Slugify Separator')
+        .setDesc('Character to use as separator in slugified filenames (default: -)')
+        .addText((text) =>
+          text
+            .setPlaceholder('-')
+            .setValue(this.plugin.settings.slugifySeparator)
+            .onChange(async (value) => {
+              this.plugin.settings.slugifySeparator = value || '-';
+              await this.plugin.saveSettings();
+            })
+        );
+
+      new Setting(containerEl)
+        .setName('Slugify Lowercase')
+        .setDesc('Convert slugified filenames to lowercase')
+        .addToggle((toggle) =>
+          toggle.setValue(this.plugin.settings.slugifyLowercase).onChange(async (value) => {
+            this.plugin.settings.slugifyLowercase = value;
             await this.plugin.saveSettings();
           })
-      );
-
-    new Setting(containerEl)
-      .setName('Slugify Lowercase')
-      .setDesc('Convert slugified filenames to lowercase')
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.slugifyLowercase).onChange(async (value) => {
-          this.plugin.settings.slugifyLowercase = value;
-          await this.plugin.saveSettings();
-        })
-      );
+        );
+    }
 
     new Setting(containerEl)
       .setName('Deduplicate Files')
