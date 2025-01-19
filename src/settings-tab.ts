@@ -3,9 +3,9 @@ import { Template } from 'nunjucks';
 import * as YAML from 'yaml';
 import { getAPI as getDVAPI } from 'obsidian-dataview';
 import { sampleMetadata } from '../test-data/sampleData';
-import Notify from '../notify';
-import ReadwiseMirror from '../main';
-import { FRONTMATTER_TO_ESCAPE, DEFAULT_SETTINGS } from './lib';
+import Notify from 'notify';
+import ReadwiseMirror from 'main';
+import { FRONTMATTER_TO_ESCAPE, DEFAULT_SETTINGS } from 'lib';
 import { ReadwiseApi } from 'readwiseApi';
 
 export class ReadwiseMirrorSettingTab extends PluginSettingTab {

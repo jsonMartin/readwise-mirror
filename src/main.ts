@@ -8,8 +8,8 @@ import filenamify from 'filenamify';
 import { DataviewApi, getAPI as getDVAPI, Literal } from 'obsidian-dataview';
 import { Export, Highlight, Library, ReadwiseApi, Tag } from 'readwiseApi';
 import * as YAML from 'yaml';
-import { ReadwiseMirrorSettingTab } from './src/settings-tab';
-import { FRONTMATTER_TO_ESCAPE, DEFAULT_SETTINGS, PluginSettings } from './src/lib';
+import { ReadwiseMirrorSettingTab } from 'settings-tab';
+import { FRONTMATTER_TO_ESCAPE, DEFAULT_SETTINGS, PluginSettings } from 'lib';
 
 // ...existing code...
 
