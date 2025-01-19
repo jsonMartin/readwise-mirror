@@ -1,23 +1,18 @@
-import Notify from 'notify';
-import { ConfigureOptions, Environment, Template } from 'nunjucks';
-import { Plugin, TFile } from 'obsidian';
-import spacetime from 'spacetime';
 import slugify from '@sindresorhus/slugify';
 import filenamify from 'filenamify';
-
+import { ConfigureOptions, Environment, Template } from 'nunjucks';
+import { Plugin, TFile } from 'obsidian';
 import { DataviewApi, getAPI as getDVAPI, Literal } from 'obsidian-dataview';
-import { Export, Highlight, Library, ReadwiseApi, Tag } from 'readwiseApi';
+import spacetime from 'spacetime';
 import * as YAML from 'yaml';
-import { ReadwiseMirrorSettingTab } from 'settings-tab';
-import { FRONTMATTER_TO_ESCAPE, DEFAULT_SETTINGS, PluginSettings } from 'lib';
 
-// ...existing code...
-
-interface YamlStringState {
-  hasSingleQuotes: boolean;
-  hasDoubleQuotes: boolean;
-  isValueEscapedAlready: boolean;
-}
+import { DEFAULT_SETTINGS, FRONTMATTER_TO_ESCAPE } from 'constants/index';
+import { Export, Highlight, Library, Tag } from 'models/readwise';
+import { PluginSettings } from 'models/settings';
+import { YamlStringState } from 'models/yaml';
+import ReadwiseApi from 'services/readwise-api';
+import ReadwiseMirrorSettingTab from 'ui/settings-tab';
+import Notify from 'ui/notify';
 export default class ReadwiseMirror extends Plugin {
   settings: PluginSettings;
   readwiseApi: ReadwiseApi;

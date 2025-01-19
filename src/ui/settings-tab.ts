@@ -1,14 +1,14 @@
-import { App, PluginSettingTab, Setting } from 'obsidian';
-import { Template } from 'nunjucks';
-import * as YAML from 'yaml';
-import { getAPI as getDVAPI } from 'obsidian-dataview';
-import { sampleMetadata } from '../test-data/sampleData';
-import Notify from 'notify';
+import { DEFAULT_SETTINGS, FRONTMATTER_TO_ESCAPE } from 'constants/index';
 import ReadwiseMirror from 'main';
-import { FRONTMATTER_TO_ESCAPE, DEFAULT_SETTINGS } from 'lib';
-import { ReadwiseApi } from 'readwiseApi';
+import { Template } from 'nunjucks';
+import { App, PluginSettingTab, Setting } from 'obsidian';
+import { getAPI as getDVAPI } from 'obsidian-dataview';
+import ReadwiseApi from 'services/readwise-api';
+import { sampleMetadata } from 'test/sample-data';
+import Notify from 'ui/notify';
+import * as YAML from 'yaml';
 
-export class ReadwiseMirrorSettingTab extends PluginSettingTab {
+export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
   plugin: ReadwiseMirror;
   notify: Notify;
 
