@@ -1,4 +1,4 @@
-import { PluginSettings } from "models/settings";
+import { PluginSettings } from 'models/settings';
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   baseFolderName: 'Readwise',

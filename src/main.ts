@@ -751,4 +751,3 @@ export default class ReadwiseMirror extends Plugin {
     await this.saveData(this.settings);
   }
 }
-
