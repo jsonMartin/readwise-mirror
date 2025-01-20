@@ -370,6 +370,7 @@ export default class ReadwiseMirror extends Plugin {
         .reverse()[0];
 
       // Sanitize title, replace colon with substitute from settings
+      // FIXME: `filenamify` does Unicode normalization, which might not be desired
       const sanitizedTitle = this.settings.useSlugify
         ? slugify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
             separator: this.settings.slugifySeparator,
@@ -379,6 +380,8 @@ export default class ReadwiseMirror extends Plugin {
             replacement: ' ',
             maxLength: 255,
           })}`;
+      // Old version:
+      // : `${title.replace(/:/g, this.settings.colonSubstitute ?? '-').replace(/[<>"'\/\\|?*]+/g, '')}`;
 
       // Filter highlights
       const filteredHighlights = this.filterHighlights(highlights);
@@ -446,7 +449,10 @@ export default class ReadwiseMirror extends Plugin {
           category.charAt(0).toUpperCase() + category.slice(1)
         }/${sanitizedTitle}.md`;
 
-        const abstractFile = vault.getAbstractFileByPath(path);
+        if (path.normalize('NFKC') !== path) {
+          console.warn(`Readwise: Using normalized path '${path}' to get abstract file`);
+        }
+        const abstractFile = vault.getAbstractFileByPath(path.normalize('NFKC'));
 
         // Try to find duplicates
         try {
@@ -457,12 +463,10 @@ export default class ReadwiseMirror extends Plugin {
             let deduplicated = false;
             let filesToDeleteOrLabel: TFile[] = [];
 
-            // First: Check if target file is in duplicates
+            // First: Check if target file is in duplicates (i.e. has the same name)
             const targetFileIndex = duplicates.findIndex((f) => f.path === path);
             if (targetFileIndex >= 0 && abstractFile instanceof TFile) {
               deduplicated = true;
-              // Remove target file from duplicates
-              duplicates.splice(targetFileIndex, 1);
               // Update target file
               try {
                 // Update frontmatter if enabled
@@ -473,6 +477,10 @@ export default class ReadwiseMirror extends Plugin {
                 } else await vault.process(abstractFile, () => contents);
               } catch (err) {
                 console.error(`Readwise: Attempt to overwrite file ${path} failed`, err);
+                this.notify.notice(`Readwise: Failed to update file ${path}`);
+              } finally {
+                // Remove target file from duplicates
+                duplicates.splice(targetFileIndex, 1);
               }
             }
 
@@ -481,29 +489,31 @@ export default class ReadwiseMirror extends Plugin {
               // Keep first duplicate if we haven't updated a file yet, and write it
               if (!deduplicated && duplicates[0]) {
                 try {
-                  // Rename the duplicate first and then write the new contents
-                  await this.app.fileManager.renameFile(duplicates[0], path).then(() => {
-                    // Update frontmatter if enabled
-                    if (this.settings.updateFrontmatter) {
-                      this.updateFrontmatter(duplicates[0], frontmatterYaml).then(({ frontmatter }) => {
-                        const contents = `${frontmatter}${headerContents}${formattedHighlights}`;
-                        vault
-                          .process(duplicates[0], () => contents)
-                          .then(() => {
-                            deduplicated = true;
-                          });
-                      });
-                    } else
+                  // Write the new contents to the first duplicate
+                  if (this.settings.updateFrontmatter) {
+                    await this.updateFrontmatter(duplicates[0], frontmatterYaml).then(({ frontmatter }) => {
+                      const contents = `${frontmatter}${headerContents}${formattedHighlights}`;
                       vault
                         .process(duplicates[0], () => contents)
                         .then(() => {
                           deduplicated = true;
                         });
-                  });
+                    });
+                  } else
+                    await vault
+                      .process(duplicates[0], () => contents)
+                      .then(() => {
+                        deduplicated = true;
+                      });
+
+                  // Rename the file if we have updated it
+                  // FIXME: Catch cases where the destination file already exists (without overwriting)
+                  await this.app.fileManager.renameFile(duplicates[0], path);
                   // Remove the file we just updated from duplicates
                   duplicates.shift();
                 } catch (err) {
                   console.error(`Readwise: Failed to update duplicate ${duplicates[0].path}`, err);
+                  this.notify.notice(`Readwise: Failed to update duplicate ${duplicates[0].path}`);
                 }
               }
               // Add remaining duplicates to deletion list
@@ -516,10 +526,11 @@ export default class ReadwiseMirror extends Plugin {
                 if (this.settings.deleteDuplicates) {
                   await vault.trash(file, true);
                 } else {
-                  await this.writeUpdatedFrontmatter(file, { duplicate: true });
+                  await this.writeUpdatedFrontmatter(file, { ...frontmatterYaml, duplicate: true });
                 }
               } catch (err) {
                 console.error(`Readwise: Failed to delete duplicate ${file.path}`, err);
+                this.notify.notice(`Readwise: Failed to delete duplicate ${file.path}`);
               }
             }
           }
@@ -536,13 +547,21 @@ export default class ReadwiseMirror extends Plugin {
               } else await vault.process(abstractFile, () => contents);
             } catch (err) {
               console.error(`Readwise: Attempt to overwrite file ${path} failed`, err);
+              this.notify.notice(`Readwise: Failed to update file ${path}`);
             }
           } else {
-            // File does not exist
-            vault.create(path, contents);
+            try {
+              // File does not exist
+              // FIXME: Custom Normalization on OS X might mess with filenames (e.g. NFD -> NFC)
+              // E.g. https://unicode-org.github.io/icu/design/normalization/custom.html
+              await vault.create(path, contents);
+            } catch (err) {
+              console.error(`Readwise: Attempt to create file ${path} *de novo* failed`, err);
+              this.notify.notice(`Readwise: Failed to create file ${path}`);
+            }
           }
         } catch (err) {
-          console.error(`Readwise: Attempt to create file ${path} failed`, err);
+          console.error(`Readwise: Writing file ${path} failed`, err);
         }
       }
     }
