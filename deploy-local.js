@@ -37,23 +37,26 @@ if (!process.env.OBSIDIAN_PLUGIN_ROOT || !process.env.PACKAGE_NAME) {
 
 // Configure deployment
 const DEPLOY_PATH = `${process.env.OBSIDIAN_PLUGIN_ROOT}/${process.env.PACKAGE_NAME}`;
-const DEPLOY_FILES = ['main.js', 'manifest.json', 'styles.css'];
+const DEPLOY_FILES = ['main.js', 'manifest.json', { src: 'src/ui/styles/styles.css', dest: 'styles.css' }];
 
-// Copy files to plugin directory
+// Copy files to plugin directory: use filename if array element is string, otherwise use src/dest object
 for (const file of DEPLOY_FILES) {
-  switch (file) {
+  const src = typeof file === 'string' ? file : file.src;
+  const dest = typeof file === 'string' ? file : file.dest;
+
+  switch (dest) {
     case 'manifest.json':
-      json = JSON.parse(fs.readFileSync(file));
+      json = JSON.parse(fs.readFileSync(src));
       json.version = `${json.version}-${new Date().toISOString().replace(/[-:\.TZ]/g, '')}`;
       console.log(`Written ${file} to ${DEPLOY_PATH}/${file} with updated version ${json.version}`);
-      fs.writeFileSync(`${DEPLOY_PATH}/${file}`, JSON.stringify(json, null, 4) + '\n');
+      fs.writeFileSync(`${DEPLOY_PATH}/${dest}`, JSON.stringify(json, null, 4) + '\n');
       break;
     default:
-      fs.copyFile(file, `${DEPLOY_PATH}/${file}`, (err) => {
+      fs.copyFile(src, `${DEPLOY_PATH}/${dest}`, (err) => {
         if (err) {
-          console.error(`Failed to copy ${file} to ${DEPLOY_PATH}/${file}`);
+          console.error(`Failed to copy ${src} to ${DEPLOY_PATH}/${dest}`);
         } else {
-          console.log(`Copied ${file} to ${DEPLOY_PATH}/${file}`);
+          console.log(`Copied ${src} to ${DEPLOY_PATH}/${dest}`);
         }
       });
       break;
