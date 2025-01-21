@@ -388,7 +388,11 @@ Rendered output:
 
 ## Deduplication
 
-The plugin prevents duplicate files when articles are re-imported from Readwise, maintaining link consistency in your vault. This can be useful if you plan to change the character used to escape the colon `:` in your titles.
+The plugin prevents duplicate files when articles are re-imported from Readwise, maintaining link consistency in your vault. This can be useful in a number of cases: 
+
+- if you change the character used to escape the colon `:` in your titles, 
+- when changing to use the "Slugify" feature, or changing its options, and  
+- if the title of a Readwise item changes
 
 ### How It Works
 
@@ -400,7 +404,7 @@ The plugin prevents duplicate files when articles are re-imported from Readwise,
 2. **Update Strategy**
    - If exact filename match exists: Updates content in place
    - If different filename exists: Updates first matching file, and changes this file's filename to the new filename
-   - Additional matches: Either deleted or marked as duplicates
+   - Additional matches: Either deleted or marked as duplicates (with the `duplicate` property)
 
 3. **Link Preservation**
    - Maintains existing internal links
@@ -441,8 +445,8 @@ Currently, the following limitations apply to deduplication:
 - Readwise items with the exact same title will be detected, the first one in the export will be used to write to your vault
 - To start using deduplication, you have to run a full sync to make sure all your files have the deduplication frontmatter property and can thus be deduplicated. This means any changes you made to your local files will be lost (this is not a new behaviour though, but you should be aware of it)
 
-### Readwise duplicates
+### Readwise (remote) duplicates
 
-In Readwise, multiple items with the same title but different `id`'s can exist, which leads to a filename collision in `readwise-mirror`. If a such a duplicate is detected (e.g. because a file already exists with the "same" filename), the plugin will write a file which has the Readwise id value added to the filename.
+In Readwise, multiple items with the same title but different `id`'s can exist. This leads to a filename collision in `readwise-mirror`. If a such a duplicate ('remote dupliacate') is detected (because a file already exists with the "same" filename), the plugin will write a file which has the Readwise id value added to the filename of all detected duplicates.
 
-The filename of two Readwise items `My Duplicate Book` would thus become `My Duplicate Book.md` and `My Duplicate Book <ID>.md` where `<ID>` would be the id value of the second item the plugin encounters when downloading. As this order can change between runs of the plugin (e.g. because of changes to one item which changes the order in the returned data), the filenames might change. 
+The filename of two different Readwise items both titled `My Duplicate Book` would thus become `My Duplicate Book.md` and `My Duplicate Book <ID>.md` where `<ID>` would be the id value of the second item the plugin encounters when downloading. As this order can change between runs of the plugin (e.g. because of changes to one item which changes the order in the returned data), the filenames might change as well from run to run.
