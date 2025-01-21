@@ -5,7 +5,7 @@ import { Plugin, TFile } from 'obsidian';
 import spacetime from 'spacetime';
 import * as YAML from 'yaml';
 
-import { DEFAULT_SETTINGS, FRONTMATTER_TO_ESCAPE } from 'constants/index';
+import { DEFAULT_SETTINGS, FRONTMATTER_TO_ESCAPE, YAML_TOSTRING_OPTIONS } from 'constants/index';
 import { Export, Highlight, Library, Tag } from 'models/readwise';
 import { PluginSettings } from 'models/settings';
 import { YamlStringState } from 'models/yaml';
@@ -278,9 +278,9 @@ export default class ReadwiseMirror extends Plugin {
         ...updates,
       };
 
-      frontmatter = ['---', YAML.stringify(newFrontmatter), '---'].join('\n');
+      frontmatter = ['---', YAML.stringify(newFrontmatter, YAML_TOSTRING_OPTIONS), '---'].join('\n');
     } else {
-      frontmatter = ['---', YAML.stringify(updates), '---'].join('\n');
+      frontmatter = ['---', YAML.stringify(updates, YAML_TOSTRING_OPTIONS), '---'].join('\n');
     }
     return { frontmatter, body };
   }
@@ -440,7 +440,7 @@ export default class ReadwiseMirror extends Plugin {
             .replace(/\n---\n*$/, '')
         );
         const frontMatterContents = this.settings.frontMatter
-          ? ['---', YAML.stringify(frontmatterYaml), '---'].join('\n')
+          ? ['---', YAML.stringify(frontmatterYaml, YAML_TOSTRING_OPTIONS), '---'].join('\n')
           : '';
         const headerContents = this.headerTemplate.render(metadata);
         const contents = `${frontMatterContents}${headerContents}${formattedHighlights}`;

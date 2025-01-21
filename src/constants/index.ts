@@ -1,4 +1,5 @@
 import { PluginSettings } from 'models/settings';
+import { ToStringOptions } from 'yaml';
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   baseFolderName: 'Readwise',
@@ -83,3 +84,7 @@ Tags: {{ tags }}
 };
 
 export const FRONTMATTER_TO_ESCAPE = ['title', 'sanitized_title', 'author', 'authorStr'];
+
+// YAML options
+// Don't line-break (mainly for compatiblity with platers/obsidian-linter#1227)
+export const YAML_TOSTRING_OPTIONS : ToStringOptions = { 'lineWidth': -1 }
