@@ -1,108 +1,17 @@
-import { App, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
-import Notify from 'notify';
+import slugify from '@sindresorhus/slugify';
+import filenamify from 'filenamify';
+import { ConfigureOptions, Environment, Template } from 'nunjucks';
+import { normalizePath, Plugin, TFile } from 'obsidian';
 import spacetime from 'spacetime';
-import { Environment, Template, ConfigureOptions } from 'nunjucks';
-import * as _ from 'lodash';
+import * as YAML from 'yaml';
 
-import { ReadwiseApi, Library, Highlight, Export, Tag } from 'readwiseApi';
-
-interface PluginSettings {
-  baseFolderName: string;
-  apiToken: string | null;
-  lastUpdated: string | null;
-  autoSync: boolean;
-  highlightSortOldestToNewest: boolean;
-  highlightSortByLocation: boolean;
-  highlightDiscard: boolean;
-  syncNotesOnly: boolean;
-  colonSubstitute: string;
-  logFile: boolean;
-  logFileName: string;
-  frontMatter: boolean;
-  frontMatterTemplate: string;
-  headerTemplate: string;
-  highlightTemplate: string;
-}
-
-const DEFAULT_SETTINGS: PluginSettings = {
-  baseFolderName: 'Readwise',
-  apiToken: null,
-  lastUpdated: null,
-  autoSync: true,
-  highlightSortOldestToNewest: true,
-  highlightSortByLocation: true,
-  highlightDiscard: false,
-  syncNotesOnly: false,
-  colonSubstitute: '-',
-  logFile: true,
-  logFileName: 'Sync.md',
-  frontMatter: false,
-  frontMatterTemplate: `---
-id: {{ id }}
-created: {{ created }}
-updated: {{ updated }}
-title: {{ title }}
-author: {{ author }}
----
-`,
-  headerTemplate: `
-%%
-ID: {{ id }}
-Updated: {{ updated }}
-%%
-
-![]( {{ cover_image_url }})
-
-# About
-Title: [[{{ sanitized_title }}]]
-Authors: {{ authorStr }}
-Category: #{{ category }}
-{%- if tags %}
-Tags: {{ tags }}
-{%- endif %}
-Number of Highlights: =={{ num_highlights }}==
-Readwise URL: {{ highlights_url }}
-{%- if source_url %}
-Source URL: {{ source_url }}
-{%- endif %}
-Date: [[{{ created }}]]
-Last Highlighted: *{{ last_highlight_at }}*
-{%- if summary %}
-Summary: {{ summary }}
-{%- endif %}
-
----
-
-{%- if document_note %}
-# Document Note
-
-{{ document_note }}
-{%- endif %}
-
-# Highlights
-
-`,
-  highlightTemplate: `{{ text }}{%- if category == 'books' %} ([{{ location }}]({{ location_url }})){%- endif %}{%- if color %} %% Color: {{ color }} %%{%- endif %} ^{{id}}{%- if note %}
-
-Note: {{ note }}
-{%- endif %}{%- if tags %}
-
-Tags: {{ tags }}
-{%- endif %}{%- if url %}
-
-[View Highlight]({{ url }})
-{%- endif %}
-
----
-`,
-};
-
-interface YamlStringState {
-  hasSingleQuotes: boolean;
-  hasDoubleQuotes: boolean;
-  isValueEscapedAlready: boolean;
-}
-
+import { DEFAULT_SETTINGS, FRONTMATTER_TO_ESCAPE, YAML_TOSTRING_OPTIONS } from 'constants/index';
+import { Export, Highlight, Library, Tag } from 'models/readwise';
+import { PluginSettings } from 'models/settings';
+import { YamlStringState } from 'models/yaml';
+import ReadwiseApi from 'services/readwise-api';
+import ReadwiseMirrorSettingTab from 'ui/settings-tab';
+import Notify from 'ui/notify';
 export default class ReadwiseMirror extends Plugin {
   settings: PluginSettings;
   readwiseApi: ReadwiseApi;
@@ -123,24 +32,34 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   // Before metadata is used
-  private escapeFrontmatter(metadata: any, fieldsToProcess: Array<string>): any {
+  public escapeFrontmatter(metadata: any, fieldsToProcess: Array<string>): any {
     // Copy the metadata object to avoid modifying the original
-    const processedMetadata = {... metadata};
+    const processedMetadata = { ...metadata };
     fieldsToProcess.forEach((field) => {
       if (field in processedMetadata && processedMetadata[field] && typeof processedMetadata[field] === 'string') {
         processedMetadata[field] = this.escapeYamlValue(processedMetadata[field]);
-    }});
+      }
+    });
 
     return processedMetadata;
   }
 
-  private escapeYamlValue(value: string): string {
+  private escapeYamlValue(value: string, multiline: boolean = false): string {
     if (!value) return '""';
 
     const state = this.analyzeStringForFrontmatter(value);
 
     // Already properly quoted and valid YAML
     if (state.isValueEscapedAlready) return value;
+
+    // Handle multi-line strings
+    if (value.includes('\n') && multiline) {
+      // Use folded block style (>) for titles, preserve single line ending
+      const indent = '  ';
+      return `>-\n${indent}${value.replace(/\n/g, `\n${indent}`)}`;
+    }
+
+    value = value.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
 
     // No quotes in string - use simple double quotes to catch other special characters
     if (!state.hasSingleQuotes && !state.hasDoubleQuotes) {
@@ -213,7 +132,7 @@ export default class ReadwiseMirror extends Plugin {
 
       // Check if is discarded
       if (this.settings.highlightDiscard && this.highlightIsDiscarded(highlight)) {
-        console.log('Readwise: Found discarded highlight, removing', highlight);
+        console.debug('Readwise: Found discarded highlight, removing', highlight);
         return false;
       }
 
@@ -290,6 +209,103 @@ export default class ReadwiseMirror extends Plugin {
     }
   }
 
+  /**
+   * Writes updated frontmatter of a file with new values
+   * @param file TFile to update
+   * @param updates Record of key-value pairs to update/add in frontmatter
+   * @returns Promise<void>
+   *
+   * Example:
+   * ```typescript
+   * await updateFrontmatter(file, {
+   *   duplicate: true,
+   *   lastUpdated: '2024-03-15'
+   * });
+   * ```
+   *
+   * Behavior:
+   * - If file has no frontmatter, creates new frontmatter section
+   * - If key exists, updates value (unless protected)
+   * - If key doesn't exist, adds new key-value pair
+   * - Preserves existing frontmatter formatting and values
+   * - Maintains file content after frontmatter unchanged
+   *
+   * Protection:
+   * - When frontmatter protection is enabled, specified fields are preserved
+   * - Protected fields are not updated even if included in updates
+   * - Protection is configured in plugin settings
+   * - Example protected fields: status, tags, categories
+   */
+  private async writeUpdatedFrontmatter(file: TFile, updates: Record<string, any>): Promise<void> {
+    let { frontmatter, body } = await this.updateFrontmatter(file, updates);
+
+    // Combine and write back
+    await this.app.vault.modify(file, `${frontmatter}\n${body}`);
+  }
+
+  private async updateFrontmatter(file: TFile, updates: Record<string, any>) {
+    const content = await this.app.vault.read(file);
+    const frontmatterRegex = /^(---\n[\s\S]*?\n---)/;
+    const match = content.match(frontmatterRegex);
+
+    let frontmatter = '';
+    let body = content;
+
+    // If frontmatter exists, update it
+    if (match) {
+      frontmatter = match[1];
+      body = content.slice(match[0].length);
+
+      // Parse existing frontmatter
+      const currentFrontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter || {};
+
+      // Remove protected fields from updates (but only if they exist)
+      if (this.settings.protectFrontmatter) {
+        const protectedFields = this.settings.protectedFields
+          .split('\n')
+          .map((f) => f.trim())
+          .filter((f) => f.length > 0);
+
+        for (const field of protectedFields) {
+          // only delete if the field is not present in currentFrontmatter
+          if (field in currentFrontmatter) delete updates[field];
+        }
+      }
+
+      // Create new frontmatter
+      const newFrontmatter = {
+        ...currentFrontmatter,
+        ...updates,
+      };
+
+      frontmatter = ['---', YAML.stringify(newFrontmatter, YAML_TOSTRING_OPTIONS), '---'].join('\n');
+    } else {
+      frontmatter = ['---', YAML.stringify(updates, YAML_TOSTRING_OPTIONS), '---'].join('\n');
+    }
+    return { frontmatter, body };
+  }
+
+  private async findDuplicates(book: Export): Promise<TFile[]> {
+    const canDeduplicate = this.settings.deduplicateFiles;
+
+    if (!canDeduplicate) {
+      return Promise.resolve([]);
+    }
+
+    // Fallback to MetadataCache if Dataview is not available
+    const duplicateFiles: TFile[] = [];
+    const files = this.app.vault.getMarkdownFiles();
+
+    for (const file of files) {
+      const metadata = this.app.metadataCache.getFileCache(file);
+      if (metadata?.frontmatter?.[this.settings.deduplicateProperty] === book.readwise_url) {
+        duplicateFiles.push(file);
+      }
+    }
+
+    return duplicateFiles;
+  }
+
   async writeLibraryToMarkdown(library: Library) {
     const vault = this.app.vault;
 
@@ -316,7 +332,7 @@ export default class ReadwiseMirror extends Plugin {
         )}% finished (${bookCurrent}/${booksTotal})`
       );
       bookCurrent += 1;
-      const book = library['books'][bookId];
+      const book: Export = library['books'][bookId];
 
       const {
         user_book_id,
@@ -354,15 +370,21 @@ export default class ReadwiseMirror extends Plugin {
         .reverse()[0];
 
       // Sanitize title, replace colon with substitute from settings
-      const sanitizedTitle = `${title
-        .replace(/:/g, this.settings.colonSubstitute ?? '-')
-        .replace(/[<>"'\/\\|?*#]+/g, '')}`;
+      const sanitizedTitle = this.settings.useSlugify
+        ? slugify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
+            separator: this.settings.slugifySeparator,
+            lowercase: this.settings.slugifyLowercase,
+          })
+        : `${filenamify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
+            replacement: ' ',
+            maxLength: 255,
+          })}`;
 
       // Filter highlights
       const filteredHighlights = this.filterHighlights(highlights);
 
       if (filteredHighlights.length === 0) {
-        console.log(`Readwise: No highlights found for '${title}' (${source_url})`);
+        console.debug(`Readwise: No highlights found for '${title}' (${source_url})`);
       } else {
         const formattedHighlights = this.sortHighlights(filteredHighlights)
           .map((highlight: Highlight) => this.formatHighlight(highlight, book))
@@ -407,9 +429,15 @@ export default class ReadwiseMirror extends Plugin {
         };
 
         // Escape specific fields used in frontmatter
-        const fieldsToProcess = ['title', 'sanitized_title', 'author', 'authorStr'];
+        // TODO: Tidy up code. It doesn't make sense to remove the frontmatter markers and then add them back
+        const frontmatterYaml = YAML.parse(
+          this.frontMatterTemplate
+            .render(this.escapeFrontmatter(metadata, FRONTMATTER_TO_ESCAPE))
+            .replace(/^---\n/, '')
+            .replace(/\n---\n*$/, '')
+        );
         const frontMatterContents = this.settings.frontMatter
-          ? this.frontMatterTemplate.render(this.escapeFrontmatter(metadata, fieldsToProcess))
+          ? ['---', YAML.stringify(frontmatterYaml, YAML_TOSTRING_OPTIONS), '---'].join('\n')
           : '';
         const headerContents = this.headerTemplate.render(metadata);
         const contents = `${frontMatterContents}${headerContents}${formattedHighlights}`;
@@ -418,23 +446,141 @@ export default class ReadwiseMirror extends Plugin {
           category.charAt(0).toUpperCase() + category.slice(1)
         }/${sanitizedTitle}.md`;
 
-        const abstractFile = vault.getAbstractFileByPath(path);
+        const abstractFile = vault.getAbstractFileByPath(normalizePath(path));
 
-        // Overwrite existing file with remote changes, or
-        // Create new file if not existing
-        if (abstractFile && abstractFile instanceof TFile) {
-          // File exists
-          try {
-            await vault.process(abstractFile, function (data) {
-              // Simply return new contents to overwrite file
-              return contents;
-            });
-          } catch (err) {
-            console.error(`Readwise: Attempt to overwrite file ${path} failed`, err);
+        // Try to find duplicates: local duplicates (e.g. copies of files), and remote duplicates (e.g. readwise items with the same title)
+        try {
+          const duplicates = await this.findDuplicates(book);
+
+          // Deduplicate files
+          if (duplicates.length > 0) {
+            let deduplicated = false;
+            let filesToDeleteOrLabel: TFile[] = [];
+
+            // First: Check if target file is in duplicates (i.e. has the same name)
+            const targetFileIndex = duplicates.findIndex((f) => f.path === path);
+            if (targetFileIndex >= 0 && abstractFile instanceof TFile) {
+              deduplicated = true;
+              // Update target file
+              try {
+                // Update frontmatter if enabled
+                if (this.settings.updateFrontmatter) {
+                  const { frontmatter } = await this.updateFrontmatter(abstractFile, frontmatterYaml);
+                  const contents = `${frontmatter}${headerContents}${formattedHighlights}`;
+                  await vault.process(abstractFile, () => contents);
+                } else await vault.process(abstractFile, () => contents);
+              } catch (err) {
+                console.error(`Readwise: Attempt to overwrite file ${path} failed`, err);
+                this.notify.notice(`Readwise: Failed to update file ${path}`);
+              } finally {
+                // Remove target file from duplicates
+                duplicates.splice(targetFileIndex, 1);
+              }
+            }
+
+            // Second: Handle remaining duplicates (if any)
+            if (duplicates.length > 0) {
+              // Keep first duplicate if we haven't updated a file yet, and write it
+              if (!deduplicated && duplicates[0]) {
+                try {
+                  // Write the new contents to the first duplicate
+                  if (this.settings.updateFrontmatter) {
+                    await this.updateFrontmatter(duplicates[0], frontmatterYaml).then(({ frontmatter }) => {
+                      const contents = `${frontmatter}${headerContents}${formattedHighlights}`;
+                      vault
+                        .process(duplicates[0], () => contents)
+                        .then(() => {
+                          deduplicated = true;
+                        });
+                    });
+                  } else
+                    await vault
+                      .process(duplicates[0], () => contents)
+                      .then(() => {
+                        deduplicated = true;
+                      });
+
+                  // Rename the file if we have updated it
+                  await this.app.fileManager.renameFile(duplicates[0], path).catch(async () => {
+                    // We couldn't rename – check if we happen to have a file with "identical" (case-insenstivie) names
+                    if (vault.adapter.exists(normalizePath(path))) {
+                      // Replace the sanitized title
+                      const incrementPath = path.replace(`${sanitizedTitle}.md`, `${sanitizedTitle} ${metadata.id}.md`);
+                      if (incrementPath !== path) {
+                        await this.app.fileManager.renameFile(duplicates[0], incrementPath);
+                        console.warn(`Readwise: Processed remote duplicate ${incrementPath}`);
+                        this.notify.notice(`Readwise: Processed remote duplicate into ${incrementPath}`);
+                      } else {
+                        console.warn(
+                          `Readwise: file '${await vault.create(
+                            path,
+                            contents
+                          )}' for remote duplicate will not be renamed.`
+                        );
+                      }
+                    }
+                  });
+                  // Remove the file we just updated from duplicates
+                  duplicates.shift();
+                } catch (err) {
+                  // Verify if file exists: if yes, we might have a duplicate in Readwise (i.e. same title (minus case))
+                  console.error(`Readwise: Failed to rename local duplicate ${duplicates[0].path}`, err);
+                  this.notify.notice(`Readwise: Failed to rename local duplicate ${duplicates[0].path}`);
+                }
+              }
+              // Add remaining duplicates to deletion list
+              filesToDeleteOrLabel.push(...duplicates);
+            }
+
+            // Delete extra duplicates or mark as "duplicate" in the Vault
+            for (const file of filesToDeleteOrLabel) {
+              try {
+                if (this.settings.deleteDuplicates) {
+                  await vault.trash(file, true);
+                } else {
+                  await this.writeUpdatedFrontmatter(file, { ...frontmatterYaml, duplicate: true });
+                }
+              } catch (err) {
+                console.error(`Readwise: Failed to delete local duplicate ${file.path}`, err);
+                this.notify.notice(`Readwise: Failed to delete local duplicate ${file.path}`);
+              }
+            }
           }
-        } else {
-          // File does not exist
-          vault.create(path, contents);
+          // Overwrite existing file with remote changes, or
+          // Create new file if not existing
+          else if (abstractFile && abstractFile instanceof TFile) {
+            // File exists
+            try {
+              // Update frontmatter if enabled
+              if (this.settings.updateFrontmatter) {
+                const { frontmatter } = await this.updateFrontmatter(abstractFile, frontmatterYaml);
+                const contents = `${frontmatter}${headerContents}${formattedHighlights}`;
+                await vault.process(abstractFile, () => contents);
+              } else await vault.process(abstractFile, () => contents);
+            } catch (err) {
+              console.error(`Readwise: Attempt to overwrite file ${path} failed`, err);
+              this.notify.notice(`Readwise: Failed to update file ${path}`);
+            }
+          } else {
+            try {
+              // File does not exist
+              await vault.create(path, contents).catch(async () => {
+                // We might have a file that already exists but with different cased filename … check
+                if (vault.adapter.exists(normalizePath(path))) {
+                  // Replace the sanitized title
+                  const incrementPath = path.replace(`${sanitizedTitle}.md`, `${sanitizedTitle} ${metadata.id}.md`);
+                  await vault.create(incrementPath, contents);
+                  console.warn(`Readwise: Processed remote duplicate ${incrementPath}`);
+                  this.notify.notice(`Readwise: Processed remote duplicate into ${incrementPath}`);
+                }
+              });
+            } catch (err) {
+              console.error(`Readwise: Attempt to create file ${path} *de novo* failed`, err);
+              this.notify.notice(`Readwise: Failed to create file ${path}`);
+            }
+          }
+        } catch (err) {
+          console.error(`Readwise: Writing file ${path} failed`, err);
         }
       }
     }
@@ -526,6 +672,34 @@ export default class ReadwiseMirror extends Plugin {
       this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()} elsewhere`);
   }
 
+  public ensureDedupPropertyInTemplate(template: string): string {
+    if (!this.settings.deduplicateFiles) return template;
+
+    const propertyName = this.settings.deduplicateProperty;
+    const propertyValue = `${propertyName}: {{ highlights_url }}`;
+
+    const lines = template.split('\n');
+    const frontmatterStart = lines.findIndex((line) => line.trim() === '---');
+    const frontmatterEnd =
+      lines.slice(frontmatterStart + 1).findIndex((line) => line.trim() === '---') + frontmatterStart + 1;
+
+    if (frontmatterStart === -1 || frontmatterEnd <= frontmatterStart) return template;
+
+    // Check for existing property
+    const propertyIndex = lines.findIndex((line) => line.trim().startsWith(`${propertyName}:`));
+
+    if (propertyIndex > -1 && propertyIndex < frontmatterEnd) {
+      // Replace existing property
+      console.warn(`Readwise: Replacing existing property '${propertyName}' in frontmatter template for deduplication`);
+      lines[propertyIndex] = propertyValue;
+    } else {
+      // Add new property before closing ---
+      lines.splice(frontmatterEnd, 0, propertyValue);
+    }
+
+    return lines.join('\n');
+  }
+
   async onload() {
     await this.loadSettings();
 
@@ -554,7 +728,12 @@ export default class ReadwiseMirror extends Plugin {
       return this.escapeForYaml(str);
     });
 
-    this.frontMatterTemplate = new Template(this.settings.frontMatterTemplate, this.env, null, true);
+    this.frontMatterTemplate = new Template(
+      this.ensureDedupPropertyInTemplate(this.settings.frontMatterTemplate),
+      this.env,
+      null,
+      true
+    );
     this.headerTemplate = new Template(this.settings.headerTemplate, this.env, null, true);
     this.highlightTemplate = new Template(this.settings.highlightTemplate, this.env, null, true);
 
@@ -613,323 +792,10 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData()) };
   }
 
   async saveSettings() {
     await this.saveData(this.settings);
-  }
-}
-
-class ReadwiseMirrorSettingTab extends PluginSettingTab {
-  plugin: ReadwiseMirror;
-  notify: Notify;
-
-  constructor(app: App, plugin: ReadwiseMirror, notify: Notify) {
-    super(app, plugin);
-    this.plugin = plugin;
-    this.notify = notify;
-  }
-
-  private createTemplateDocumentation(title: string, variables: [string, string][]) {
-    return createFragment((fragment) => {
-      fragment.createEl('div', {
-        text: title,
-        cls: 'setting-item-description',
-      });
-
-      const container = fragment.createDiv({
-        cls: 'setting-item-description',
-        attr: { style: 'margin-top: 10px' },
-      });
-
-      container.createSpan({ text: 'Available variables:' });
-      container.createEl('br');
-
-      const list = container.createEl('ul', { cls: 'template-vars-list' });
-
-      variables.forEach(([key, desc]) => {
-        const item = list.createEl('li');
-        item.createEl('code', { text: `{{ ${key} }}` });
-        item.appendText(`: ${desc}`);
-      });
-
-      container.createDiv({
-        cls: 'template-syntax-note',
-        text: 'Supports Nunjucks templating syntax',
-      });
-    });
-  }
-
-  display(): void {
-    let { containerEl } = this;
-
-    containerEl.empty();
-
-    containerEl.createEl('h1', { text: 'Readwise Sync Configuration' });
-
-    const apiTokenFragment = document.createDocumentFragment();
-    apiTokenFragment.createEl('span', null, (spanEl) =>
-      spanEl.createEl('a', null, (aEl) => (aEl.innerText = aEl.href = 'https://readwise.io/access_token'))
-    );
-
-    new Setting(containerEl)
-      .setName('Enter your Readwise Access Token')
-      .setDesc(apiTokenFragment)
-      .addText((text) =>
-        text
-          .setPlaceholder('Readwise Access Token')
-          .setValue(this.plugin.settings.apiToken)
-          .onChange(async (value) => {
-            if (!value) return;
-            this.plugin.settings.apiToken = value;
-            await this.plugin.saveSettings();
-            this.plugin.readwiseApi = new ReadwiseApi(value, this.notify);
-          })
-      );
-
-    new Setting(containerEl)
-      .setName('Readwise library folder name')
-      .setDesc('Default: Readwise')
-      .addText((text) =>
-        text
-          .setPlaceholder('Readwise')
-          .setValue(this.plugin.settings.baseFolderName)
-          .onChange(async (value) => {
-            if (!value) return;
-            this.plugin.settings.baseFolderName = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName('Auto Sync when starting')
-      .setDesc('Automatically syncs new highlights after opening Obsidian')
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.autoSync).onChange(async (value) => {
-          this.plugin.settings.autoSync = value;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName('Sort Highlights in notes from Oldest to Newest')
-      .setDesc(
-        'If checked, highlights will be listed from oldest to newest. Unchecked, newest highlights will appear first.'
-      )
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.highlightSortOldestToNewest).onChange(async (value) => {
-          this.plugin.settings.highlightSortOldestToNewest = value;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName('Sort Highlights by Location')
-      .setDesc(
-        'If checked, highlights will be listed in order of Location. Combine with above Sort Highlights from Oldest to Newest option to reverse order.'
-      )
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.highlightSortByLocation).onChange(async (value) => {
-          this.plugin.settings.highlightSortByLocation = value;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName('Filter Discarded Highlights')
-      .setDesc('If enabled, do not display discarded highlights in the Readwise library.')
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.highlightDiscard).onChange(async (value) => {
-          this.plugin.settings.highlightDiscard = value;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName('Only sync highlights with notes')
-      .setDesc(
-        'If checked, highlights will only be synced if they have a note. This makes it easier to use these notes for Zettelkasten.'
-      )
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.syncNotesOnly).onChange(async (value) => {
-          this.plugin.settings.syncNotesOnly = value;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName('Replacement string for colons in filenames')
-      .setDesc(
-        "Set the string to be used for replacement of colon (:) in filenames derived from the title. The default value for this setting is '-'."
-      )
-      .addText((text) =>
-        text
-          .setPlaceholder('Colon replacement in title')
-          .setValue(this.plugin.settings.colonSubstitute)
-          .onChange(async (value) => {
-            if (!value || value.match(':')) {
-              console.warn(`Readwise: colon replacement: empty or invalid value: ${value}`);
-              this.plugin.settings.colonSubstitute = DEFAULT_SETTINGS.colonSubstitute;
-            } else {
-              console.info(`Readwise: colon replacement: setting value: ${value}`);
-              this.plugin.settings.colonSubstitute = value;
-            }
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName('Sync Log')
-      .setDesc('Save sync log to file in Library')
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.logFile).onChange(async (value) => {
-          this.plugin.settings.logFile = value;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName('Sync Log File Name')
-      .setDesc('Default: Sync.md')
-      .addText((text) =>
-        text
-          .setPlaceholder('Sync.md')
-          .setValue(this.plugin.settings.logFileName)
-          .onChange(async (value) => {
-            if (!value) return;
-            this.plugin.settings.logFileName = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName('Header Template')
-      .setDesc(
-        this.createTemplateDocumentation('Controls document metadata and structure.', [
-          ['id', 'Document ID'],
-          ['title', 'Document title'],
-          ['sanitized_title', 'Title safe for file system'],
-          ['author/authorStr', 'Author name(s), authorStr includes wiki links'],
-          ['category', 'Content type (books, articles, etc)'],
-          ['cover_image_url', 'Book/article cover'],
-          ['summary', 'Document summary'],
-          ['document_note', 'Additional notes'],
-          ['num_highlights', 'Number of highlights'],
-          ['highlights_url', 'Readwise URL'],
-          ['source_url', 'Original content URL'],
-          ['unique_url', 'Unique identifier URL'],
-          ['created/updated/last_highlight_at', 'Timestamps'],
-          ['tags/tags_nohash', 'Tags (with/without # prefix)'],
-          ['highlight_tags/hl_tags_nohash', 'Tags from highlights (with/without # prefix)'],
-        ])
-      )
-      .addTextArea((text) => {
-        text.inputEl.addClass('settings-template-input');
-        text.inputEl.rows = 15;
-        text.inputEl.cols = 50;
-        text.setValue(this.plugin.settings.headerTemplate).onChange(async (value) => {
-          if (!value) {
-            this.plugin.settings.headerTemplate = DEFAULT_SETTINGS.headerTemplate;
-          } else {
-            this.plugin.settings.headerTemplate = value;
-          }
-          this.plugin.headerTemplate = new Template(this.plugin.settings.headerTemplate, this.plugin.env, null, true);
-          await this.plugin.saveSettings();
-        });
-      });
-
-    new Setting(containerEl)
-      .setName('Frontmatter')
-      .setDesc('Add frontmatter (defined with the following Template)')
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.frontMatter).onChange(async (value) => {
-          this.plugin.settings.frontMatter = value;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName('Frontmatter Template')
-      .setDesc(
-        this.createTemplateDocumentation(
-          'Controls YAML frontmatter metadata. The same variables are available as for the Header template, with specific versions optimised for YAML frontmatter (tags), and escaped values for YAML compatibility.',
-          [
-            ['id', 'Document ID'],
-            ['created', 'Creation timestamp'],
-            ['updated', 'Last update timestamp'],
-            ['last_highlight_at', 'Last highlight timestamp'],
-            ['title', 'Document title (escaped for YAML)'],
-            ['sanitized_title', 'Title safe for file system (escaped for YAML)'],
-            ['author', 'Author name(s) (escaped for YAML)'],
-            ['authorStr', 'Author names with wiki links (escaped for YAML)'],
-            ['category', 'Content type'],
-            ['num_highlights', 'Number of highlights'],
-            ['source_url', 'Original content URL'],
-            ['unique_url', 'Unique identifier URL'],
-            ['tags', 'Tags with # prefix'],
-            ['tags_nohash', 'Tags without # prefix (compatible with frontmatter)'],
-            ['highlight_tags', 'Tags from highlights with # prefix'],
-            ['hl_tags_nohash', 'Tags from highlights without # prefix (compatible with frontmatter)'],
-          ]
-        )
-      )
-      .addTextArea((text) => {
-        text.inputEl.addClass('settings-template-input');
-        text.inputEl.rows = 15;
-        text.inputEl.cols = 50;
-        return text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
-          if (!value) {
-            this.plugin.settings.frontMatterTemplate = DEFAULT_SETTINGS.frontMatterTemplate;
-          } else {
-            this.plugin.settings.frontMatterTemplate = value;
-          }
-          this.plugin.frontMatterTemplate = new Template(
-            this.plugin.settings.frontMatterTemplate,
-            this.plugin.env,
-            null,
-            true
-          );
-          await this.plugin.saveSettings();
-        });
-      });
-
-    new Setting(containerEl)
-      .setName('Highlight Template')
-      .setDesc(
-        this.createTemplateDocumentation('Controls individual highlight formatting.', [
-          ['text', 'Highlight content (supports bq filter for blockquotes)'],
-          ['note', 'Associated notes (supports qa filter for Q&A format)'],
-          ['color', 'Highlight color'],
-          ['location', 'Book location'],
-          ['locationUrl', 'Direct link to highlight location'],
-          ['url', 'Source URL'],
-          ['id', 'Highlight ID'],
-          ['category', 'Content type (e.g., books)'],
-          ['tags', 'Tags with # prefix'],
-          ['created_at', 'Creation timestamp'],
-          ['updated_at', 'Last update timestamp'],
-          ['highlighted_at', 'Highlight timestamp'],
-        ])
-      )
-      .addTextArea((text) => {
-        text.inputEl.addClass('settings-template-input');
-        text.inputEl.rows = 12;
-        text.inputEl.cols = 50;
-        return text.setValue(this.plugin.settings.highlightTemplate).onChange(async (value) => {
-          if (!value) {
-            this.plugin.settings.highlightTemplate = DEFAULT_SETTINGS.highlightTemplate;
-          } else {
-            this.plugin.settings.highlightTemplate = value;
-          }
-          this.plugin.highlightTemplate = new Template(
-            this.plugin.settings.highlightTemplate,
-            this.plugin.env,
-            null,
-            true
-          );
-          await this.plugin.saveSettings();
-        });
-      });
   }
 }

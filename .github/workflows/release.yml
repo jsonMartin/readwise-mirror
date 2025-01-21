@@ -2,7 +2,7 @@ name: Release plugin version
 on: 
   workflow_dispatch:
   push:
-    branches: [master, main]
+    branches: [master, main, beta]
 
 permissions:
   contents: read # for checkout
@@ -37,4 +37,4 @@ jobs:
       - name: Release update
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx semantic-release
+        run: npx -p github:brianrodri/semantic-release-obsidian-plugin semantic-release

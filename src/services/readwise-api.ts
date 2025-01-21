@@ -1,57 +1,10 @@
-import Notify from 'notify';
+import { Export, Library } from 'models/readwise';
+import Notify from 'ui/notify';
 
 const API_ENDPOINT = 'https://readwise.io/api/v2';
 const API_PAGE_SIZE = 1000; // number of results per page, default 100 / max 1000
 
-export interface Export {
-  user_book_id: number;
-  title: string;
-  author: string;
-  readable_title: string;
-  source: string;
-  cover_image_url: string;
-  unique_url: string;
-  book_tags: Tag[];
-  category: string;
-  document_note: string;
-  summary: string;
-  readwise_url: string;
-  source_url: string;
-  asin: string | null;
-  highlights: Highlight[];
-}
-
-export interface Highlight {
-  id: number;
-  text: string;
-  note: string;
-  location: number;
-  location_type: string;
-  highlighted_at: string;
-  created_at: string;
-  updated_at: string;
-  url: string | null;
-  color: string;
-  book_id: number;
-  tags: Tag[];
-}
-
-export interface Tag {
-  id: number;
-  name: string;
-}
-
-export interface Exports {
-  [key: string]: Export;
-}
-
-export interface Library {
-  categories: Set<string>;
-  books: Exports;
-  highlightCount: number;
-}
-
-export class ReadwiseApi {
+export default class ReadwiseApi {
   private apiToken: string;
   private notify: Notify;
 
@@ -106,7 +59,7 @@ export class ReadwiseApi {
 
       console.info(`Readwise: Fetching ${contentType}`);
       if (lastUpdated) console.info(`Readwise: Checking for new content since ${lastUpdated}`);
-      if (bookId) console.info(`Readwise: Checking for all highlights on book ID: ${bookId}`);
+      if (bookId) console.debug(`Readwise: Checking for all highlights on book ID: ${bookId}`);
       let statusBarText = `Readwise: Fetching ${contentType}`;
       if (data?.count) statusBarText += ` (${results.length})`;
       this.notify.setStatusBarText(statusBarText);
@@ -129,7 +82,7 @@ export class ReadwiseApi {
         if (!nextPageCursor) {
           break;
         } else {
-          console.info(`Readwise: There are more records left, proceeding to next page: ${data.nextPageCursor}`);
+          console.debug(`Readwise: There are more records left, proceeding to next page: ${data.nextPageCursor}`);
         }
       }
     }

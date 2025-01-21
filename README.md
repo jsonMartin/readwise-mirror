@@ -73,6 +73,17 @@ A lot of the value of Readwise highlights lies in the notes associated with them
 
 The option "Only sync highlights with notes" will do exactly that: it will only sync highlights with notes. If an item in your library has only highlights without notes, it will not be synced.
 
+## Slugify Filenames
+
+The plugin provides an option to "slugify" filenames. This means converting the filenames into a URL-friendly format by replacing spaces and special characters with hyphens or other safe characters. This is useful for ensuring compatibility across different filesystems and avoiding issues with special characters.
+
+### Options
+
+- **Default**: The default behavior does not modify filenames.
+- **Slugify**: Converts filenames to a slugified format. For example, `My Book Title` becomes `my-book-title`. You can select a separator and whether the filename will be all lowercase
+
+To enable slugifying filenames, go to the plugin settings and toggle the "Slugify Filenames" option. Please note that this is a major change. You will end up with duplicate files unless you delete and sync the entire library.
+
 ## Templates
 
 The plugin uses three template types to format content, all using Nunjucks templating syntax:
@@ -82,6 +93,70 @@ The plugin uses three template types to format content, all using Nunjucks templ
 - **Header Template**: Controls document structure and metadata display
 - **Highlight Template**: Controls individual highlight formatting
 - **Frontmatter Template**: Controls YAML metadata (optional)
+
+### Frontmatter Validation
+
+Real-time template validation for the frontmatter ensures:
+
+- Valid YAML syntax
+- Proper field escaping
+- Correct template variables
+- Preview with sample data
+
+## Frontmatter Management
+
+### Updating Frontmatter
+
+The plugin provides granular control over how frontmatter is handled in existing files:
+
+- **Update Frontmatter**: When enabled, updates frontmatter in existing files during sync, overwriting values defined in the frontmatter template and keeping additional fields you might have added since the last sync.
+- When disabled, existing frontmatter will always completely be overwritten
+- Works best with Deduplication enabled to ensure consistent file handling
+
+### Frontmatter Protection
+
+Protect specific frontmatter fields from being overwritten during sync:
+
+1. Enable "Protect Frontmatter Fields"
+2. Enter field names to protect (one per line), for example:
+
+   ```yaml
+   status
+   tags
+   categories
+   ```
+
+3. Protected fields will retain their values during sync **only if they already exist** in the file
+4. Fields listed for protection but not present in the file will be:
+   - Added normally on first sync
+   - Protected in subsequent updates once they exist
+5. Note: If deduplication is enabled, the deduplication field (e.g., `uri`) cannot be protected
+
+#### Example
+
+If you have an existing note:
+
+```yaml
+---
+title: My Article
+status: in-progress  # Will be protected
+tags: [research]     # Will be protected
+uri: https://readwise.io/article/123
+---
+```
+
+And protect `status`, `tags`, and `category`:
+
+- `status` and `tags` will keep their values
+- `category` would:
+  - Be added if present in the first sync
+  - Be protected in future syncs once it exists
+
+>**Note**:
+>
+> - Frontmatter protection only works when "Update Frontmatter" is enabled.
+> - Fields must exist in the file to be protected
+> - Non-existent protected fields will be written once, then protected
 
 ### Available Variables
 
@@ -155,9 +230,9 @@ The following would print both document and all highlight tags, rolled-up:
 ---
 id: {{ id }}
 updated: {{ updated }}
-title: "{{ title }}"
-alias: "{{ sanitized_title }}"
-author: "{{ author }}"
+title: {{ title }}
+alias: {{ sanitized_title }}
+author: {{ author }}
 highlights: {{ num_highlights }}
 last_highlight_at: {{ last_highlight_at }}
 source: {{ source_url }}
@@ -310,4 +385,68 @@ Rendered output:
 
 - The templating is based on the [`nunjucks`](https://mozilla.github.io/nunjucks/templating.html) templating library and thus shares its limitations;
 - Certain strings (e.g. date, tags, authors) are currently preformatted
-- If you have frontmatter and items with `@` in the title or author's name (typically this happens with highlights imported from Twitter), the frontmatter will be invalid. You can add quotes in your frontmatter template to try to work around these cases: `title: "{{ title }}" but any quotes already present in the title will break your frontmatter too.
+
+## Deduplication
+
+The plugin prevents duplicate files when articles are re-imported from Readwise, maintaining link consistency in your vault. This can be useful in a number of cases: 
+
+- if you change the character used to escape the colon `:` in your titles, 
+- when changing to use the "Slugify" feature, or changing its options, and  
+- if the title of a Readwise item changes
+
+### How It Works
+
+1. **File Matching**
+   - Uses MetadataCache to find files with matching `readwise_url`
+   - Checks all vault locations, not just the Readwise folder
+   - Honors existing file structure
+
+2. **Update Strategy**
+   - If exact filename match exists: Updates content in place
+   - If different filename exists: Updates first matching file, and changes this file's filename to the new filename
+   - Additional matches: Either deleted or marked as duplicates (with the `duplicate` property)
+
+3. **Link Preservation**
+   - Maintains existing internal links
+   - Preserves file locations in vault
+   - Updates content while keeping references intact
+
+### Duplicate Handling
+
+When duplicates are found:
+
+1. **Exact Match**
+
+   ```
+   📄 "My Article.md" (existing)
+   └── Updates content in place
+   ```
+
+2. **Different Filename**
+
+   ```
+   📄 "Article (2024).md" (existing)
+   └── Updates content, changes filename to "My Article.md"
+   ```
+
+3. **Multiple Matches**
+
+   ```
+   📄 "My Article.md" (primary)
+   └── Updated with new content
+   📄 "Same Article.md" (duplicate)
+   └── Deleted or marked with duplicate: true
+   ```
+
+### Deduplication limitations
+
+Currently, the following limitations apply to deduplication:
+
+- Readwise items with the exact same title will be detected, the first one in the export will be used to write to your vault
+- To start using deduplication, you have to run a full sync to make sure all your files have the deduplication frontmatter property and can thus be deduplicated. This means any changes you made to your local files will be lost (this is not a new behaviour though, but you should be aware of it)
+
+### Readwise (remote) duplicates
+
+In Readwise, multiple items with the same title but different `id`'s can exist. This leads to a filename collision in `readwise-mirror`. If a such a duplicate ('remote dupliacate') is detected (because a file already exists with the "same" filename), the plugin will write a file which has the Readwise id value added to the filename of all detected duplicates.
+
+The filename of two different Readwise items both titled `My Duplicate Book` would thus become `My Duplicate Book.md` and `My Duplicate Book <ID>.md` where `<ID>` would be the id value of the second item the plugin encounters when downloading. As this order can change between runs of the plugin (e.g. because of changes to one item which changes the order in the returned data), the filenames might change as well from run to run.

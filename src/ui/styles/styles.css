@@ -1,6 +1,4 @@
-.settings-template-input {
-  width: 100%;
-  height: 300px;
+.settings-template-input, .error-details {
   font-family: var(--font-monospace);
   font-size: smaller;
   resize: vertical;
