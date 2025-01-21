@@ -370,7 +370,6 @@ export default class ReadwiseMirror extends Plugin {
         .reverse()[0];
 
       // Sanitize title, replace colon with substitute from settings
-      // FIXME: `filenamify` does Unicode normalization, which might not be desired
       const sanitizedTitle = this.settings.useSlugify
         ? slugify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
             separator: this.settings.slugifySeparator,
@@ -380,8 +379,6 @@ export default class ReadwiseMirror extends Plugin {
             replacement: ' ',
             maxLength: 255,
           })}`;
-      // Old version:
-      // : `${title.replace(/:/g, this.settings.colonSubstitute ?? '-').replace(/[<>"'\/\\|?*]+/g, '')}`;
 
       // Filter highlights
       const filteredHighlights = this.filterHighlights(highlights);
@@ -451,7 +448,6 @@ export default class ReadwiseMirror extends Plugin {
 
         const abstractFile = vault.getAbstractFileByPath(normalizePath(path));
 
-        
         // TODO: Use DataAdapter.exists() to check for duplicates, and write "versioned" file in case the vault methods fail
         // https://docs.obsidian.md/Reference/TypeScript+API/DataAdapter/exists#DataAdapter.exists()+method
         // Try to find duplicates
@@ -508,12 +504,23 @@ export default class ReadwiseMirror extends Plugin {
 
                   // Rename the file if we have updated it
                   // FIXME: Catch cases where the destination file already exists (without overwriting)
-                  await this.app.fileManager.renameFile(duplicates[0], path);
+                  await this.app.fileManager.renameFile(duplicates[0], path).catch(async () => {
+                    // We couldn't rename – check if we happen to have a file with "identical" (case-insenstivie) names
+                    if (vault.adapter.exists(normalizePath(path))) {
+
+                      // Replace the sanitized title
+                      const incrementPath = path.replace(`${sanitizedTitle}.md`, `${sanitizedTitle} ${metadata.id}.md`);
+                      await this.app.fileManager.renameFile(duplicates[0], incrementPath);
+                      console.warn(`Readwise: Processed Readwise duplicate ${incrementPath}`);
+                      this.notify.notice(`Readwise: Processed Readwise duplicate into ${incrementPath}`);
+                    }
+                  });
                   // Remove the file we just updated from duplicates
                   duplicates.shift();
                 } catch (err) {
-                  console.error(`Readwise: Failed to update duplicate ${duplicates[0].path}`, err);
-                  this.notify.notice(`Readwise: Failed to update duplicate ${duplicates[0].path}`);
+                  // Verify if file exists: if yes, we might have a duplicate in Readwise (i.e. same title (minus case))
+                  console.error(`Readwise: Failed to rename duplicate ${duplicates[0].path}`, err);
+                  this.notify.notice(`Readwise: Failed to rename duplicate ${duplicates[0].path}`);
                 }
               }
               // Add remaining duplicates to deletion list
@@ -552,9 +559,16 @@ export default class ReadwiseMirror extends Plugin {
           } else {
             try {
               // File does not exist
-              // FIXME: Custom Normalization on OS X might mess with filenames (e.g. NFD -> NFC)
-              // E.g. https://unicode-org.github.io/icu/design/normalization/custom.html
-              await vault.create(path, contents);
+              await vault.create(path, contents).catch(async () => {
+                // We might have a file that already exists but with different cased filename … check
+                if(vault.adapter.exists(normalizePath(path))) {
+                  // Replace the sanitized title
+                  const incrementPath = path.replace(`${sanitizedTitle}.md`, `${sanitizedTitle} ${metadata.id}.md`);
+                  await vault.create(incrementPath, contents);
+                  console.warn(`Readwise: Processed Readwise duplicate ${incrementPath}`);
+                  this.notify.notice(`Readwise: Processed Readwise duplicate into ${incrementPath}`);
+                }
+              });
             } catch (err) {
               console.error(`Readwise: Attempt to create file ${path} *de novo* failed`, err);
               this.notify.notice(`Readwise: Failed to create file ${path}`);
@@ -773,7 +787,7 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData()) };
   }
 
   async saveSettings() {
