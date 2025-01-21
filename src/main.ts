@@ -1,7 +1,7 @@
 import slugify from '@sindresorhus/slugify';
 import filenamify from 'filenamify';
 import { ConfigureOptions, Environment, Template } from 'nunjucks';
-import { Plugin, TFile } from 'obsidian';
+import { normalizePath, Plugin, TFile } from 'obsidian';
 import spacetime from 'spacetime';
 import * as YAML from 'yaml';
 
@@ -449,11 +449,11 @@ export default class ReadwiseMirror extends Plugin {
           category.charAt(0).toUpperCase() + category.slice(1)
         }/${sanitizedTitle}.md`;
 
-        if (path.normalize('NFKC') !== path) {
-          console.warn(`Readwise: Using normalized path '${path}' to get abstract file`);
-        }
-        const abstractFile = vault.getAbstractFileByPath(path.normalize('NFKC'));
+        const abstractFile = vault.getAbstractFileByPath(normalizePath(path));
 
+        
+        // TODO: Use DataAdapter.exists() to check for duplicates, and write "versioned" file in case the vault methods fail
+        // https://docs.obsidian.md/Reference/TypeScript+API/DataAdapter/exists#DataAdapter.exists()+method
         // Try to find duplicates
         try {
           const duplicates = await this.findDuplicates(book);
