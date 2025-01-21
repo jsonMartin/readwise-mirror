@@ -218,7 +218,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           .setPlaceholder('Colon replacement in title')
           .setValue(this.plugin.settings.colonSubstitute)
           .onChange(async (value) => {
-            if (!value || value.match(':')) {
+            if (!value || /[:<>\"\/\\|?*]/.test(value)) {
               console.warn(`Readwise: colon replacement: empty or invalid value: ${value}`);
               this.plugin.settings.colonSubstitute = DEFAULT_SETTINGS.colonSubstitute;
             } else {
