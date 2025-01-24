@@ -109,8 +109,8 @@ export default class ReadwiseMirror extends Plugin {
       location_url: locationUrl,
       url, // URL is set for source of highlight (webpage, tweet, etc). null for books
       color: color,
-      created_at: highlighted_at ? this.formatDate(created_at) : '',
-      updated_at: highlighted_at ? this.formatDate(updated_at) : '',
+      created_at: created_at ? this.formatDate(created_at) : '',
+      updated_at: updated_at ? this.formatDate(updated_at) : '',
       highlighted_at: highlighted_at ? this.formatDate(highlighted_at) : '',
       tags: formattedTagStr,
 
