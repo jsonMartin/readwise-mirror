@@ -313,6 +313,7 @@ export default class ReadwiseMirror extends Plugin {
     library['categories'].forEach(async (category: string) => {
       category = category.charAt(0).toUpperCase() + category.slice(1); // Title Case the directory name
 
+      // TODO: deal with case sensitiveness – getAbstractFileByPath is *case sensitive* but `vault.create()` is not
       const path = `${this.settings.baseFolderName}/${category}`;
       const abstractFolder = vault.getAbstractFileByPath(path);
 
@@ -471,7 +472,7 @@ export default class ReadwiseMirror extends Plugin {
                 } else await vault.process(abstractFile, () => contents);
               } catch (err) {
                 console.error(`Readwise: Attempt to overwrite file ${path} failed`, err);
-                this.notify.notice(`Readwise: Failed to update file ${path}`);
+                this.notify.notice(`Readwise: Failed to update file '${path}'. ${err}`);
               } finally {
                 // Remove target file from duplicates
                 duplicates.splice(targetFileIndex, 1);
@@ -559,7 +560,7 @@ export default class ReadwiseMirror extends Plugin {
               } else await vault.process(abstractFile, () => contents);
             } catch (err) {
               console.error(`Readwise: Attempt to overwrite file ${path} failed`, err);
-              this.notify.notice(`Readwise: Failed to update file ${path}`);
+              this.notify.notice(`Readwise: Failed to update file '${path}'. ${err}`);
             }
           } else {
             try {
@@ -575,12 +576,13 @@ export default class ReadwiseMirror extends Plugin {
                 }
               });
             } catch (err) {
-              console.error(`Readwise: Attempt to create file ${path} *de novo* failed`, err);
-              this.notify.notice(`Readwise: Failed to create file ${path}`);
+              console.error(`Readwise: Attempt to create file ${path} *DE NOVO* failed (uri: ${metadata.highlights_url})`, err);
+              this.notify.notice(`Readwise: Failed to create file '${path}'. ${err}`);
             }
           }
         } catch (err) {
-          console.error(`Readwise: Writing file ${path} failed`, err);
+          console.error(`Readwise: Writing file ${path} (${metadata.highlights_url}) failed`, err);
+          this.notify.notice(`Readwise: Writing to '${path}' failed. ${err}`);
         }
       }
     }

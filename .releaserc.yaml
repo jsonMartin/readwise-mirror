@@ -14,7 +14,7 @@ plugins:
     - assets:
         - path: main.js
         - path: manifest.json
-        - path: styles.css
+        - path: src/ui/styles/styles.css
   # Uncomment the following block if semantic release *should* commit the 
   # updated `manifest.json`, `versions.json` and `package.json` files with the new version number.
   #
