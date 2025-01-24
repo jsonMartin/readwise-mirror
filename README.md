@@ -18,6 +18,7 @@ The first time this plugin is ran, it will do a full sync downloading all conten
   - Automatically creates `[[Links]]` for book titles and authors
   - Contains block level link references *(using the Highlight ID)*. Allows to automatically link/transclude any highlight without needing to modify the Readwise note.
 - Supports tags, both within highlights as well as sources (books, articles, etc)
+- Supports Readwise Reader fields, notably the summary and document note
 
 ## Usage
 
@@ -72,36 +73,143 @@ A lot of the value of Readwise highlights lies in the notes associated with them
 
 The option "Only sync highlights with notes" will do exactly that: it will only sync highlights with notes. If an item in your library has only highlights without notes, it will not be synced.
 
-## Templating
+## Slugify Filenames
 
-The plugin allows for simple templating. Similarly to Readwise's templating, it allows to define
+The plugin provides an option to "slugify" filenames. This means converting the filenames into a URL-friendly format by replacing spaces and special characters with hyphens or other safe characters. This is useful for ensuring compatibility across different filesystems and avoiding issues with special characters.
 
-- a header template,
-- a highlight template, and
-- a template for frontmatter
+### Options
 
-The frontmatter template can be turned on and off. If you want to revert to the default template, you can just empty the template completely and the plugin will restore the default.
+- **Default**: The default behavior does not modify filenames.
+- **Slugify**: Converts filenames to a slugified format. For example, `My Book Title` becomes `my-book-title`. You can select a separator and whether the filename will be all lowercase
 
-### Header and frontmatter template
+To enable slugifying filenames, go to the plugin settings and toggle the "Slugify Filenames" option. Please note that this is a major change. You will end up with duplicate files unless you delete and sync the entire library.
 
-The template exposes the following variables (they can be used for both the header and frontmatter):
+## Templates
 
-- ```id```: Document id,
-- ```title```: Sanitized title,
-- ```author```: Author (raw),
-- ```authorStr```: Author (formatted, as Wiki Links ```[[Author Name]]```),
-- ```category```: Document category,
-- ```num_highlights```: Number of highlights,
-- ```updated```: Date of last update,
-- ```cover_image_url```: Cover image,
-- ```highlights_url```: Readwise URL,
-- ```highlights```: Highlights,
-- ```last_highlight_at```: Date of last highlight,
-- ```source_url```: Source URL,
-- ```tags```: Document tags,
-- ```highlight_tags```: Rolled-up list of highlight tags,
-- ```tags_nohash```: Document tags withough "#",  but with single quotes "'" to avoid issues with tags that are valid in readwise but require special care when used in Obsidian frontmatter (e.g. tags using '@'). To be used in an array in frontmatter (use `tags: [ {{ tags_nohash }}]` in your frontmatter template)
-- ```hl_tags_nohash```: List of all highlight tags to be used in an array in frontmatter (withouth "#", similar to `tags_nohash`)
+The plugin uses three template types to format content, all using Nunjucks templating syntax:
+
+### Template Types
+
+- **Header Template**: Controls document structure and metadata display
+- **Highlight Template**: Controls individual highlight formatting
+- **Frontmatter Template**: Controls YAML metadata (optional)
+
+### Frontmatter Validation
+
+Real-time template validation for the frontmatter ensures:
+
+- Valid YAML syntax
+- Proper field escaping
+- Correct template variables
+- Preview with sample data
+
+## Frontmatter Management
+
+### Updating Frontmatter
+
+The plugin provides granular control over how frontmatter is handled in existing files:
+
+- **Update Frontmatter**: When enabled, updates frontmatter in existing files during sync, overwriting values defined in the frontmatter template and keeping additional fields you might have added since the last sync.
+- When disabled, existing frontmatter will always completely be overwritten
+- Works best with Deduplication enabled to ensure consistent file handling
+
+### Frontmatter Protection
+
+Protect specific frontmatter fields from being overwritten during sync:
+
+1. Enable "Protect Frontmatter Fields"
+2. Enter field names to protect (one per line), for example:
+
+   ```yaml
+   status
+   tags
+   categories
+   ```
+
+3. Protected fields will retain their values during sync **only if they already exist** in the file
+4. Fields listed for protection but not present in the file will be:
+   - Added normally on first sync
+   - Protected in subsequent updates once they exist
+5. Note: If deduplication is enabled, the deduplication field (e.g., `uri`) cannot be protected
+
+#### Example
+
+If you have an existing note:
+
+```yaml
+---
+title: My Article
+status: in-progress  # Will be protected
+tags: [research]     # Will be protected
+uri: https://readwise.io/article/123
+---
+```
+
+And protect `status`, `tags`, and `category`:
+
+- `status` and `tags` will keep their values
+- `category` would:
+  - Be added if present in the first sync
+  - Be protected in future syncs once it exists
+
+>**Note**:
+>
+> - Frontmatter protection only works when "Update Frontmatter" is enabled.
+> - Fields must exist in the file to be protected
+> - Non-existent protected fields will be written once, then protected
+
+### Available Variables
+
+#### Document Metadata
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `id` | Document ID | `12345` |
+| `title` | Original title | `"My Book"` |
+| `sanitized_title` | Filesystem-safe title | `"My-Book"` |
+| `author` | Author name(s) | `"John Smith"` |
+| `authorStr` | Author with wiki links | `"[[John Smith]]"` |
+| `category` | Content type | `"books"` |
+
+#### Header / Frontmatter Content
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `document_note` | Reader document note | `"My reading notes..."` |
+| `summary` | Reader summary | `"Book summary..."` |
+| `num_highlights` | Number of highlights | `42` |
+| `cover_image_url` | Cover image URL | `"https://..."` |
+
+#### URLs
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `highlights_url` | Readwise URL | `"https://readwise.io/..."` |
+| `source_url` | Original content URL | `"https://..."` |
+| `unique_url` | Reader URL (if available) | `"https://reader.readwise.io/..."` |
+
+#### Tags
+
+| Variable | Description | Example |
+|----------|-------------|--------|
+| `tags` | Document tags with # | `"#tag1, #tag2"` |
+| `tags_nohash` | Tags for frontmatter | `"'tag1', 'tag2'"` |
+| `highlight_tags` | Highlight tags with # | `"#note, #important"` |
+| `hl_tags_nohash` | Highlight tags for frontmatter | `"'note', 'important'"` |
+
+#### Timestamps
+
+| Variable | Description |
+|----------|-------------|
+| `created` | Creation date |
+| `updated` | Last update |
+| `last_highlight_at` | Last highlight date |
+
+### Template Filters
+
+- `bq`: Add blockquote markers.
+- `is_qa`: Check for Q&A format.
+- `qa`: Convert to Q&A format.
 
 #### Default frontmatter template
 
@@ -122,8 +230,9 @@ The following would print both document and all highlight tags, rolled-up:
 ---
 id: {{ id }}
 updated: {{ updated }}
-title: "{{ title }}"
-author: "{{ author }}"
+title: {{ title }}
+alias: {{ sanitized_title }}
+author: {{ author }}
 highlights: {{ num_highlights }}
 last_highlight_at: {{ last_highlight_at }}
 source: {{ source_url }}
@@ -155,27 +264,58 @@ Source URL: {{ source_url }}
 {%- endif %}
 Date: [[{{ updated }}]]
 Last Highlighted: *{{ last_highlight_at }}*
+{%- if summary %}
+Summary: {{ summary }}
+{%- endif %}
 
 ---
+
+{%- if document_note %}
+# Document Note
+
+{{ document_note }}
+{%- endif %}
 
 # Highlights
 
 ```
 
-### Highlights
+### Highlight Template Variables
 
-The highlight template exposes the following variables:
+#### Highlight Content
 
-- ```id```: The id of the highlight
-- ```text```: The highlighted text
-- ```note```: Your nore
-- ```location```: The location
-- ```location_url```: The url of the location
-- ```url```: Unique highlight link (Open in Readwise)
-- ```color```: The color
-- ```highlighted_at```: Date highlighted (empty if none)
-- ```tags```: A formatted string of tags
-- ```category```: Category of the source item (book, article, etc.)
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `text` | Highlighted text | `"This is the highlight"` |
+| `note` | Your annotation | `"My thoughts on this..."` |
+| `color` | Highlight color | `"yellow"` |
+
+#### Location
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `location` | Position reference | `"Page 42"` |
+| `location_url` | Direct link to location | `"https://readwise.io/to_kindle?..."` |
+| `url` | Source URL | `"https://readwise.io/open/..."` |
+
+#### Metadata
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `id` | Highlight ID | `"abc123"` |
+| `category` | Content type | `"books"` |
+| `tags` | Associated tags | `"#important, #todo"` |
+| `highlighted_at` | Creation date | `"2024-01-20"` |
+| `created_at` | Creation timestamp | `"2024-01-20T10:00:00Z"` |
+| `updated_at` | Last update timestamp | `"2024-01-21T15:30:00Z"` |
+
+#### Available Filters
+
+| Filter | Description | Example |
+|--------|-------------|---------|
+| `bq` | Add blockquote markers | `{{ text \| bq }}` |
+| `is_qa` | Check for Q&A format | `{% if note \| is_qa %}` |
+| `qa` | Convert to Q&A format | `{{ note \| qa }}` |
 
 #### Default highlight template
 
@@ -207,8 +347,106 @@ Tags: {{ tags }}
 ---
 ```
 
+### Q & A Filter
+
+If you want to render [notes with the `.qa` action tag](https://docs.readwise.io/reader/docs/faqs/action-tags#how-can-i-create-a-q-and-a-mastery-card-while-reading) properly, the plugin makes several nunjucks filters available for that:  
+
+- `is_qa`: this filter returns `true` if the string it is applied to contains the `.qa` action tag
+- `qa`: this filter extracts the question and answer and returns them as a rendered string
+
+Using both filters, you could for example format Q&A notes differently from regular notes.
+
+```nunjucks
+{# Example template using both filters #}
+{% if note | is_qa %}
+  {{ note | qa }}
+  **Original Highlight:** 
+  {{ text | replace('__', '==') }}  
+  ***
+{% else %}
+  > [!quote]
+  > {{ text | bq | replace('__', '==') }}  
+  {{ note }}
+{% endif %}
+```
+
+### Example Q&A Output
+
+Input note with `.qa` tag:
+
+> .qa What is the capital of France? Paris is the capital of France.
+
+Rendered output:
+> **Q:** What is the capital of France?
+>
+> **A:** Paris is the capital of France.
+
 ### Limitations
 
 - The templating is based on the [`nunjucks`](https://mozilla.github.io/nunjucks/templating.html) templating library and thus shares its limitations;
 - Certain strings (e.g. date, tags, authors) are currently preformatted
-- If you have frontmatter and items with `@` in the title or author's name (typically this happens with highlights imported from Twitter), the frontmatter will be invalid. You can add quotes in your frontmatter template to try to work around these cases: `title: "{{ title }}" but any quotes already present in the title will break your frontmatter too.
+
+## Deduplication
+
+The plugin prevents duplicate files when articles are re-imported from Readwise, maintaining link consistency in your vault. This can be useful in a number of cases: 
+
+- if you change the character used to escape the colon `:` in your titles, 
+- when changing to use the "Slugify" feature, or changing its options, and  
+- if the title of a Readwise item changes
+
+### How It Works
+
+1. **File Matching**
+   - Uses MetadataCache to find files with matching `readwise_url`
+   - Checks all vault locations, not just the Readwise folder
+   - Honors existing file structure
+
+2. **Update Strategy**
+   - If exact filename match exists: Updates content in place
+   - If different filename exists: Updates first matching file, and changes this file's filename to the new filename
+   - Additional matches: Either deleted or marked as duplicates (with the `duplicate` property)
+
+3. **Link Preservation**
+   - Maintains existing internal links
+   - Preserves file locations in vault
+   - Updates content while keeping references intact
+
+### Duplicate Handling
+
+When duplicates are found:
+
+1. **Exact Match**
+
+   ```
+   📄 "My Article.md" (existing)
+   └── Updates content in place
+   ```
+
+2. **Different Filename**
+
+   ```
+   📄 "Article (2024).md" (existing)
+   └── Updates content, changes filename to "My Article.md"
+   ```
+
+3. **Multiple Matches**
+
+   ```
+   📄 "My Article.md" (primary)
+   └── Updated with new content
+   📄 "Same Article.md" (duplicate)
+   └── Deleted or marked with duplicate: true
+   ```
+
+### Deduplication limitations
+
+Currently, the following limitations apply to deduplication:
+
+- Readwise items with the exact same title will be detected, the first one in the export will be used to write to your vault
+- To start using deduplication, you have to run a full sync to make sure all your files have the deduplication frontmatter property and can thus be deduplicated. This means any changes you made to your local files will be lost (this is not a new behaviour though, but you should be aware of it)
+
+### Readwise (remote) duplicates
+
+In Readwise, multiple items with the same title but different `id`'s can exist. This leads to a filename collision in `readwise-mirror`. If a such a duplicate ('remote dupliacate') is detected (because a file already exists with the "same" filename), the plugin will write a file which has the Readwise id value added to the filename of all detected duplicates.
+
+The filename of two different Readwise items both titled `My Duplicate Book` would thus become `My Duplicate Book.md` and `My Duplicate Book <ID>.md` where `<ID>` would be the id value of the second item the plugin encounters when downloading. As this order can change between runs of the plugin (e.g. because of changes to one item which changes the order in the returned data), the filenames might change as well from run to run.

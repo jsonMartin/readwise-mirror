@@ -1,0 +1,33 @@
+# A semantic-release configuration for an Obsidian plugin
+# By using `npx`, we avoid the need to install `semantic-release` 
+#  and `semantic-release-obsidian-plugin` globally.
+# This configuration is set up to run in dry-run mode by default and 
+# uses the standard branches for Obsidian plugins (`master`, `main`, `beta` etc.)
+# run semantic-release as follows to release a new version of your plugin:
+#   dry-run (default):  npx -p github:brianrodri/semantic-release-obsidian-plugin semantic-release 
+#   for real: npx -p github:brianrodri/semantic-release-obsidian-plugin semantic-release --dry-run false
+plugins:
+  - '@semantic-release/commit-analyzer'
+  - '@semantic-release/release-notes-generator'
+  - semantic-release-obsidian-plugin
+  - - '@semantic-release/github'
+    - assets:
+        - path: main.js
+        - path: manifest.json
+        - path: src/ui/styles/styles.css
+  # Uncomment the following block if semantic release *should* commit the 
+  # updated `manifest.json`, `versions.json` and `package.json` files with the new version number.
+  #
+  # - - '@semantic-release/git'
+  #   - assets:
+  #       - manifest.json
+  #       - versions.json
+  #       - package.json
+  #       - package-lock.json
+  #     message: >-
+  #       chore(release): set `package.json`, `manifest.json`,`versions.json` and
+  #       `package-lock.json` to ${nextRelease.version} [skip ci]
+  #
+  #
+  #       ${nextRelease.notes}
+tagFormat: '${version}'
