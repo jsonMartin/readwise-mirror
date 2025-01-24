@@ -7,8 +7,8 @@
         "dev": "rollup --config rollup.config.js -w",
         "build": "rollup --config rollup.config.js --environment BUILD:production",
         "deploy:local": "npm run build && cross-env PACKAGE_NAME=$npm_package_name node deploy-local.js",
-        "release:local": "npm ci && npm run build && npx -p github:brianrodri/semantic-release-obsidian-plugin semantic-release --dry-run false",
-        "release:dry-run": "npm ci && npm run build && npx -p github:brianrodri/semantic-release-obsidian-plugin semantic-release --dry-run"
+        "release:local": "npm ci && npm run build && npx -p semantic-release-obsidian-plugin@1.1.0 semantic-release --dry-run false",
+        "release:dry-run": "npm ci && npm run build && npx -p semantic-release-obsidian-plugin@1.1.0 semantic-release --dry-run"
     },
     "keywords": [],
     "author": "",
@@ -31,9 +31,10 @@
     },
     "dependencies": {
         "@sindresorhus/slugify": "^2.2.1",
-        "nunjucks": "^3.2.3",
         "filenamify": "^6.0.0",
+        "nunjucks": "^3.2.3",
         "spacetime": "^6.16.0",
+        "unused-filename": "^4.0.1",
         "yaml": "^2.7.0"
     }
 }
