@@ -67,17 +67,32 @@ export default class ReadwiseApi {
       const response = await fetch(url + queryParams.toString(), this.headers);
       data = await response.json();
 
+      if (!response.ok && response.status !== 429) {
+        console.error(`Readwise: Failed to fetch data. Status: ${response.status} - ${response.statusText}`);
+        throw new Error(`Failed to fetch data. Status: ${response.status}`);
+      }
+
       if (response.status === 429) {
         // Error handling for rate limit throttling
-        const rateLimitedDelayTime = parseInt(response.headers.get('Retry-After')) * 1000 + 1000;
-        console.warn(`Readwise: API Rate Limited, waiting to retry for ${rateLimitedDelayTime}`);
+        let rateLimitedDelayTime = parseInt(response.headers.get('Retry-After')) * 1000 + 1000;
+        if (isNaN(rateLimitedDelayTime)) {
+          // Default to a 1-second delay if 'Retry-After' is missing or invalid
+          console.warn("Readwise: 'Retry-After' header is missing or invalid. Defaulting to 1 second delay.");
+          rateLimitedDelayTime = 1000;
+        } else {
+          console.warn(`Readwise: API Rate Limited, waiting to retry for ${rateLimitedDelayTime}`);
+        }
         this.notify.setStatusBarText(`Readwise: API Rate Limited, waiting ${rateLimitedDelayTime}`);
 
         await new Promise((_) => setTimeout(_, rateLimitedDelayTime));
         console.info('Readwise: Trying to fetch highlights again...');
         this.notify.setStatusBarText(`Readwise: Attempting to retry...`);
       } else {
-        results.push(...data.results);
+        if (data.results && Array.isArray(data.results)) {
+          results.push(...data.results);
+        } else {
+          console.warn('Readwise: No results found in the response data.');
+        }
         nextPageCursor = data.nextPageCursor;
         if (!nextPageCursor) {
           break;
