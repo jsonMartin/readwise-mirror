@@ -376,10 +376,14 @@ export default class ReadwiseMirror extends Plugin {
             separator: this.settings.slugifySeparator,
             lowercase: this.settings.slugifyLowercase,
           })
-        : `${filenamify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
+        : // ... else filenamify the title
+          `${filenamify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
             replacement: ' ',
             maxLength: 255,
-          })}`;
+          })}` // Ensure we remove additional critical characters, replace multiple spaces with one, and trim
+            .replace(/[<>"'\/\\|?*#]+/g, '')
+            .replace(/ +/g, ' ')
+            .trim();
 
       // Filter highlights
       const filteredHighlights = this.filterHighlights(highlights);
@@ -576,7 +580,10 @@ export default class ReadwiseMirror extends Plugin {
                 }
               });
             } catch (err) {
-              console.error(`Readwise: Attempt to create file ${path} *DE NOVO* failed (uri: ${metadata.highlights_url})`, err);
+              console.error(
+                `Readwise: Attempt to create file ${path} *DE NOVO* failed (uri: ${metadata.highlights_url})`,
+                err
+              );
               this.notify.notice(`Readwise: Failed to create file '${path}'. ${err}`);
             }
           }
