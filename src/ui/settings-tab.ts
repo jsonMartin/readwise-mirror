@@ -112,7 +112,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
   }
 
   async display(): Promise<void> {
-    let { containerEl } = this;
+    const { containerEl } = this;
 
     containerEl.empty();
 

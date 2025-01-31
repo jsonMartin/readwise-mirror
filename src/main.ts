@@ -102,13 +102,13 @@ export default class ReadwiseMirror extends Plugin {
 
     return this.highlightTemplate.render({
       // Highlight fields
-      id: id,
-      text: text,
-      note: note,
-      location: location,
+      id,
+      text,
+      note,
+      location,
       location_url: locationUrl,
       url, // URL is set for source of highlight (webpage, tweet, etc). null for books
-      color: color,
+      color,
       created_at: created_at ? this.formatDate(created_at) : '',
       updated_at: updated_at ? this.formatDate(updated_at) : '',
       highlighted_at: highlighted_at ? this.formatDate(highlighted_at) : '',
@@ -166,7 +166,7 @@ export default class ReadwiseMirror extends Plugin {
     // extract all tags from all Highlights and
     // construct an array with unique values
 
-    var tags: Tag[] = [];
+    let tags: Tag[] = [];
     this.sortHighlights(highlights).forEach((highlight: Highlight) =>
       highlight.tags ? (tags = [...tags, ...highlight.tags]) : tags
     );
@@ -176,19 +176,21 @@ export default class ReadwiseMirror extends Plugin {
   async writeLogToMarkdown(library: Library) {
     const vault = this.app.vault;
 
-    let path = `${this.settings.baseFolderName}/${this.settings.logFileName}`;
+    const path = `${this.settings.baseFolderName}/${this.settings.logFileName}`;
     const abstractFile = vault.getAbstractFileByPath(path);
 
     const now = spacetime.now();
     let logString = `# [[${now.format('iso-short')}]] *(${now.time()})*`;
 
-    for (let bookId in library['books']) {
+    for (const bookId in library['books']) {
       const book = library['books'][bookId];
 
       const { title, highlights } = book;
       const num_highlights = highlights.length;
       console.warn(`Readwise: Replacing colon with ${this.settings.colonSubstitute}`);
-      const sanitizedTitle = `${title.replace(/:/g, this.settings.colonSubstitute).replace(/[<>"'\/\\|?*]+/g, '')}`;
+      const sanitizedTitle = title
+        .replace(/:/g, this.settings.colonSubstitute ?? '-')
+        .replace(/[<>"'/\\|?*]+/g, '');
       const contents = `\n- [[${sanitizedTitle}]] *(${num_highlights} highlights)*`;
       logString += contents;
     }
@@ -237,7 +239,7 @@ export default class ReadwiseMirror extends Plugin {
    * - Example protected fields: status, tags, categories
    */
   private async writeUpdatedFrontmatter(file: TFile, updates: Record<string, any>): Promise<void> {
-    let { frontmatter, body } = await this.updateFrontmatter(file, updates);
+    const { frontmatter, body } = await this.updateFrontmatter(file, updates);
 
     // Combine and write back
     await this.app.vault.modify(file, `${frontmatter}\n${body}`);
@@ -287,18 +289,22 @@ export default class ReadwiseMirror extends Plugin {
 
   private async findDuplicates(book: Export): Promise<TFile[]> {
     const canDeduplicate = this.settings.deduplicateFiles;
+    const dedupProperty = this.settings.deduplicateProperty;
 
-    if (!canDeduplicate) {
+    // Return early if deduplication is disabled or no property is set
+    if (!canDeduplicate || !dedupProperty || !book.readwise_url) {
       return Promise.resolve([]);
     }
 
-    // Fallback to MetadataCache if Dataview is not available
     const duplicateFiles: TFile[] = [];
     const files = this.app.vault.getMarkdownFiles();
 
     for (const file of files) {
       const metadata = this.app.metadataCache.getFileCache(file);
-      if (metadata?.frontmatter?.[this.settings.deduplicateProperty] === book.readwise_url) {
+      const frontmatterValue = metadata?.frontmatter?.[dedupProperty];
+      
+      // Only match if the property exists and matches exactly
+      if (frontmatterValue && frontmatterValue === book.readwise_url) {
         duplicateFiles.push(file);
       }
     }
@@ -309,24 +315,28 @@ export default class ReadwiseMirror extends Plugin {
   async writeLibraryToMarkdown(library: Library) {
     const vault = this.app.vault;
 
-    // Create parent directories for all categories, if they do not exist
-    library['categories'].forEach(async (category: string) => {
-      category = category.charAt(0).toUpperCase() + category.slice(1); // Title Case the directory name
+    // Create parent directories for all categories synchronously
+    try {
+      for (const category of library['categories']) {
+        const titleCaseCategory = category.charAt(0).toUpperCase() + category.slice(1); // Title Case the directory name
+        const path = `${this.settings.baseFolderName}/${titleCaseCategory}`;
+        const abstractFolder = vault.getAbstractFileByPath(path);
 
-      // TODO: deal with case sensitiveness – getAbstractFileByPath is *case sensitive* but `vault.create()` is not
-      const path = `${this.settings.baseFolderName}/${category}`;
-      const abstractFolder = vault.getAbstractFileByPath(path);
-
-      if (!abstractFolder) {
-        vault.createFolder(path);
-        console.info('Readwise: Successfully created folder', path);
+        if (!abstractFolder) {
+          await vault.createFolder(path);
+          console.info('Readwise: Successfully created folder', path);
+        }
       }
-    });
+    } catch (err) {
+      console.error('Readwise: Failed to create category folders', err);
+      this.notify.notice('Readwise: Failed to create category folders. Sync aborted.');
+      return;
+    }
 
     // Get total number of records
     const booksTotal = Object.keys(library.books).length;
     let bookCurrent = 1;
-    for (let bookId in library['books']) {
+    for (const bookId in library['books']) {
       this.notify.setStatusBarText(
         `Readwise: Processing - ${Math.floor(
           (bookCurrent / booksTotal) * 100
@@ -381,7 +391,7 @@ export default class ReadwiseMirror extends Plugin {
             replacement: ' ',
             maxLength: 255,
           }) // Ensure we remove additional critical characters, replace multiple spaces with one, and trim
-            .replace(/[<>"'\/\\|?*#]+/g, '')
+            .replace(/[<>"'/\\|?*#]+/g, '')
             .replace(/ +/g, ' ')
             .trim();
 
@@ -399,7 +409,7 @@ export default class ReadwiseMirror extends Plugin {
         const highlightTags = this.getTagsFromHighlights(filteredHighlights);
         const authors = author ? author.split(/and |,/) : [];
 
-        let authorStr =
+        const authorStr =
           authors[0] && authors?.length > 1
             ? authors
                 .filter((authorName: string) => authorName.trim() != '')
@@ -447,7 +457,7 @@ export default class ReadwiseMirror extends Plugin {
         const headerContents = this.headerTemplate.render(metadata);
         const contents = `${frontMatterContents}${headerContents}${formattedHighlights}`;
 
-        let path = `${this.settings.baseFolderName}/${
+        const path = `${this.settings.baseFolderName}/${
           category.charAt(0).toUpperCase() + category.slice(1)
         }/${sanitizedTitle}.md`;
 
@@ -460,7 +470,7 @@ export default class ReadwiseMirror extends Plugin {
           // Deduplicate files
           if (duplicates.length > 0) {
             let deduplicated = false;
-            let filesToDeleteOrLabel: TFile[] = [];
+            const filesToDeleteOrLabel: TFile[] = [];
 
             // First: Check if target file is in duplicates (i.e. has the same name)
             const targetFileIndex = duplicates.findIndex((f) => f.path === path);
@@ -597,7 +607,7 @@ export default class ReadwiseMirror extends Plugin {
 
   async deleteLibraryFolder() {
     const vault = this.app.vault;
-    let path = `${this.settings.baseFolderName}`;
+    const path = `${this.settings.baseFolderName}`;
 
     const abstractFile = vault.getAbstractFileByPath(path);
 

@@ -38,7 +38,7 @@ export default class ReadwiseApi {
 
   // If lastUpdated or bookID aren't provided, fetch everything.
   async fetchData(contentType = 'export', lastUpdated?: string, bookId?: number[]): Promise<Export[]> {
-    let url = `${API_ENDPOINT}/${contentType}?`;
+    const url = `${API_ENDPOINT}/${contentType}?`;
     let data;
     let nextPageCursor;
 
