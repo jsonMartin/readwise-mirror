@@ -6,7 +6,7 @@
 // TODO: Base it on Readwise API and not internal metadata
 //
 
-import { Tag } from 'models/readwise';
+import { ReadwiseMetadata, Tag } from 'models/readwise';
 
 export const testTags: Tag[] = [
   { id: 1, name: 'important' },
@@ -21,8 +21,8 @@ export const testTags: Tag[] = [
   { id: 10, name: 'nested/path/tag' },
 ];
 
-export const sampleMetadata = {
-  id: '12345',
+export const sampleMetadata: ReadwiseMetadata = {
+  id: 12345,
   title: "My Book:\nA Subtitle's Journey",
   sanitized_title: "My Book - A Subtitle's Journey",
   author: 'O\'Reilly, Tim & "Doc" Smith',

@@ -6,7 +6,7 @@ import spacetime from 'spacetime';
 import * as YAML from 'yaml';
 
 import { DEFAULT_SETTINGS, FRONTMATTER_TO_ESCAPE, YAML_TOSTRING_OPTIONS } from 'constants/index';
-import { Export, Highlight, Library, Tag } from 'models/readwise';
+import { Export, Highlight, Library, Tag, ReadwiseMetadata } from 'models/readwise';
 import { PluginSettings } from 'models/settings';
 import { YamlStringState } from 'models/yaml';
 import ReadwiseApi from 'services/readwise-api';
@@ -32,12 +32,19 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   // Before metadata is used
-  public escapeFrontmatter(metadata: any, fieldsToProcess: Array<string>): any {
+  public escapeFrontmatter(metadata: ReadwiseMetadata, fieldsToProcess: Array<string>): ReadwiseMetadata {
     // Copy the metadata object to avoid modifying the original
-    const processedMetadata = { ...metadata };
+    const processedMetadata = { ...metadata } as ReadwiseMetadata;
     fieldsToProcess.forEach((field) => {
-      if (field in processedMetadata && processedMetadata[field] && typeof processedMetadata[field] === 'string') {
-        processedMetadata[field] = this.escapeYamlValue(processedMetadata[field]);
+      if (
+        field in processedMetadata &&
+        processedMetadata[field as keyof ReadwiseMetadata] &&
+        typeof processedMetadata[field as keyof ReadwiseMetadata] === 'string'
+      ) {
+        const key = field as keyof ReadwiseMetadata;
+        if (typeof processedMetadata[key] === 'string') {
+          (processedMetadata[key] as unknown) = this.escapeYamlValue(processedMetadata[key] as string);
+        }
       }
     });
 
@@ -236,14 +243,14 @@ export default class ReadwiseMirror extends Plugin {
    * - Protection is configured in plugin settings
    * - Example protected fields: status, tags, categories
    */
-  private async writeUpdatedFrontmatter(file: TFile, updates: Record<string, any>): Promise<void> {
+  private async writeUpdatedFrontmatter(file: TFile, updates: Record<string, unknown>): Promise<void> {
     const { frontmatter, body } = await this.updateFrontmatter(file, updates);
 
     // Combine and write back
     await this.app.vault.modify(file, `${frontmatter}\n${body}`);
   }
 
-  private async updateFrontmatter(file: TFile, updates: Record<string, any>) {
+  private async updateFrontmatter(file: TFile, updates: Record<string, unknown>) {
     const content = await this.app.vault.read(file);
     const frontmatterRegex = /^(---\n[\s\S]*?\n---)/;
     const match = content.match(frontmatterRegex);
@@ -417,7 +424,7 @@ export default class ReadwiseMirror extends Plugin {
             ? `[[${author}]]`
             : ``;
 
-        const metadata = {
+        const metadata: ReadwiseMetadata = {
           id: user_book_id,
           title: title,
           sanitized_title: sanitizedTitle,

@@ -45,3 +45,27 @@ export interface Library {
   books: Exports;
   highlightCount: number;
 }
+
+export interface ReadwiseMetadata {
+  id: number; // book id from Readwise API
+  title: string;
+  sanitized_title: string;
+  author: string;
+  authorStr: string;
+  document_note: string;
+  summary: string;
+  category: string;
+  num_highlights: number;
+  created: string;
+  updated: string;
+  cover_image_url: string;
+  highlights_url: string;
+  highlights: Highlight[];
+  last_highlight_at: string;
+  source_url: string;
+  unique_url: string;
+  tags: string;
+  highlight_tags: string;
+  tags_nohash: string;
+  hl_tags_nohash: string;
+}
