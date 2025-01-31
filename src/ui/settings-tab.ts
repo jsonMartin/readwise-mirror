@@ -118,6 +118,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
     containerEl.createEl('h1', { text: 'Readwise Sync Configuration' });
 
+    new Setting(containerEl)
+      .setName('Authentication')
+      .setHeading();
+
     const apiTokenFragment = document.createDocumentFragment();
     apiTokenFragment.createEl('span', null, (spanEl) =>
       spanEl.createEl('a', null, (aEl) => (aEl.innerText = aEl.href = 'https://readwise.io/access_token'))
@@ -139,6 +143,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName('Library Settings')
+      .setHeading();
+
+    new Setting(containerEl)
       .setName('Readwise library folder name')
       .setDesc('Default: Readwise')
       .addText((text) =>
@@ -153,6 +161,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName('Sync Settings')
+      .setHeading();
+
+    new Setting(containerEl)
       .setName('Auto Sync when starting')
       .setDesc('Automatically syncs new highlights after opening Obsidian')
       .addToggle((toggle) =>
@@ -161,6 +173,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
+
+    new Setting(containerEl)
+      .setName('Highlight Organization')
+      .setHeading();
 
     new Setting(containerEl)
       .setName('Sort Highlights in notes from Oldest to Newest')
@@ -209,6 +225,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName('File Naming')
+      .setHeading();
+
+    new Setting(containerEl)
       .setName('Replacement string for colons in filenames')
       .setDesc(
         "Set the string to be used for replacement of colon (:) in filenames derived from the title. The default value for this setting is '-'."
@@ -218,7 +238,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           .setPlaceholder('Colon replacement in title')
           .setValue(this.plugin.settings.colonSubstitute)
           .onChange(async (value) => {
-            if (!value || /[:<>\"\/\\|?*]/.test(value)) {
+            if (!value || /[:<>"/\\|?*]/.test(value)) {
               console.warn(`Readwise: colon replacement: empty or invalid value: ${value}`);
               this.plugin.settings.colonSubstitute = DEFAULT_SETTINGS.colonSubstitute;
             } else {
@@ -228,6 +248,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    new Setting(containerEl)
+      .setName('Sync Logging')
+      .setHeading();
 
     new Setting(containerEl)
       .setName('Sync Log')
@@ -254,51 +278,25 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Header Template')
+      .setName('Templates')
+      .setHeading()
       .setDesc(
-        this.createTemplateDocumentation('Controls document metadata and structure.', [
-          ['id', 'Document ID'],
-          ['title', 'Document title'],
-          ['sanitized_title', 'Title safe for file system'],
-          ['author/authorStr', 'Author name(s), authorStr includes wiki links'],
-          ['category', 'Content type (books, articles, etc)'],
-          ['cover_image_url', 'Book/article cover'],
-          ['summary', 'Document summary'],
-          ['document_note', 'Additional notes'],
-          ['num_highlights', 'Number of highlights'],
-          ['highlights_url', 'Readwise URL'],
-          ['source_url', 'Original content URL'],
-          ['unique_url', 'Unique identifier URL'],
-          ['created/updated/last_highlight_at', 'Timestamps'],
-          ['tags/tags_nohash', 'Tags (with/without # prefix)'],
-          ['highlight_tags/hl_tags_nohash', 'Tags from highlights (with/without # prefix)'],
-        ])
-      )
-      .addTextArea((text) => {
-        const initialRows = 15;
-        text.inputEl.addClass('settings-template-input');
-        text.inputEl.rows = initialRows;
-        text.inputEl.cols = 50;
-        text.setValue(this.plugin.settings.headerTemplate).onChange(async (value) => {
-          if (!value) {
-            this.plugin.settings.headerTemplate = DEFAULT_SETTINGS.headerTemplate;
-          } else {
-            this.plugin.settings.headerTemplate = value;
-          }
-          this.plugin.headerTemplate = new Template(this.plugin.settings.headerTemplate, this.plugin.env, null, true);
-          await this.plugin.saveSettings();
-        });
+        createFragment((fragment) => {
+          fragment.createEl('p', { text: 'The plugin uses three templates to control how your Readwise content is formatted:' });
+          
+          fragment.createEl('p', { text: '1. Frontmatter Template: Controls the YAML metadata at the top of each note' });
+          fragment.createEl('p', { text: '2. Header Template: Controls the main document structure and metadata below the frontmatter' });
+          fragment.createEl('p', { text: '3. Highlight Template: Controls how individual highlights are formatted within the note' });
+          
+          fragment.createEl('p', { text: 'Each template supports Nunjucks templating syntax and provides access to specific variables relevant to that section.' });
+        })
+      );
 
-        // Initial row adjustment
-        this.adjustTextareaRows(text.inputEl, initialRows);
+    // Documentation block for templates
 
-        // Adjust on content change
-        text.inputEl.addEventListener('input', () => {
-          this.adjustTextareaRows(text.inputEl, initialRows);
-        });
-
-        return text;
-      });
+    new Setting(containerEl)
+      .setName('Frontmatter Settings')
+      .setHeading();
 
     new Setting(containerEl)
       .setName('Frontmatter')
@@ -353,11 +351,11 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               fragment.appendText(
                 'Note: Only fields that already exist in the file will be protected. A field marked for protection which is not present yet in the original field will be written normally at the first write/update, and will be protected henceforth.'
               );
-              if (this.plugin.settings.deduplicateFiles) {
-                fragment.createEl('br');
-                fragment.appendText('The deduplication field ');
-                fragment.createEl('strong', { text: this.plugin.settings.deduplicateProperty });
-                fragment.appendText(' cannot be protected');
+              fragment.createEl('br');
+              if (this.plugin.settings.trackFiles) {
+                fragment.appendText('The tracking field ');
+                fragment.createEl('strong', { text: this.plugin.settings.trackingProperty });
+                fragment.appendText(' cannot be protected.');
               }
             })
           )
@@ -371,18 +369,18 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
         if (this.plugin.settings.protectFrontmatter) {
           const validateProtectedFields = (value: string): { isValid: boolean; error?: string } => {
-            if (!this.plugin.settings.deduplicateFiles) return { isValid: true };
+            if (!this.plugin.settings.trackFiles) return { isValid: true };
 
             const fields = value
               .split('\n')
               .map((f) => f.trim())
               .filter((f) => f.length > 0);
-            const dedupField = this.plugin.settings.deduplicateProperty;
+            const dedupField = this.plugin.settings.trackingProperty;
 
             if (fields.includes(dedupField)) {
               return {
                 isValid: false,
-                error: `Cannot protect deduplication field '${dedupField}'`,
+                error: `Cannot protect tracking field '${dedupField}'`,
               };
             }
             return { isValid: true };
@@ -428,6 +426,72 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             });
         }
       }
+    }
+
+    new Setting(containerEl)
+      .setName('File Tracking')
+      .setHeading();
+
+    new Setting(containerEl)
+      .setName('Enable File Tracking')
+      .setDesc(
+        createFragment((fragment) => {
+          fragment.appendText(
+            'Track files using their unique Readwise URL to maintain consistency when titles or properties change.'
+          );
+          fragment.createEl('br');
+          fragment.appendText(
+            'This prevents duplicate files and maintains links when articles are updated in Readwise.'
+          );
+          fragment.createEl('br');
+          fragment.createEl('br');
+          fragment.appendText('Note: Requires frontmatter to be enabled');
+        })
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.trackFiles && this.plugin.settings.frontMatter)
+          .setDisabled(!this.plugin.settings.frontMatter)
+          .onChange(async (value) => {
+            this.plugin.settings.trackFiles = value;
+            await this.plugin.saveSettings();
+            this.display();
+          })
+      );
+
+    if (this.plugin.settings.trackFiles) {
+      new Setting(containerEl)
+        .setName('Tracking Property')
+        .setDesc(
+          'Frontmatter property to store the unique Readwise URL (default: uri). This field will be automatically managed in the frontmatter.'
+        )
+        .addText((text) =>
+          text
+            .setValue(this.plugin.settings.trackingProperty)
+            .setDisabled(!this.plugin.settings.frontMatter)
+            .onChange(async (value) => {
+              this.plugin.settings.trackingProperty = value || 'uri';
+              await this.plugin.saveSettings();
+            })
+        );
+
+      new Setting(containerEl)
+        .setName('Remove Duplicate Files')
+        .setDesc(
+          createFragment((fragment) => {
+            fragment.appendText(
+              'When enabled, duplicate files will be removed. Otherwise, they will be marked with duplicate: true in frontmatter.'
+            );
+            fragment.createEl('br');
+            fragment.createEl('blockquote', { text: 'Default: Remove duplicates' });
+          })
+        )
+        .addToggle((toggle) =>
+          toggle.setValue(this.plugin.settings.deleteDuplicates).onChange(async (value) => {
+            this.plugin.settings.deleteDuplicates = value;
+            await this.plugin.saveSettings();
+          })
+        );
     }
 
     new Setting(containerEl)
@@ -580,6 +644,53 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
+      .setName('Header Template')
+      .setDesc(
+        this.createTemplateDocumentation('Controls document metadata and structure.', [
+          ['id', 'Document ID'],
+          ['title', 'Document title'],
+          ['sanitized_title', 'Title safe for file system'],
+          ['author/authorStr', 'Author name(s), authorStr includes wiki links'],
+          ['category', 'Content type (books, articles, etc)'],
+          ['cover_image_url', 'Book/article cover'],
+          ['summary', 'Document summary'],
+          ['document_note', 'Additional notes'],
+          ['num_highlights', 'Number of highlights'],
+          ['highlights_url', 'Readwise URL'],
+          ['source_url', 'Original content URL'],
+          ['unique_url', 'Unique identifier URL'],
+          ['created/updated/last_highlight_at', 'Timestamps'],
+          ['tags/tags_nohash', 'Tags (with/without # prefix)'],
+          ['highlight_tags/hl_tags_nohash', 'Tags from highlights (with/without # prefix)'],
+        ])
+      )
+      .addTextArea((text) => {
+        const initialRows = 15;
+        text.inputEl.addClass('settings-template-input');
+        text.inputEl.rows = initialRows;
+        text.inputEl.cols = 50;
+        text.setValue(this.plugin.settings.headerTemplate).onChange(async (value) => {
+          if (!value) {
+            this.plugin.settings.headerTemplate = DEFAULT_SETTINGS.headerTemplate;
+          } else {
+            this.plugin.settings.headerTemplate = value;
+          }
+          this.plugin.headerTemplate = new Template(this.plugin.settings.headerTemplate, this.plugin.env, null, true);
+          await this.plugin.saveSettings();
+        });
+
+        // Initial row adjustment
+        this.adjustTextareaRows(text.inputEl, initialRows);
+
+        // Adjust on content change
+        text.inputEl.addEventListener('input', () => {
+          this.adjustTextareaRows(text.inputEl, initialRows);
+        });
+
+        return text;
+      });
+
+    new Setting(containerEl)
       .setName('Highlight Template')
       .setDesc(
         this.createTemplateDocumentation('Controls individual highlight formatting.', [
@@ -627,6 +738,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
         return text;
       });
+
+    new Setting(containerEl)
+      .setName('Filename Settings')
+      .setHeading();
 
     new Setting(containerEl)
       .setName('Use Slugify for filenames')
@@ -682,62 +797,6 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         .addToggle((toggle) =>
           toggle.setValue(this.plugin.settings.slugifyLowercase).onChange(async (value) => {
             this.plugin.settings.slugifyLowercase = value;
-            await this.plugin.saveSettings();
-          })
-        );
-    }
-
-    new Setting(containerEl)
-      .setName('Deduplicate Files')
-      .setDesc(
-        createFragment((fragment) => {
-          fragment.appendText('Check for duplicate files based on Readwise URL.');
-          fragment.createEl('br');
-          fragment.appendText(
-            'This prevents creating duplicate files when articles are updated, even if the file name separator or the title in Readwise change.'
-          );
-        })
-      )
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.deduplicateFiles)
-          .onChange(async (value) => {
-            this.plugin.settings.deduplicateFiles = value;
-            await this.plugin.saveSettings();
-            // Trigger re-render to show/hide property selector
-            this.display();
-          })
-      );
-
-    if (this.plugin.settings.deduplicateFiles) {
-      new Setting(containerEl)
-        .setName('Deduplication Property')
-        .setDesc(
-          'Frontmatter property to use for deduplication (default: uri). This field will be set in the frontmatter template. If it exists in your frontmatter template, its value will be updated automatically when processing highlights.'
-        )
-        .addText((text) =>
-          text.setValue(this.plugin.settings.deduplicateProperty).onChange(async (value) => {
-            this.plugin.settings.deduplicateProperty = value || 'uri';
-            await this.plugin.saveSettings();
-          })
-        );
-    }
-
-    if (this.plugin.settings.deduplicateFiles) {
-      new Setting(containerEl)
-        .setName('Delete Duplicates')
-        .setDesc(
-          createFragment((fragment) => {
-            fragment.appendText(
-              'When enabled, duplicate files will be deleted. Otherwise, they will be marked with duplicate: true in frontmatter.'
-            );
-            fragment.createEl('br');
-            fragment.createEl('blockquote', { text: 'Default: Delete duplicates' });
-          })
-        )
-        .addToggle((toggle) =>
-          toggle.setValue(this.plugin.settings.deleteDuplicates).onChange(async (value) => {
-            this.plugin.settings.deleteDuplicates = value;
             await this.plugin.saveSettings();
           })
         );

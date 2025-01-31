@@ -188,9 +188,7 @@ export default class ReadwiseMirror extends Plugin {
       const { title, highlights } = book;
       const num_highlights = highlights.length;
       console.warn(`Readwise: Replacing colon with ${this.settings.colonSubstitute}`);
-      const sanitizedTitle = title
-        .replace(/:/g, this.settings.colonSubstitute ?? '-')
-        .replace(/[<>"'/\\|?*]+/g, '');
+      const sanitizedTitle = title.replace(/:/g, this.settings.colonSubstitute ?? '-').replace(/[<>"'/\\|?*]+/g, '');
       const contents = `\n- [[${sanitizedTitle}]] *(${num_highlights} highlights)*`;
       logString += contents;
     }
@@ -288,11 +286,11 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   private async findDuplicates(book: Export): Promise<TFile[]> {
-    const canDeduplicate = this.settings.deduplicateFiles;
-    const dedupProperty = this.settings.deduplicateProperty;
+    const canTrack = this.settings.trackFiles;
+    const trackingProperty = this.settings.trackingProperty;
 
     // Return early if deduplication is disabled or no property is set
-    if (!canDeduplicate || !dedupProperty || !book.readwise_url) {
+    if (!canTrack || !trackingProperty || !book.readwise_url) {
       return Promise.resolve([]);
     }
 
@@ -301,8 +299,8 @@ export default class ReadwiseMirror extends Plugin {
 
     for (const file of files) {
       const metadata = this.app.metadataCache.getFileCache(file);
-      const frontmatterValue = metadata?.frontmatter?.[dedupProperty];
-      
+      const frontmatterValue = metadata?.frontmatter?.[trackingProperty];
+
       // Only match if the property exists and matches exactly
       if (frontmatterValue && frontmatterValue === book.readwise_url) {
         duplicateFiles.push(file);
@@ -692,9 +690,9 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   public ensureDedupPropertyInTemplate(template: string): string {
-    if (!this.settings.deduplicateFiles) return template;
+    if (!this.settings.trackFiles) return template;
 
-    const propertyName = this.settings.deduplicateProperty;
+    const propertyName = this.settings.trackingProperty;
     const propertyValue = `${propertyName}: {{ highlights_url }}`;
 
     const lines = template.split('\n');

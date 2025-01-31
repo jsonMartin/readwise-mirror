@@ -17,8 +17,8 @@ export interface PluginSettings {
   useSlugify: boolean;
   slugifySeparator: string;
   slugifyLowercase: boolean;
-  deduplicateFiles: boolean;
-  deduplicateProperty: string;
+  trackFiles: boolean;
+  trackingProperty: string;
   deleteDuplicates: boolean;
   protectFrontmatter: boolean;
   protectedFields: string;
