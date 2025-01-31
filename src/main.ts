@@ -377,10 +377,10 @@ export default class ReadwiseMirror extends Plugin {
             lowercase: this.settings.slugifyLowercase,
           })
         : // ... else filenamify the title
-          `${filenamify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
+          filenamify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
             replacement: ' ',
             maxLength: 255,
-          })}` // Ensure we remove additional critical characters, replace multiple spaces with one, and trim
+          }) // Ensure we remove additional critical characters, replace multiple spaces with one, and trim
             .replace(/[<>"'\/\\|?*#]+/g, '')
             .replace(/ +/g, ' ')
             .trim();
