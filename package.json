@@ -6,7 +6,7 @@
     "scripts": {
         "dev": "rollup --config rollup.config.js -w",
         "build": "rollup --config rollup.config.js --environment BUILD:production",
-        "deploy:local": "npm run build && cross-env PACKAGE_NAME=$npm_package_name node deploy-local.js",
+        "deploy:local": "npm run build && cross-env PACKAGE_NAME=$npm_package_name node deploy-local.mjs",
         "release:local": "npm ci && npm run build && npx -p semantic-release-obsidian-plugin@1.1.0 semantic-release --dry-run false",
         "release:dry-run": "npm ci && npm run build && npx -p semantic-release-obsidian-plugin@1.1.0 semantic-release --dry-run"
     },
