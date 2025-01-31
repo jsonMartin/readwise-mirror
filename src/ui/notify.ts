@@ -11,13 +11,13 @@ export default class Notify {
     new Notice(message, duration);
   }
 
-  // Intended to use event emitters to pass status message updates back to main module rather than write directly to statusBarItem here,
-  // but encountered issues with using event the `app.on` syntax provided in Obsidian API, so writing directly to the statusBar for now to solve the problem.
   setStatusBarText(message: string) {
-    this.statusBarItem.setText(message);
+    // Ensure the message is a string
+    const text = typeof message === 'string' ? message : '';
+    this.statusBarItem.setText(text);
   }
 
   getStatusBarText(): string {
-    return this.statusBarItem.textContent;
+    return this.statusBarItem.textContent || '';
   }
 }
