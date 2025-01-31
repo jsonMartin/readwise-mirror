@@ -10,15 +10,25 @@ The first time this plugin is ran, it will do a full sync downloading all conten
 
 ## Features
 
-- Supports custom folder for Readwise Library content (default is `Readwise`)
-- Subfolders for content type (such as `Books`, `Articles`, etc)
-- Full one-way sync ensuring highlights are always current
-- Downloads entire Readwise library in a format similar to Readwise manual Markdown export
-- Enhanced Obsidian Markdown formatting
-  - Automatically creates `[[Links]]` for book titles and authors
-  - Contains block level link references *(using the Highlight ID)*. Allows to automatically link/transclude any highlight without needing to modify the Readwise note.
-- Supports tags, both within highlights as well as sources (books, articles, etc)
-- Supports Readwise Reader fields, notably the summary and document note
+- **Flexible Organization**
+  - Customizable library folder location (defaults to `Readwise`)
+  - Automatic content categorization into subfolders (Books, Articles, etc.)
+
+- **Seamless Syncing**
+  - Complete one-way synchronization that keeps your highlights current
+  - Downloads your entire Readwise library in clean Markdown format
+
+- **Enhanced Obsidian Integration** 
+  - Automatic `[[Links]]` creation for book titles and authors
+  - Block references using highlight IDs for easy linking and transclusion
+  - Full support for tags on both highlights and sources
+  - Integration with Readwise Reader features like summaries and document notes
+
+- **Smart File Management**
+  - Uses Readwise's unique URLs to track notes across title changes
+  - Automatically updates filenames and content while preserving links
+  - Protected frontmatter fields to maintain your custom note properties
+  - URL-friendly filename conversion (slugification)
 
 ## Usage
 
@@ -37,7 +47,7 @@ Then run any of the below commands or click the Readwise toolbar to sync for the
 
 ### One-way mirror sync vs append-based sync
 
-Any changes made to content in Readwise will be automatically updated during the next sync. **It's important to note that this is a *read only/one way sync*, meaning that any new highlights detected from Readwise will cause the note file to automatically regenerate with the new content**. This was a deliberate design decision to ensure that Readwise is the ultimate source of truth for data; any changes to currently existing highlights in Readwise are always reflected rather than getting out of sync. While another possible solution is to append new highlights to existing content notes instead, it is not feasible to modify existing highlights; this is how Readwise's integration with other services such as Notion & Roam work:
+Any changes made to content in Readwise will be automatically updated during the next sync. **It's important to note that this is a *read only/one way sync*, meaning that any new highlights detected from Readwise will cause the note file to automatically regenerate with the new content**. This was a deliberate design decision to ensure that Readwise is the ultimate source of truth for data; any changes to currently existing highlights in Readwise are always reflected rather than getting out of sync. The notable exception is frontmatter ("Properties") which can be protected if you allow the plugin to track notes with their unique Readwise URL. See below for other options. While another possible solution is to append new highlights to existing content notes instead, it is not feasible to modify existing highlights; this is how Readwise's integration with other services such as Notion & Roam work:
 > If I edit or format an existing highlight in Readwise, or make a new note or tag to an existing highlight, will that change be updated in Notion?
 > Not at the moment. Any edits, formatting, notes, or tags you had in Readwise before your first sync with Notion will appear in Notion, but new updates to existing highlights will not be reflected in already synced highlights.
 
@@ -59,6 +69,22 @@ If the update is so large that a Readwise API limit is reached, this plugin has 
 As a reference for performance, syncing my library of 5,067 Highlights across 92 books and 9 articles took approximately 20 seconds.
 
 ## Manual Installation
+
+### Using BRAT for Beta Testing
+
+The current recommended way to test beta features is through frozen beta versions using BRAT:
+
+1. Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin in Obsidian
+2. Go to the [releases page](https://github.com/jsonMartin/readwise-mirror/releases) and note the latest beta version number (e.g. `1.5.1-beta.1`), labeled as pre-release
+3. Open BRAT settings and add the beta repository:
+   - Click "Add Beta Plugin with frozen version" 
+   - Enter `jsonMartin/readwise-mirror`
+   - Enter the version number you noted from releases (e.g. `1.5.1-beta.1`)
+   - Click "Add Plugin"
+
+Note: Beta versions are currently distributed as frozen releases that must be installed through BRAT's version selector. In the future, BRAT might support a feature that allows automatic updates to the latest pre-release version on GitHub.
+
+### Manual Download
 
 - Browse to [releases](https://github.com/jsonMartin/readwise-mirror/releases)
 - Download `main.js` and `manifest.json` of the latest release
@@ -111,7 +137,7 @@ The plugin provides granular control over how frontmatter is handled in existing
 
 - **Update Frontmatter**: When enabled, updates frontmatter in existing files during sync, overwriting values defined in the frontmatter template and keeping additional fields you might have added since the last sync.
 - When disabled, existing frontmatter will always completely be overwritten
-- Works best with Deduplication enabled to ensure consistent file handling
+- Works best with File Tracking enabled to ensure consistent file handling
 
 ### Frontmatter Protection
 
@@ -130,7 +156,7 @@ Protect specific frontmatter fields from being overwritten during sync:
 4. Fields listed for protection but not present in the file will be:
    - Added normally on first sync
    - Protected in subsequent updates once they exist
-5. Note: If deduplication is enabled, the deduplication field (e.g., `uri`) cannot be protected
+5. Note: If File Tracking is enabled, the tracking field (e.g., `uri`) cannot be protected
 
 #### Example
 
@@ -388,13 +414,14 @@ Rendered output:
 
 ## Deduplication
 
-The plugin prevents duplicate files when articles are re-imported from Readwise, maintaining link consistency in your vault. This can be useful in a number of cases: 
+If File Tracking is enabled, the plugin prevents duplicate files when articles are re-imported from Readwise, maintaining link consistency in your vault. This can be useful in a number of cases:
 
-- if you change the character used to escape the colon `:` in your titles, 
+- if you change the character used to escape the colon `:` in your titles,
 - when changing to use the "Slugify" feature, or changing its options, and  
-- if the title of a Readwise item changes
+- if the title of a Readwise item changes at the source
 
 ### How It Works
+
 
 1. **File Matching**
    - Uses MetadataCache to find files with matching `readwise_url`
@@ -413,7 +440,7 @@ The plugin prevents duplicate files when articles are re-imported from Readwise,
 
 ### Duplicate Handling
 
-When duplicates are found:
+If File Tracking is enabled, when duplicates are found:
 
 1. **Exact Match**
 
