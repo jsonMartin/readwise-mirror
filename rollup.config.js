@@ -21,7 +21,12 @@ export default {
     exports: 'default',
     banner,
   },
-  external: ['obsidian'],
+  external: [
+    'obsidian',
+    // Add these built-in Node.js modules as external
+    'node:path',
+    'path'
+  ],
   plugins: [
     typescript(),
     nodeResolve({browser: true}),
