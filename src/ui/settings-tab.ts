@@ -2,7 +2,6 @@ import { DEFAULT_SETTINGS, FRONTMATTER_TO_ESCAPE } from 'constants/index';
 import ReadwiseMirror from 'main';
 import { Template } from 'nunjucks';
 import { App, PluginSettingTab, Setting } from 'obsidian';
-import ReadwiseApi from 'services/readwise-api';
 import { sampleMetadata } from 'test/sample-data';
 import Notify from 'ui/notify';
 import * as YAML from 'yaml';
