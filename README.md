@@ -18,7 +18,7 @@ The first time this plugin is ran, it will do a full sync downloading all conten
   - Complete one-way synchronization that keeps your highlights current
   - Downloads your entire Readwise library in clean Markdown format
 
-- **Enhanced Obsidian Integration** 
+- **Enhanced Obsidian Integration**
   - Automatic `[[Links]]` creation for book titles and authors
   - Block references using highlight IDs for easy linking and transclusion
   - Full support for tags on both highlights and sources
@@ -77,7 +77,7 @@ The current recommended way to test beta features is through frozen beta version
 1. Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin in Obsidian
 2. Go to the [releases page](https://github.com/jsonMartin/readwise-mirror/releases) and note the latest beta version number (e.g. `1.5.1-beta.1`), labeled as pre-release
 3. Open BRAT settings and add the beta repository:
-   - Click "Add Beta Plugin with frozen version" 
+   - Click "Add Beta Plugin with frozen version"
    - Enter `jsonMartin/readwise-mirror`
    - Enter the version number you noted from releases (e.g. `1.5.1-beta.1`)
    - Click "Add Plugin"
@@ -422,7 +422,6 @@ If File Tracking is enabled, the plugin prevents duplicate files when articles a
 
 ### How It Works
 
-
 1. **File Matching**
    - Uses MetadataCache to find files with matching `readwise_url`
    - Checks all vault locations, not just the Readwise folder
@@ -444,21 +443,22 @@ If File Tracking is enabled, when duplicates are found:
 
 1. **Exact Match**
 
-   ```
+   ```shell
    📄 "My Article.md" (existing)
    └── Updates content in place
    ```
 
 2. **Different Filename**
 
-   ```
+   ```shell
    📄 "Article (2024).md" (existing)
+
    └── Updates content, changes filename to "My Article.md"
    ```
 
 3. **Multiple Matches**
 
-   ```
+   ```shell
    📄 "My Article.md" (primary)
    └── Updated with new content
    📄 "Same Article.md" (duplicate)
