@@ -828,8 +828,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
           return text;
         });
-      }
-
+      
 
     new Setting(containerEl)
       .setName('Header Template')
