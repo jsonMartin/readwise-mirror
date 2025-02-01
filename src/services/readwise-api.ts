@@ -7,6 +7,7 @@ const API_PAGE_SIZE = 1000; // number of results per page, default 100 / max 100
 export default class ReadwiseApi {
   private apiToken: string;
   private notify: Notify;
+  private validToken: boolean = undefined;
 
   constructor(apiToken: string, notify: Notify) {
     if (!apiToken) {
@@ -15,10 +16,14 @@ export default class ReadwiseApi {
 
     this.setToken(apiToken);
     this.notify = notify;
+    this.checkToken().then((isValid) => {
+      this.validToken = isValid;
+    });
   }
 
   setToken(apiToken: string) {
     this.apiToken = apiToken;
+    this.validToken = undefined;
   }
 
   get headers() {
@@ -30,7 +35,14 @@ export default class ReadwiseApi {
     };
   }
 
-  async checkToken() {
+  async hasValidToken() {
+    if (this.validToken === undefined) {
+      this.validToken = await this.checkToken();
+    }
+    return this.validToken;
+  }
+
+  private async checkToken() {
     const results = await fetch(`${API_ENDPOINT}/auth`, this.headers);
 
     return results.status === 204; // Returns a 204 response if token is valid

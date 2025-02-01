@@ -77,6 +77,53 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     }
   }
 
+  // Button-based authentication inspired by the official Readwise plugin
+  private async getUserAuthToken(button: HTMLElement, attempt = 0): Promise<boolean> {
+    const baseURL = 'https://readwise.io';
+    const uuid = this.getReadwiseMirrorClientId();
+
+    if (attempt === 0) {
+      window.open(`${baseURL}/api_auth?token=${uuid}&service=readwise-mirror`);
+    }
+
+    let response, data;
+    try {
+      response = await fetch(`${baseURL}/api/auth?token=${uuid}`);
+      if (response.ok) {
+        data = await response.json();
+        if (data.userAccessToken) {
+          this.plugin.settings.apiToken = data.userAccessToken;
+          this.plugin.readwiseApi.setToken(data.userAccessToken);
+          await this.plugin.saveSettings();
+          this.display(); // Refresh the settings page
+          return true;
+        }
+      }
+    } catch (e) {
+      console.log("Failed to authenticate with Readwise:", e);
+    }
+
+    if (attempt > 20) {
+      this.notify.notice("Authentication timeout. Please try again.");
+      return false;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return this.getUserAuthToken(button, attempt + 1);
+  }
+
+  // Button-based authentication inspired by the official Readwise plugin
+  private getReadwiseMirrorClientId() {
+    let readwiseMirrorClientId = window.localStorage.getItem('readwise-mirror-obsidian-client-id');
+    if (readwiseMirrorClientId) {
+      return readwiseMirrorClientId;
+    } else {
+      readwiseMirrorClientId = Math.random().toString(36).substring(2, 15);
+      window.localStorage.setItem('readwise-mirror-obsidian-client-id', readwiseMirrorClientId);
+      return readwiseMirrorClientId;
+    }
+  }
+  
   private createTemplateDocumentation(title: string, variables: [string, string][]) {
     return createFragment((fragment) => {
       const documentationContainer = fragment.createDiv({
@@ -118,29 +165,82 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
     containerEl.createEl('h1', { text: 'Readwise Sync Configuration' });
 
-    new Setting(containerEl)
-      .setName('Authentication')
-      .setHeading();
+    // Authentication section inspired by the official Readwise plugin
+    new Setting(containerEl).setName('Authentication').setHeading();
 
-    const apiTokenFragment = document.createDocumentFragment();
-    apiTokenFragment.createEl('span', null, (spanEl) =>
-      spanEl.createEl('a', null, (aEl) => (aEl.innerText = aEl.href = 'https://readwise.io/access_token'))
-    );
+   
+    const hasValidToken = await this.plugin.readwiseApi.hasValidToken();
+
+    const tokenValidationError = containerEl.createDiv({ 
+      cls: 'setting-item-description validation-error',
+      text: 'Invalid token. Please try authenticating again.',
+      attr: { 
+        style: 'color: var(--text-error); margin-top: 0.5em; display: none;'
+      }
+    });;
+    const tokenValidationSuccess = containerEl.createDiv({
+      cls: 'setting-item-description validation-success',
+      text: 'Token validated successfully',
+      attr: {
+        style: 'color: var(--text-success); margin-top: 0.5em; display: none;'
+      }
+    });
 
     new Setting(containerEl)
-      .setName('Enter your Readwise Access Token')
-      .setDesc(apiTokenFragment)
-      .addText((text) =>
+      .setName('Readwise Authentication')
+      .setDesc(createFragment((fragment) => {
+        fragment.createEl('br');
+        fragment.createEl('br');
+        fragment.createEl('strong', { text: 'Important: ' });
+        fragment.appendText('After successful authentication, a window with an error message will appear.');
+        fragment.createEl('br');
+        fragment.appendText('This is expected and can be safely closed.');
+        fragment.createEl('br');
+        fragment.createEl('br');
+        fragment.append(tokenValidationError);
+        fragment.append(tokenValidationSuccess);
+
+        // Show success or error message based on token validity
+        if(hasValidToken) {
+          tokenValidationSuccess.show();
+          tokenValidationError.hide();
+        } else {
+          tokenValidationSuccess.hide();
+          tokenValidationError.show();
+        } 
+      }))
+      .addButton((button) => {
+        button
+          .setButtonText(!hasValidToken ? 'Re-authenticate with Readwise' : 'Authenticate with Readwise')
+          .setCta()
+          .onClick(async (evt) => {
+            const buttonEl = evt.target as HTMLElement;
+            const token = await this.getUserAuthToken(buttonEl);
+            if (token) {
+              if (!hasValidToken) {
+                tokenValidationError.show();
+                tokenValidationSuccess.hide();
+              } else {
+                tokenValidationError.hide();
+                tokenValidationSuccess.show();
+              }
+            }
+          }).setDisabled(hasValidToken);
+        return button;
+      })
+      .addText((text) => {
+        const token = this.plugin.settings.apiToken;
+        const maskedToken = token 
+          ? token.slice(0, 6) + '*'.repeat(token.length - 6)
+          : '';
+        
         text
-          .setPlaceholder('Readwise Access Token')
-          .setValue(this.plugin.settings.apiToken)
-          .onChange(async (value) => {
-            if (!value) return;
-            this.plugin.settings.apiToken = value;
-            await this.plugin.saveSettings();
-            this.plugin.readwiseApi = new ReadwiseApi(value, this.notify);
-          })
-      );
+          .setPlaceholder('Token will be filled automatically after authentication')
+          .setValue(maskedToken)
+          .setDisabled(true);
+      });
+
+    
 
     new Setting(containerEl)
       .setName('Library Settings')

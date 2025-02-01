@@ -785,7 +785,7 @@ export default class ReadwiseMirror extends Plugin {
       id: 'test',
       name: 'Test Readwise API key',
       callback: async () => {
-        const isTokenValid = await this.readwiseApi.checkToken();
+        const isTokenValid = await this.readwiseApi.hasValidToken();
         this.notify.notice('Readwise: ' + (isTokenValid ? 'Token is valid' : 'INVALID TOKEN'));
       },
     });
