@@ -727,19 +727,15 @@ export default class ReadwiseMirror extends Plugin {
 
     if (frontmatterStart === -1 || frontmatterEnd <= frontmatterStart) return template;
 
-    // Check for existing property
-    const propertyIndex = lines.findIndex((line) => line.trim().startsWith(`${propertyName}:`));
-
-    if (propertyIndex > -1 && propertyIndex < frontmatterEnd) {
-      // Replace existing property
-      console.warn(`Readwise: Replacing existing property '${propertyName}' in frontmatter template for deduplication`);
-      lines[propertyIndex] = propertyValue;
-    } else {
-      // Add new property before closing ---
-      lines.splice(frontmatterEnd, 0, propertyValue);
-    }
-
-    return lines.join('\n');
+  // Update the frontmatter template with the sync properties
+  public updateFrontmatteTemplate() {
+    this.frontMatterTemplate = new Template(
+      this.addSyncPropertiesToFrontmatterTemplate(this.settings.frontMatterTemplate),
+      this.env,
+      null,
+      true
+    );
+  }
   }
 
   async onload() {
@@ -765,17 +761,8 @@ export default class ReadwiseMirror extends Plugin {
       return str.replace(/\.qa(.*)\?(.*)/g, '**Q:**$1?\r\n\r\n**A:**$2');
     });
 
-    // Add filter to nunjucks environment
-    this.env.addFilter('yaml', function (str) {
-      return this.escapeForYaml(str);
-    });
+    this.updateFrontmatteTemplate();
 
-    this.frontMatterTemplate = new Template(
-      this.ensureDedupPropertyInTemplate(this.settings.frontMatterTemplate),
-      this.env,
-      null,
-      true
-    );
     this.headerTemplate = new Template(this.settings.headerTemplate, this.env, null, true);
     this.highlightTemplate = new Template(this.settings.highlightTemplate, this.env, null, true);
 

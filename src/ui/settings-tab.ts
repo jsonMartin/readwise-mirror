@@ -124,16 +124,18 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     }
   }
   
-  private createTemplateDocumentation(title: string, variables: [string, string][]) {
+  private createTemplateDocumentation(variables: [string, string][], title?: string) {
     return createFragment((fragment) => {
       const documentationContainer = fragment.createDiv({
         cls: 'setting-documentation-container',
       });
 
-      documentationContainer.createDiv({
-        text: title,
-        cls: 'setting-item-description',
-      });
+      if (title) {
+        documentationContainer.createDiv({
+          text: title,
+          cls: 'setting-item-description',
+        });
+      }
 
       const container = documentationContainer.createDiv({
         cls: 'setting-item-description',
@@ -325,7 +327,8 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('File Naming')
+      .setName('Filename Settings')
+      .setDesc('Controls how filenames are generated from the title')
       .setHeading();
 
     new Setting(containerEl)
@@ -349,6 +352,67 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           })
       );
 
+      new Setting(containerEl)
+        .setName('Use Slugify for filenames')
+        .setDesc(
+          createFragment((fragment) => {
+            fragment.appendText(
+              'Use slugify to create clean filenames. This removes diacritics and other special characters, including emojis.'
+            );
+            fragment.createEl('br');
+            fragment.createEl('br');
+            fragment.appendText('Example filename: "Déjà Vu with a 🦄"');
+            fragment.createEl('br');
+            fragment.createEl('blockquote', {
+              text: 'Slugify disabled: "Deja Vu with a "',
+            });
+            fragment.createEl('blockquote', {
+              text: 'Slugify enabled (default settings): "deja-vu-with-a"',
+            });
+            fragment.createEl('blockquote', {
+              text: 'Slugify + custom separator "_": "deja_vu_with_a"',
+            });
+            fragment.createEl('blockquote', {
+              text: 'Slugify + lowercase disabled: "Deja-Vu-With-A"',
+            });
+          })
+        )
+        .addToggle((toggle) =>
+          toggle.setValue(this.plugin.settings.useSlugify).onChange(async (value) => {
+            this.plugin.settings.useSlugify = value;
+            await this.plugin.saveSettings();
+            // Trigger re-render to show/hide property selector
+            this.display();
+          })
+        );
+  
+      if (this.plugin.settings.useSlugify) {
+        new Setting(containerEl)
+          .setClass('indent')
+          .setName('Slugify Separator')
+          .setDesc('Character to use as separator in slugified filenames (default: -)')
+          .addText((text) =>
+            text
+              .setPlaceholder('-')
+              .setValue(this.plugin.settings.slugifySeparator)
+              .onChange(async (value) => {
+                this.plugin.settings.slugifySeparator = value || '-';
+                await this.plugin.saveSettings();
+              })
+          );
+  
+        new Setting(containerEl)
+          .setClass('indent')
+          .setName('Slugify Lowercase')
+          .setDesc('Convert slugified filenames to lowercase')
+          .addToggle((toggle) =>
+            toggle.setValue(this.plugin.settings.slugifyLowercase).onChange(async (value) => {
+              this.plugin.settings.slugifyLowercase = value;
+              await this.plugin.saveSettings();
+            })
+          );
+      }
+
     new Setting(containerEl)
       .setName('Sync Logging')
       .setHeading();
@@ -363,19 +427,22 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         })
       );
 
-    new Setting(containerEl)
-      .setName('Sync Log File Name')
-      .setDesc('Default: Sync.md')
-      .addText((text) =>
-        text
-          .setPlaceholder('Sync.md')
-          .setValue(this.plugin.settings.logFileName)
-          .onChange(async (value) => {
-            if (!value) return;
-            this.plugin.settings.logFileName = value;
-            await this.plugin.saveSettings();
-          })
-      );
+    if (this.plugin.settings.logFile) {
+      new Setting(containerEl)
+        .setClass('indent')
+        .setName('Sync Log File Name')
+        .setDesc('Default: Sync.md')
+        .addText((text) =>
+          text
+            .setPlaceholder('Sync.md')
+            .setValue(this.plugin.settings.logFileName)
+            .onChange(async (value) => {
+              if (!value) return;
+              this.plugin.settings.logFileName = value;
+              await this.plugin.saveSettings();
+            })
+        );
+    }
 
     new Setting(containerEl)
       .setName('Templates')
@@ -396,11 +463,16 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Frontmatter Settings')
+      .setDesc(
+        createFragment((fragment) => {
+          fragment.appendText('Controls the YAML metadata at the top of each note.');
+        })
+      )
       .setHeading();
 
     new Setting(containerEl)
       .setName('Frontmatter')
-      .setDesc('Add frontmatter (defined with the following Template)')
+      .setDesc('Add frontmatter (defined with the Frontmatter Template below)')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.frontMatter).onChange(async (value) => {
           // Test template with sample data
@@ -421,6 +493,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
     if (this.plugin.settings.frontMatter) {
       new Setting(containerEl)
+        .setClass('indent')
         .setName('Update Frontmatter')
         .setDesc(
           createFragment((fragment) => {
@@ -442,6 +515,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
       if (this.plugin.settings.updateFrontmatter) {
         new Setting(containerEl)
+          .setClass('indent')
           .setName('Protect Frontmatter Fields')
           .setDesc(
             createFragment((fragment) => {
@@ -469,15 +543,13 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
         if (this.plugin.settings.protectFrontmatter) {
           const validateProtectedFields = (value: string): { isValid: boolean; error?: string } => {
-            if (!this.plugin.settings.trackFiles) return { isValid: true };
-
             const fields = value
               .split('\n')
               .map((f) => f.trim())
               .filter((f) => f.length > 0);
             const dedupField = this.plugin.settings.trackingProperty;
 
-            if (fields.includes(dedupField)) {
+            if (this.plugin.settings.trackFiles && fields.includes(dedupField)) {
               return {
                 isValid: false,
                 error: `Cannot protect tracking field '${dedupField}'`,
@@ -488,6 +560,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
           const container = containerEl.createDiv();
           new Setting(container)
+            .setClass('indent')
             .setName('Protected Fields')
             .setDesc('Enter one field name per line')
             .addTextArea((text) => {
@@ -514,7 +587,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
                   }
                 });
 
-              // Initial row adjustment
+              const validation = validateProtectedFields(this.plugin.settings.protectedFields);
+              errorDiv.setText(validation.error || '');
+              
+                // Initial row adjustment
               this.adjustTextareaRows(text.inputEl, initialRows);
 
               // Adjust on content change
@@ -526,7 +602,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             });
         }
       }
-    }
+    
 
     new Setting(containerEl)
       .setName('File Tracking')
@@ -555,198 +631,219 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.trackFiles = value;
             await this.plugin.saveSettings();
+            this.plugin.updateFrontmatteTemplate();
             this.display();
           })
       );
 
-    if (this.plugin.settings.trackFiles) {
-      new Setting(containerEl)
-        .setName('Tracking Property')
-        .setDesc(
-          'Frontmatter property to store the unique Readwise URL (default: uri). This field will be automatically managed in the frontmatter.'
-        )
-        .addText((text) =>
-          text
-            .setValue(this.plugin.settings.trackingProperty)
-            .setDisabled(!this.plugin.settings.frontMatter)
-            .onChange(async (value) => {
-              this.plugin.settings.trackingProperty = value || 'uri';
+      if (this.plugin.settings.trackFiles && this.plugin.settings.frontMatter) {
+        new Setting(containerEl)
+          .setClass('indent')
+          .setName('Tracking Property')
+          .setDesc(
+            'Frontmatter property to store the unique Readwise URL (default: uri). This field will be automatically managed in the frontmatter.'
+          )
+          .addText((text) =>
+            text
+              .setValue(this.plugin.settings.trackingProperty)
+              .setDisabled(!this.plugin.settings.frontMatter)
+              .onChange(async (value) => {
+                this.plugin.settings.trackingProperty = value || 'uri';
+                await this.plugin.saveSettings();
+                this.plugin.updateFrontmatteTemplate();
+              })
+          );
+
+        new Setting(containerEl)
+          .setClass('indent')
+          .setName('Remove Duplicate Files')
+          .setDesc(
+            createFragment((fragment) => {
+              fragment.appendText(
+                'When enabled, duplicate files will be removed. Otherwise, they will be marked with duplicate: true in frontmatter.'
+              );
+              fragment.createEl('br');
+              fragment.createEl('blockquote', { text: 'Default: Remove duplicates' });
+            })
+          )
+          .addToggle((toggle) =>
+            toggle.setValue(this.plugin.settings.deleteDuplicates).onChange(async (value) => {
+              this.plugin.settings.deleteDuplicates = value;
               await this.plugin.saveSettings();
             })
-        );
+          );
+
+
+      }
+
+      }
 
       new Setting(containerEl)
-        .setName('Remove Duplicate Files')
+        .setName('Frontmatter Template')
         .setDesc(
           createFragment((fragment) => {
-            fragment.appendText(
-              'When enabled, duplicate files will be removed. Otherwise, they will be marked with duplicate: true in frontmatter.'
-            );
-            fragment.createEl('br');
-            fragment.createEl('blockquote', { text: 'Default: Remove duplicates' });
+            fragment.appendText('Controls YAML frontmatter metadata. The same variables are available as for the Header template, with specific versions optimised for YAML frontmatter (tags), and escaped values for YAML compatibility.');
           })
         )
-        .addToggle((toggle) =>
-          toggle.setValue(this.plugin.settings.deleteDuplicates).onChange(async (value) => {
-            this.plugin.settings.deleteDuplicates = value;
-            await this.plugin.saveSettings();
-          })
-        );
-    }
+        .setHeading();
 
-    new Setting(containerEl)
-      .setName('Frontmatter Template')
-      .setDesc(
-        createFragment((fragment) => {
-          fragment.append(
-            this.createTemplateDocumentation(
-              'Controls YAML frontmatter metadata. The same variables are available as for the Header template, with specific versions optimised for YAML frontmatter (tags), and escaped values for YAML compatibility.',
-              [
-                ['id', 'Document ID'],
-                ['created', 'Creation timestamp'],
-                ['updated', 'Last update timestamp'],
-                ['last_highlight_at', 'Last highlight timestamp'],
-                ['title', 'Document title (escaped for YAML)'],
-                ['sanitized_title', 'Title safe for file system (escaped for YAML)'],
-                ['author', 'Author name(s) (escaped for YAML)'],
-                ['authorStr', 'Author names with wiki links (escaped for YAML)'],
-                ['category', 'Content type'],
-                ['num_highlights', 'Number of highlights'],
-                ['source_url', 'Original content URL'],
-                ['unique_url', 'Unique identifier URL'],
-                ['tags', 'Tags with # prefix'],
-                ['tags_nohash', 'Tags without # prefix (compatible with frontmatter)'],
-                ['highlight_tags', 'Tags from highlights with # prefix'],
-                ['hl_tags_nohash', 'Tags from highlights without # prefix (compatible with frontmatter)'],
-                ['highlights_url', 'Readwise URL (auto-injected if deduplication enabled)'],
+      new Setting(containerEl)
+        .setDesc(
+          createFragment((fragment) => {
+            fragment.append(
+              this.createTemplateDocumentation( 
                 [
-                  'Note:',
-                  'If deduplication is enabled, the specified property will be automatically added or updated in the frontmatter template.',
-                ],
-              ]
-            )
-          );
-        })
-      )
-      .addTextArea((text) => {
-        const initialRows = 12;
-        text.inputEl.addClass('settings-template-input');
-        text.inputEl.rows = initialRows;
-        text.inputEl.cols = 50;
+                  ['id', 'Document ID'],
+                  ['created', 'Creation timestamp'],
+                  ['updated', 'Last update timestamp'],
+                  ['last_highlight_at', 'Last highlight timestamp'],
+                  ['title', 'Document title (escaped for YAML)'],
+                  ['sanitized_title', 'Title safe for file system (escaped for YAML)'],
+                  ['author', 'Author name(s) (escaped for YAML)'],
+                  ['authorStr', 'Author names with wiki links (escaped for YAML)'],
+                  ['category', 'Content type'],
+                  ['num_highlights', 'Number of highlights'],
+                  ['source_url', 'Original content URL'],
+                  ['unique_url', 'Unique identifier URL'],
+                  ['tags', 'Tags with # prefix'],
+                  ['tags_nohash', 'Tags without # prefix (compatible with frontmatter)'],
+                  ['highlight_tags', 'Tags from highlights with # prefix'],
+                  ['hl_tags_nohash', 'Tags from highlights without # prefix (compatible with frontmatter)'],
+                  ['highlights_url', 'Readwise URL (auto-injected if deduplication enabled)'],
+                  [
+                    'Note:',
+                    'If deduplication is enabled, the specified property will be automatically added or updated in the frontmatter template.',
+                  ],
+                ]
+              )
+            );
+          })
+        )
+        .addTextArea((text) => {
+          const initialRows = 12;
+          text.inputEl.addClass('settings-template-input');
+          text.inputEl.rows = initialRows;
+          text.inputEl.cols = 50;
 
-        const container = containerEl.createDiv();
+          const container = containerEl.createDiv();
 
-        text.inputEl.addClass('settings-template-input');
-        text.inputEl.rows = 12;
-        text.inputEl.cols = 50;
+          text.inputEl.addClass('settings-template-input');
+          text.inputEl.rows = 12;
+          text.inputEl.cols = 50;
 
-        // Create preview elements below textarea
-        const previewContainer = container.createDiv('template-preview');
-        const previewTitle = previewContainer.createDiv({
-          text: 'Template Preview (Error):',
-          cls: 'template-preview-title',
-          attr: {
-            style: 'color: var(--text-error);',
-          },
-        });
-        previewTitle.style.fontWeight = 'bold';
-        previewTitle.style.marginTop = '1em';
+          // Create preview elements below textarea
+          const previewContainer = container.createDiv('template-preview');
+          const previewTitle = previewContainer.createDiv({
+            text: 'Template Preview (Error):',
+            cls: 'template-preview-title',
+            attr: {
+              style: 'color: var(--text-error);',
+            },
+          });
+          previewTitle.style.fontWeight = 'bold';
+          previewTitle.style.marginTop = '1em';
 
-        const errorNotice = previewContainer.createDiv({
-          cls: 'validation-notice',
-          attr: {
-            style: 'color: var(--text-error); margin-top: 1em;',
-          },
-        });
+          const errorNotice = previewContainer.createDiv({
+            cls: 'validation-notice',
+            attr: {
+              style: 'color: var(--text-error); margin-top: 1em;',
+            },
+          });
 
-        const previewContent = previewContainer.createEl('pre', {
-          cls: ['template-preview-content', 'settings-template-input'],
-          attr: {
-            style: 'background-color: var(--background-secondary); padding: 1em; border-radius: 4px; overflow-x: auto;',
-          },
-        });
+          const previewContent = previewContainer.createEl('pre', {
+            cls: ['template-preview-content', 'settings-template-input'],
+            attr: {
+              style:
+                'background-color: var(--background-secondary); padding: 1em; border-radius: 4px; overflow-x: auto;',
+            },
+          });
 
-        const errorDetails = previewContainer.createEl('pre', {
-          cls: ['error-details'],
-          attr: {
-            style:
-              'color: var(--text-error); background-color: var(--background-primary-alt); padding: 0.5em; border-radius: 4px; margin-top: 0.5em; font-family: monospace; white-space: pre-wrap;',
-          },
-        });
+          const errorDetails = previewContainer.createEl('pre', {
+            cls: ['error-details'],
+            attr: {
+              style:
+                'color: var(--text-error); background-color: var(--background-primary-alt); padding: 0.5em; border-radius: 4px; margin-top: 0.5em; font-family: monospace; white-space: pre-wrap;',
+            },
+          });
 
-        errorDetails.hide();
+          errorDetails.hide();
 
-        // Update preview on template changes
-        const updatePreview = (template: string) => {
-          const rendered = new Template(template, this.plugin.env, null, true).render(
-            this.plugin.escapeFrontmatter(sampleMetadata, FRONTMATTER_TO_ESCAPE)
-          );
-          const yamlContent = rendered
-            .replace(/^---\n/, '') // Remove opening ---
-            .replace(/\n---\n*$/, ''); // Remove closing --- and any trailing newlines
+          // Update preview on template changes
+          const updatePreview = (template: string) => {
+            const rendered = new Template(template, this.plugin.env, null, true).render(
+              this.plugin.escapeFrontmatter(sampleMetadata, FRONTMATTER_TO_ESCAPE)
+            );
+            const yamlContent = rendered
+              .replace(/^---\n/, '') // Remove opening ---
+              .replace(/\n---\n*$/, ''); // Remove closing --- and any trailing newlines
 
-          try {
-            YAML.parse(yamlContent);
-            errorNotice.setText('');
-            previewContainer.hide();
-          } catch (error) {
-            // Turn Frontmatter toggle off
-            if (error instanceof YAML.YAMLParseError) {
-              errorNotice.setText(`Invalid YAML:`);
-              errorDetails.setText(error.message);
-              errorDetails.show();
-            } else {
-              errorNotice.setText(`Template error: ${error.message}`);
-              errorDetails.hide();
+            try {
+              YAML.parse(yamlContent);
+              errorNotice.setText('');
+              previewContainer.hide();
+            } catch (error) {
+              // Turn Frontmatter toggle off
+              if (error instanceof YAML.YAMLParseError) {
+                errorNotice.setText(`Invalid YAML:`);
+                errorDetails.setText(error.message);
+                errorDetails.show();
+              } else {
+                errorNotice.setText(`Template error: ${error.message}`);
+                errorDetails.hide();
+              }
+              previewContent.setText(yamlContent);
+              previewContainer.show();
             }
-            previewContent.setText(yamlContent);
-            previewContainer.show();
-          }
-        };
+          };
 
-        // Display rendered template on load
-        updatePreview(this.plugin.settings.frontMatterTemplate);
-        text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
-          const validation = this.validateFrontmatterTemplate(value);
+          // Display rendered template on load
+          updatePreview(this.plugin.settings.frontMatterTemplate);
+          text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
+            const validation = this.validateFrontmatterTemplate(value);
 
-          // Update validation notice
-          const noticeEl = containerEl.querySelector('.validation-notice');
-          if (noticeEl) {
-            noticeEl.setText(validation.isValid ? '' : validation.error);
-          }
+            // Update validation notice
+            const noticeEl = containerEl.querySelector('.validation-notice');
+            if (noticeEl) {
+              noticeEl.setText(validation.isValid ? '' : validation.error);
+            }
 
-          if (!value) {
-            this.plugin.settings.frontMatterTemplate = DEFAULT_SETTINGS.frontMatterTemplate;
-          } else {
-            this.plugin.settings.frontMatterTemplate = value.replace(/\n*$/, '\n');
-          }
+            if (!value) {
+              this.plugin.settings.frontMatterTemplate = DEFAULT_SETTINGS.frontMatterTemplate;
+            } else {
+              this.plugin.settings.frontMatterTemplate = value.replace(/\n*$/, '\n');
+            }
 
-          updatePreview(value);
+            updatePreview(value);
 
-          this.plugin.frontMatterTemplate = new Template(
-            this.plugin.ensureDedupPropertyInTemplate(this.plugin.settings.frontMatterTemplate),
-            this.plugin.env,
-            null,
-            true
-          );
-          await this.plugin.saveSettings();
-        });
+            this.plugin.updateFrontmatteTemplate();
+            await this.plugin.saveSettings();
+          });
 
-        // Initial row adjustment
-        this.adjustTextareaRows(text.inputEl, initialRows);
-
-        // Adjust on content change
-        text.inputEl.addEventListener('input', () => {
+          // Initial row adjustment
           this.adjustTextareaRows(text.inputEl, initialRows);
-        });
 
-        return text;
-      });
+          // Adjust on content change
+          text.inputEl.addEventListener('input', () => {
+            this.adjustTextareaRows(text.inputEl, initialRows);
+          });
+
+          return text;
+        });
+      }
+
 
     new Setting(containerEl)
       .setName('Header Template')
       .setDesc(
-        this.createTemplateDocumentation('Controls document metadata and structure.', [
+        createFragment((fragment) => {
+          fragment.appendText('Controls document metadata and structure.');
+        })
+      )
+      .setHeading();
+
+    new Setting(containerEl)
+      .setDesc(
+        this.createTemplateDocumentation([
           ['id', 'Document ID'],
           ['title', 'Document title'],
           ['sanitized_title', 'Title safe for file system'],
@@ -793,7 +890,15 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Highlight Template')
       .setDesc(
-        this.createTemplateDocumentation('Controls individual highlight formatting.', [
+        createFragment((fragment) => {
+          fragment.appendText('Controls individual highlight formatting.');
+        })
+      )
+      .setHeading();
+
+    new Setting(containerEl)
+      .setDesc(
+        this.createTemplateDocumentation([
           ['text', 'Highlight content (supports bq filter for blockquotes)'],
           ['note', 'Associated notes (supports qa filter for Q&A format)'],
           ['color', 'Highlight color'],
@@ -839,67 +944,5 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         return text;
       });
 
-    new Setting(containerEl)
-      .setName('Filename Settings')
-      .setHeading();
-
-    new Setting(containerEl)
-      .setName('Use Slugify for filenames')
-      .setDesc(
-        createFragment((fragment) => {
-          fragment.appendText(
-            'Use slugify to create clean filenames. This removes diacritics and other special characters, including emojis.'
-          );
-          fragment.createEl('br');
-          fragment.createEl('br');
-          fragment.appendText('Example filename: "Déjà Vu with a 🦄"');
-          fragment.createEl('br');
-          fragment.createEl('blockquote', {
-            text: 'Slugify disabled: "Deja Vu with a "',
-          });
-          fragment.createEl('blockquote', {
-            text: 'Slugify enabled (default settings): "deja-vu-with-a"',
-          });
-          fragment.createEl('blockquote', {
-            text: 'Slugify + custom separator "_": "deja_vu_with_a"',
-          });
-          fragment.createEl('blockquote', {
-            text: 'Slugify + lowercase disabled: "Deja-Vu-With-A"',
-          });
-        })
-      )
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.useSlugify).onChange(async (value) => {
-          this.plugin.settings.useSlugify = value;
-          await this.plugin.saveSettings();
-          // Trigger re-render to show/hide property selector
-          this.display();
-        })
-      );
-
-    if (this.plugin.settings.useSlugify) {
-      new Setting(containerEl)
-        .setName('Slugify Separator')
-        .setDesc('Character to use as separator in slugified filenames (default: -)')
-        .addText((text) =>
-          text
-            .setPlaceholder('-')
-            .setValue(this.plugin.settings.slugifySeparator)
-            .onChange(async (value) => {
-              this.plugin.settings.slugifySeparator = value || '-';
-              await this.plugin.saveSettings();
-            })
-        );
-
-      new Setting(containerEl)
-        .setName('Slugify Lowercase')
-        .setDesc('Convert slugified filenames to lowercase')
-        .addToggle((toggle) =>
-          toggle.setValue(this.plugin.settings.slugifyLowercase).onChange(async (value) => {
-            this.plugin.settings.slugifyLowercase = value;
-            await this.plugin.saveSettings();
-          })
-        );
-    }
   }
 }
