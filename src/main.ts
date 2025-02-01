@@ -20,6 +20,7 @@ export default class ReadwiseMirror extends Plugin {
   frontMatterTemplate: Template;
   headerTemplate: Template;
   highlightTemplate: Template;
+  isSyncing: boolean = false;
 
   private analyzeStringForFrontmatter(value: string): YamlStringState {
     return {
@@ -629,39 +630,56 @@ export default class ReadwiseMirror extends Plugin {
     }
   }
 
-  async sync() {
-    if (!this.settings.apiToken) {
-      this.notify.notice('Readwise: API Token Required');
+  async sync(full = false) {
+    if (this.isSyncing) {
+      this.notify.notice('Sync already in progress');
       return;
     }
 
-    let library: Library;
-    const lastUpdated = this.settings.lastUpdated;
+    this.isSyncing = true;
+    try {
+      if (!this.readwiseApi.hasValidToken()) {
+        this.notify.notice('Readwise: Valid API Token Required');
 
-    if (!lastUpdated) {
-      this.notify.notice('Readwise: Previous sync not detected...\nDownloading full Readwise library');
-      library = await this.readwiseApi.downloadFullLibrary();
-    } else {
-      // Load Upadtes and cache
-      this.notify.notice(`Readwise: Checking for new updates since ${this.lastUpdatedHumanReadableFormat()}`);
-      library = await this.readwiseApi.downloadUpdates(lastUpdated);
+        return;
+      }
+
+      let library: Library;
+      const lastUpdated = this.settings.lastUpdated;
+
+      if (!lastUpdated) {
+        this.notify.notice('Readwise: Previous sync not detected...\nDownloading full Readwise library');
+        library = await this.readwiseApi.downloadFullLibrary();
+      } else {
+        // Load Upadtes and cache
+        this.notify.notice(`Readwise: Checking for new updates since ${this.lastUpdatedHumanReadableFormat()}`);
+        library = await this.readwiseApi.downloadUpdates(lastUpdated);
+      }
+
+      if (Object.keys(library.books).length > 0) {
+        this.writeLibraryToMarkdown(library);
+
+        if (this.settings.logFile) this.writeLogToMarkdown(library);
+
+        this.notify.notice(
+          `Readwise: Downloaded ${library.highlightCount} Highlights from ${Object.keys(library.books).length} Sources`
+        );
+      } else {
+        this.notify.notice(`Readwise: No new content available`);
+      }
+
+      this.settings.lastUpdated = new Date().toISOString();
+      await this.saveSettings();
+      this.notify.setStatusBarText(`Readwise: Synced ${this.lastUpdatedHumanReadableFormat()}`);
+    } catch (error) {
+      console.error('Error during sync:', error);
+      this.notify.notice(`Readwise: Sync failed. ${error}`);
+    } finally {
+      // Make sure we reset the sync status in case of error
+      this.isSyncing = false;
     }
 
-    if (Object.keys(library.books).length > 0) {
-      this.writeLibraryToMarkdown(library);
 
-      if (this.settings.logFile) this.writeLogToMarkdown(library);
-
-      this.notify.notice(
-        `Readwise: Downloaded ${library.highlightCount} Highlights from ${Object.keys(library.books).length} Sources`
-      );
-    } else {
-      this.notify.notice(`Readwise: No new content available`);
-    }
-
-    this.settings.lastUpdated = new Date().toISOString();
-    await this.saveSettings();
-    this.notify.setStatusBarText(`Readwise: Synced ${this.lastUpdatedHumanReadableFormat()}`);
   }
 
   async download() {
