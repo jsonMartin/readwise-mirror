@@ -81,6 +81,9 @@ Tags: {{ tags }}
   protectFrontmatter: false,
   protectedFields: 'connections\nstatus\ntags',
   updateFrontmatter: true,
+  syncPropertiesToReadwise: false,
+  titleProperty: 'title',
+  authorProperty: 'author'
 };
 
 export const FRONTMATTER_TO_ESCAPE = ['title', 'sanitized_title', 'author', 'authorStr'];

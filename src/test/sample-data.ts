@@ -25,7 +25,7 @@ export const sampleMetadata: ReadwiseMetadata = {
   id: 12345,
   title: "My Book:\nA Subtitle's Journey",
   sanitized_title: "My Book - A Subtitle's Journey",
-  author: 'O\'Reilly, Tim & "Doc" Smith',
+  author: ['O\'Reilly, Tim', '"Doc" Smith'],
   authorStr: '[[O\'Reilly, Tim]] and [["Doc" Smith]]',
   document_note: 'Line 1\nLine 2\nLine 3: Important!',
   summary: 'Contains > and < symbols\nAnd some * wildcards & ampersands',

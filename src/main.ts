@@ -1,7 +1,7 @@
 import slugify from '@sindresorhus/slugify';
 import filenamify from 'filenamify';
 import { ConfigureOptions, Environment, Template } from 'nunjucks';
-import { normalizePath, Plugin, TFile } from 'obsidian';
+import { CachedMetadata, normalizePath, Plugin, TFile } from 'obsidian';
 import spacetime from 'spacetime';
 import * as YAML from 'yaml';
 
@@ -427,22 +427,22 @@ export default class ReadwiseMirror extends Plugin {
 
         const metadata: ReadwiseMetadata = {
           id: user_book_id,
-          title: title,
+          title,
           sanitized_title: sanitizedTitle,
-          author: author,
-          authorStr: authorStr,
-          document_note: document_note,
-          summary: summary,
-          category: category,
-          num_highlights: num_highlights,
+          author: authors,
+          authorStr,
+          document_note,
+          summary,
+          category,
+          num_highlights,
           created: created ? this.formatDate(created) : '',
           updated: updated ? this.formatDate(updated) : '',
           cover_image_url: cover_image_url.replace('SL200', 'SL500').replace('SY160', 'SY500'),
           highlights_url: readwise_url,
-          highlights: highlights,
+          highlights,
           last_highlight_at: last_highlight_at ? this.formatDate(last_highlight_at) : '',
-          source_url: source_url,
-          unique_url: unique_url,
+          source_url,
+          unique_url,
           tags: this.formatTags(book_tags),
           highlight_tags: this.formatTags(highlightTags),
           tags_nohash: this.formatTags(book_tags, true, "'"),
@@ -451,12 +451,27 @@ export default class ReadwiseMirror extends Plugin {
 
         // Escape specific fields used in frontmatter
         // TODO: Tidy up code. It doesn't make sense to remove the frontmatter markers and then add them back
-        const frontmatterYaml = YAML.parse(
-          this.frontMatterTemplate
-            .render(this.escapeFrontmatter(metadata, FRONTMATTER_TO_ESCAPE))
+        let frontmatterYaml;
+        try {
+          const renderedTemplate = this.frontMatterTemplate.render(
+            this.escapeFrontmatter(metadata, FRONTMATTER_TO_ESCAPE)
+          );
+          const cleanedTemplate = renderedTemplate
             .replace(/^---\n/, '')
-            .replace(/\n---\n*$/, '')
-        );
+            .replace(/\n---\n*$/, '');
+          frontmatterYaml = YAML.parse(cleanedTemplate);
+        } catch (error) {
+          if (error instanceof YAML.YAMLParseError) {
+            console.error('Failed to parse YAML frontmatter:', error.message);
+            throw new Error(`Invalid YAML frontmatter: ${error.message}`);
+          } else if (error instanceof Error) {
+            console.error('Error processing frontmatter template:', error.message);
+            throw new Error(`Failed to process frontmatter: ${error.message}`);
+          } else {
+            console.error('Unknown error processing frontmatter:', error);
+            throw new Error('Failed to process frontmatter due to unknown error');
+          }
+        }
         const frontMatterContents = this.settings.frontMatter
           ? ['---', YAML.stringify(frontmatterYaml, YAML_TOSTRING_OPTIONS), '---'].join('\n')
           : '';
@@ -714,18 +729,41 @@ export default class ReadwiseMirror extends Plugin {
       this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()} elsewhere`);
   }
 
-  public ensureDedupPropertyInTemplate(template: string): string {
-    if (!this.settings.trackFiles) return template;
-
-    const propertyName = this.settings.trackingProperty;
-    const propertyValue = `${propertyName}: {{ highlights_url }}`;
-
+  public addSyncPropertiesToFrontmatterTemplate(template: string): string {
     const lines = template.split('\n');
     const frontmatterStart = lines.findIndex((line) => line.trim() === '---');
     const frontmatterEnd =
       lines.slice(frontmatterStart + 1).findIndex((line) => line.trim() === '---') + frontmatterStart + 1;
 
     if (frontmatterStart === -1 || frontmatterEnd <= frontmatterStart) return template;
+
+    const propertiesToAdd: string[] = [];
+
+    // Add tracking property if enabled
+    if (this.settings.trackFiles) {
+      console.warn('Adding tracking property to frontmatter template');
+      const trackingProperty = `${this.settings.trackingProperty}: {{ highlights_url }}`;
+      propertiesToAdd.push(trackingProperty);
+    }
+
+    // If no properties to add, return original template
+    if (propertiesToAdd.length === 0) return template;
+
+    // Remove any existing properties
+    const propertyNames = [
+      this.settings.trackingProperty,
+    ];
+    
+    const filteredLines = lines.filter((line, index) => {
+      if (index < frontmatterStart || index > frontmatterEnd) return true;
+      return !propertyNames.some(prop => line.trim().startsWith(`${prop}:`));
+    });
+
+    // Add new properties before closing ---
+    filteredLines.splice(frontmatterEnd, 0, ...propertiesToAdd);
+
+    return filteredLines.join('\n');
+  }
 
   // Update the frontmatter template with the sync properties
   public updateFrontmatteTemplate() {
@@ -736,6 +774,13 @@ export default class ReadwiseMirror extends Plugin {
       true
     );
   }
+
+  // Dedicated function to handle metadata change events
+  private onMetadataChange(file: TFile) {
+    const metadata: CachedMetadata = this.app.metadataCache.getFileCache(file);
+    if (metadata && !this.isSyncing) {
+      console.log(`Updated metadata cache for file: ${file.path}: ${JSON.stringify(metadata?.frontmatter)}`);
+    }
   }
 
   async onload() {

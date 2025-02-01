@@ -23,4 +23,7 @@ export interface PluginSettings {
   protectFrontmatter: boolean; // Protect specified frontmatter fields from updates
   protectedFields: string;     // List of frontmatter fields to protect
   updateFrontmatter: boolean;  // Allow updating of non-protected frontmatter fields
+  syncPropertiesToReadwise: boolean;  // Sync title/author changes back to Readwise
+  titleProperty: string;       // Frontmatter property for syncing title
+  authorProperty: string;      // Frontmatter property for syncing author
 }

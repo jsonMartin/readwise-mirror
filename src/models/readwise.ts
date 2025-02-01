@@ -50,7 +50,7 @@ export interface ReadwiseMetadata {
   id: number; // book id from Readwise API
   title: string;
   sanitized_title: string;
-  author: string;
+  author: string[];
   authorStr: string;
   document_note: string;
   summary: string;
