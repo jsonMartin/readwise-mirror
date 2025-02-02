@@ -87,7 +87,7 @@ export default class ReadwiseApi {
       if (response.status === 429) {
         // Error handling for rate limit throttling
         let rateLimitedDelayTime = parseInt(response.headers.get('Retry-After')) * 1000 + 1000;
-        if (isNaN(rateLimitedDelayTime)) {
+        if (Number.isNaN(rateLimitedDelayTime)) {
           // Default to a 1-second delay if 'Retry-After' is missing or invalid
           console.warn("Readwise: 'Retry-After' header is missing or invalid. Defaulting to 1 second delay.");
           rateLimitedDelayTime = 1000;
