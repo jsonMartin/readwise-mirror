@@ -1,17 +1,21 @@
 import slugify from '@sindresorhus/slugify';
 import filenamify from 'filenamify';
-import { ConfigureOptions, Environment, Template } from 'nunjucks';
-import { CachedMetadata, normalizePath, Plugin, TFile } from 'obsidian';
 import spacetime from 'spacetime';
+import { type CachedMetadata, Plugin, normalizePath, TFile } from 'obsidian';
+import { type ConfigureOptions, Template, Environment } from 'nunjucks';
 import * as YAML from 'yaml';
 
-import { DEFAULT_SETTINGS, FRONTMATTER_TO_ESCAPE, YAML_TOSTRING_OPTIONS } from 'constants/index';
-import { Export, Highlight, Library, Tag, ReadwiseMetadata } from 'models/readwise';
-import { PluginSettings } from 'models/settings';
-import { YamlStringState } from 'models/yaml';
+// Plugin classes
 import ReadwiseApi from 'services/readwise-api';
 import ReadwiseMirrorSettingTab from 'ui/settings-tab';
 import Notify from 'ui/notify';
+
+// Types
+import { DEFAULT_SETTINGS, FRONTMATTER_TO_ESCAPE, YAML_TOSTRING_OPTIONS } from 'constants/index';
+import type { Export, Highlight, Library, Tag, ReadwiseMetadata } from 'models/readwise';
+import type { PluginSettings } from 'models/settings';
+import type { YamlStringState } from 'models/yaml';
+
 export default class ReadwiseMirror extends Plugin {
   settings: PluginSettings;
   readwiseApi: ReadwiseApi;
@@ -20,7 +24,7 @@ export default class ReadwiseMirror extends Plugin {
   frontMatterTemplate: Template;
   headerTemplate: Template;
   highlightTemplate: Template;
-  isSyncing: boolean = false;
+  isSyncing = false;
 
   private analyzeStringForFrontmatter(value: string): YamlStringState {
     return {
@@ -36,7 +40,7 @@ export default class ReadwiseMirror extends Plugin {
   public escapeFrontmatter(metadata: ReadwiseMetadata, fieldsToProcess: Array<string>): ReadwiseMetadata {
     // Copy the metadata object to avoid modifying the original
     const processedMetadata = { ...metadata } as ReadwiseMetadata;
-    fieldsToProcess.forEach((field) => {
+    for (const field of fieldsToProcess) {
       if (
         field in processedMetadata &&
         processedMetadata[field as keyof ReadwiseMetadata] &&
@@ -47,12 +51,11 @@ export default class ReadwiseMirror extends Plugin {
           (processedMetadata[key] as unknown) = this.escapeYamlValue(processedMetadata[key] as string);
         }
       }
-    });
-
+    }
     return processedMetadata;
   }
 
-  private escapeYamlValue(value: string, multiline: boolean = false): string {
+  private escapeYamlValue(value: string, multiline = false): string {
     if (!value) return '""';
 
     const state = this.analyzeStringForFrontmatter(value);
@@ -62,48 +65,46 @@ export default class ReadwiseMirror extends Plugin {
 
     // Handle multi-line strings
     if (value.includes('\n') && multiline) {
-      // Use folded block style (>) for titles, preserve single line ending
       const indent = '  ';
       return `>-\n${indent}${value.replace(/\n/g, `\n${indent}`)}`;
     }
 
-    value = value.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+    const cleanValue = value.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
 
-    // No quotes in string - use simple double quotes to catch other special characters
+    // No quotes in string - use simple double quotes
     if (!state.hasSingleQuotes && !state.hasDoubleQuotes) {
-      return `"${value}"`;
+      return `"${cleanValue}"`;
     }
 
     // Has double quotes but no single quotes - use single quotes
     if (state.hasDoubleQuotes && !state.hasSingleQuotes) {
-      return `'${value}'`;
+      return `'${cleanValue}'`;
     }
 
     // Has single quotes but no double quotes - use double quotes
     if (state.hasSingleQuotes && !state.hasDoubleQuotes) {
-      return `"${value}"`;
+      return `"${cleanValue}"`;
     }
 
     // Has both types of quotes - escape double quotes and use double quotes
-    return `"${value.replace(/"/g, '\\"')}"`;
+    return `"${cleanValue.replace(/"/g, '\\"')}"`;
   }
 
-  private formatTags(tags: Tag[], nohash: boolean = false, q: string = '') {
+  private formatTags(tags: Tag[], nohash = false, q = '') {
     // use unique list of tags
     const uniqueTags = [...new Set(tags.map((tag) => tag.name.replace(/\s/, '-')))];
 
-    if (nohash) {
+    if (nohash === true) {
       // don't return a hash in the tag name
       return uniqueTags.map((tag) => `${q}${tag}${q}`).join(', ');
-    } else {
-      return uniqueTags.map((tag) => `${q}#${tag}${q}`).join(', ');
     }
+    return uniqueTags.map((tag) => `${q}#${tag}${q}`).join(', ');
   }
 
   private formatHighlight(highlight: Highlight, book: Export) {
     const { id, text, note, location, color, url, tags, highlighted_at, created_at, updated_at } = highlight;
 
-    const locationUrl = `https://readwise.io/to_kindle?action=open&asin=${book['asin']}&location=${location}`;
+    const locationUrl = `https://readwise.io/to_kindle?action=open&asin=${book.asin}&location=${location}`;
 
     const formattedTags = tags.filter((tag) => tag.name !== color);
     const formattedTagStr = this.formatTags(formattedTags);
@@ -158,7 +159,7 @@ export default class ReadwiseMirror extends Plugin {
     if (this.settings.highlightSortByLocation) {
       sortedHighlights = sortedHighlights.sort((highlightA: Highlight, highlightB: Highlight) => {
         if (highlightA.location < highlightB.location) return -1;
-        else if (highlightA.location > highlightB.location) return 1;
+        if (highlightA.location > highlightB.location) return 1;
         return 0;
       });
 
@@ -175,10 +176,11 @@ export default class ReadwiseMirror extends Plugin {
     // construct an array with unique values
 
     let tags: Tag[] = [];
-    this.sortHighlights(highlights).forEach((highlight: Highlight) =>
-      highlight.tags ? (tags = [...tags, ...highlight.tags]) : tags
-    );
+    for (const highlight of this.sortHighlights(highlights)) {
+      if (highlight.tags) tags = [...tags, ...highlight.tags];
+    }
     return tags;
+
   }
 
   async writeLogToMarkdown(library: Library) {
@@ -190,8 +192,8 @@ export default class ReadwiseMirror extends Plugin {
     const now = spacetime.now();
     let logString = `# [[${now.format('iso-short')}]] *(${now.time()})*`;
 
-    for (const bookId in library['books']) {
-      const book = library['books'][bookId];
+    for (const bookId in library.books) {
+      const book = library.books[bookId];
 
       const { title, highlights } = book;
       const num_highlights = highlights.length;
@@ -208,12 +210,12 @@ export default class ReadwiseMirror extends Plugin {
         console.log('logFile:', logFile);
 
         const logFileContents = await vault.read(logFile);
-        vault.modify(logFile, logFileContents + '\n\n' + logString);
+        vault.modify(logFile, `${logFileContents}\n\n${logString}`);
       } else {
         vault.create(path, logString);
       }
     } catch (err) {
-      console.error(`Readwise: Error writing to sync log file`, err);
+      console.error("Readwise: Error writing to sync log file", err);
     }
   }
 
@@ -323,7 +325,7 @@ export default class ReadwiseMirror extends Plugin {
 
     // Create parent directories for all categories synchronously
     try {
-      for (const category of library['categories']) {
+      for (const category of library.categories) {
         const titleCaseCategory = category.charAt(0).toUpperCase() + category.slice(1); // Title Case the directory name
         const path = `${this.settings.baseFolderName}/${titleCaseCategory}`;
         const abstractFolder = vault.getAbstractFileByPath(path);
@@ -342,14 +344,14 @@ export default class ReadwiseMirror extends Plugin {
     // Get total number of records
     const booksTotal = Object.keys(library.books).length;
     let bookCurrent = 1;
-    for (const bookId in library['books']) {
+    for (const bookId in library.books) {
       this.notify.setStatusBarText(
         `Readwise: Processing - ${Math.floor(
           (bookCurrent / booksTotal) * 100
         )}% finished (${bookCurrent}/${booksTotal})`
       );
       bookCurrent += 1;
-      const book: Export = library['books'][bookId];
+      const book: Export = library.books[bookId];
 
       const {
         user_book_id,
@@ -369,22 +371,18 @@ export default class ReadwiseMirror extends Plugin {
       // Get highlight count
       const num_highlights = highlights.length;
       const created = highlights
-        .map(function (highlight) {
-          return highlight.created_at;
-        })
+        .map((highlight) => highlight.created_at)
         .sort()[0]; // No reverse sort: we want the oldest entry
       const updated = highlights
-        .map(function (highlight) {
-          return highlight.updated_at;
-        })
+        .map((highlight) => highlight.updated_at)
         .sort()
         .reverse()[0];
+
       const last_highlight_at = highlights
-        .map(function (highlight) {
-          return highlight.highlighted_at;
-        })
+        .map((highlight) => highlight.highlighted_at)
         .sort()
         .reverse()[0];
+
 
       // Sanitize title, replace colon with substitute from settings
       const sanitizedTitle = this.settings.useSlugify
@@ -418,12 +416,12 @@ export default class ReadwiseMirror extends Plugin {
         const authorStr =
           authors[0] && authors?.length > 1
             ? authors
-                .filter((authorName: string) => authorName.trim() != '')
+                .filter((authorName: string) => authorName.trim() !== '')
                 .map((authorName: string) => `[[${authorName.trim()}]]`)
                 .join(', ')
             : author
             ? `[[${author}]]`
-            : ``;
+            : "";
 
         const metadata: ReadwiseMetadata = {
           id: user_book_id,
@@ -451,7 +449,7 @@ export default class ReadwiseMirror extends Plugin {
 
         // Escape specific fields used in frontmatter
         // TODO: Tidy up code. It doesn't make sense to remove the frontmatter markers and then add them back
-        let frontmatterYaml;
+        let frontmatterYaml: Record<string, unknown>;
         try {
           const renderedTemplate = this.frontMatterTemplate.render(
             this.escapeFrontmatter(metadata, FRONTMATTER_TO_ESCAPE)
@@ -464,13 +462,13 @@ export default class ReadwiseMirror extends Plugin {
           if (error instanceof YAML.YAMLParseError) {
             console.error('Failed to parse YAML frontmatter:', error.message);
             throw new Error(`Invalid YAML frontmatter: ${error.message}`);
-          } else if (error instanceof Error) {
+          } 
+          if (error instanceof Error) {
             console.error('Error processing frontmatter template:', error.message);
             throw new Error(`Failed to process frontmatter: ${error.message}`);
-          } else {
-            console.error('Unknown error processing frontmatter:', error);
-            throw new Error('Failed to process frontmatter due to unknown error');
           }
+          console.error('Unknown error processing frontmatter:', error);
+          throw new Error('Failed to process frontmatter due to unknown error');
         }
         const frontMatterContents = this.settings.frontMatter
           ? ['---', YAML.stringify(frontmatterYaml, YAML_TOSTRING_OPTIONS), '---'].join('\n')
@@ -680,7 +678,7 @@ export default class ReadwiseMirror extends Plugin {
           `Readwise: Downloaded ${library.highlightCount} Highlights from ${Object.keys(library.books).length} Sources`
         );
       } else {
-        this.notify.notice(`Readwise: No new content available`);
+        this.notify.notice("Readwise: No new content available");
       }
 
       this.settings.lastUpdated = new Date().toISOString();
@@ -723,7 +721,7 @@ export default class ReadwiseMirror extends Plugin {
 
   // Reload settings after external change (e.g. after sync)
   async onExternalSettingsChange() {
-    console.info(`Reloading settings due to external change`);
+    console.info("Reloading settings due to external change");
     await this.loadSettings();
     if (this.settings.lastUpdated)
       this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()} elsewhere`);
@@ -792,19 +790,13 @@ export default class ReadwiseMirror extends Plugin {
     this.env = new Environment(null, { autoescape: false } as ConfigureOptions);
 
     // Add a nunjucks filter to convert newlines to "newlines + >" for quotes
-    this.env.addFilter('bq', function (str) {
-      return str.replace(/\r|\n|\r\n/g, '\r\n> ');
-    });
+    this.env.addFilter('bq', (str) => str.replace(/\r|\n|\r\n/g, '\r\n> '));
 
     // Add a nunjukcs filter to test whether we are a ".qa" note
-    this.env.addFilter('is_qa', function (str) {
-      return str.includes('.qa');
-    });
+    this.env.addFilter('is_qa', (str) => str.includes('.qa'));
 
     // Add a nunjucks filter to convert ".qa" notes to Q& A
-    this.env.addFilter('qa', function (str) {
-      return str.replace(/\.qa(.*)\?(.*)/g, '**Q:**$1?\r\n\r\n**A:**$2');
-    });
+    this.env.addFilter('qa', (str) => str.replace(/\.qa(.*)\?(.*)/g, '**Q:**$1?\r\n\r\n**A:**$2'));
 
     this.updateFrontmatteTemplate();
 
@@ -820,7 +812,7 @@ export default class ReadwiseMirror extends Plugin {
       this.readwiseApi = new ReadwiseApi(this.settings.apiToken, this.notify);
       if (this.settings.lastUpdated)
         this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`);
-      else this.notify.setStatusBarText(`Readwise: Click to Sync`);
+      else this.notify.setStatusBarText("Readwise: Click to Sync");
     }
 
     this.registerDomEvent(statusBarItem, 'click', this.sync.bind(this));
@@ -836,7 +828,7 @@ export default class ReadwiseMirror extends Plugin {
       name: 'Test Readwise API key',
       callback: async () => {
         const isTokenValid = await this.readwiseApi.hasValidToken();
-        this.notify.notice('Readwise: ' + (isTokenValid ? 'Token is valid' : 'INVALID TOKEN'));
+        this.notify.notice(`Readwise: ${isTokenValid ? 'Token is valid' : 'INVALID TOKEN'}`);
       },
     });
 

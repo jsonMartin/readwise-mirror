@@ -1,5 +1,5 @@
-import { Export, Library } from 'models/readwise';
-import Notify from 'ui/notify';
+import type { Export, Library } from 'models/readwise';
+import type Notify from 'ui/notify';
 
 const API_ENDPOINT = 'https://readwise.io/api/v2';
 const API_PAGE_SIZE = 1000; // number of results per page, default 100 / max 1000
@@ -51,15 +51,15 @@ export default class ReadwiseApi {
   // If lastUpdated or bookID aren't provided, fetch everything.
   async fetchData(contentType = 'export', lastUpdated?: string, bookId?: number[]): Promise<Export[]> {
     const url = `${API_ENDPOINT}/${contentType}?`;
-    let data;
-    let nextPageCursor;
+    let data: Record<string, unknown>;
+    let nextPageCursor: string;
 
     const results = [];
 
     while (true) {
       const queryParams = new URLSearchParams();
       queryParams.append('page_size', API_PAGE_SIZE.toString());
-      if (lastUpdated && lastUpdated != '') {
+      if (lastUpdated && lastUpdated !== '') {
         queryParams.append('updatedAfter', lastUpdated);
       }
       if (bookId) {
@@ -86,7 +86,7 @@ export default class ReadwiseApi {
 
       if (response.status === 429) {
         // Error handling for rate limit throttling
-        let rateLimitedDelayTime = parseInt(response.headers.get('Retry-After')) * 1000 + 1000;
+        let rateLimitedDelayTime = Number.parseInt(response.headers.get('Retry-After')) * 1000 + 1000;
         if (Number.isNaN(rateLimitedDelayTime)) {
           // Default to a 1-second delay if 'Retry-After' is missing or invalid
           console.warn("Readwise: 'Retry-After' header is missing or invalid. Defaulting to 1 second delay.");
@@ -98,19 +98,18 @@ export default class ReadwiseApi {
 
         await new Promise((_) => setTimeout(_, rateLimitedDelayTime));
         console.info('Readwise: Trying to fetch highlights again...');
-        this.notify.setStatusBarText(`Readwise: Attempting to retry...`);
+        this.notify.setStatusBarText("Readwise: Attempting to retry...");
       } else {
         if (data.results && Array.isArray(data.results)) {
           results.push(...data.results);
         } else {
           console.warn('Readwise: No results found in the response data.');
         }
-        nextPageCursor = data.nextPageCursor;
+        nextPageCursor = data.nextPageCursor as string;
         if (!nextPageCursor) {
           break;
-        } else {
-          console.debug(`Readwise: There are more records left, proceeding to next page: ${data.nextPageCursor}`);
         }
+        console.debug(`Readwise: There are more records left, proceeding to next page: ${data.nextPageCursor}`);
       }
     }
 
@@ -127,9 +126,9 @@ export default class ReadwiseApi {
     };
 
     for (const record of results) {
-      library['books'][record['user_book_id']] = record;
-      library['categories'].add(record.category);
-      library['highlightCount'] += record['highlights'].length;
+      library.books[record.user_book_id] = record;
+      library.categories.add(record.category);
+      library.highlightCount += record.highlights.length;
     }
 
     return library;
@@ -149,9 +148,8 @@ export default class ReadwiseApi {
       // Build a library which contains *all* highlights only for changed books
       const records = (await this.fetchData('export', '', bookIds)) as Export[];
       return this.buildLibrary(records);
-    } else {
-      // Essentially return an empty library
-      return this.buildLibrary(recordsUpdated);
     }
-  }
+    // Essentially return an empty library
+    return this.buildLibrary(recordsUpdated);
+}
 }

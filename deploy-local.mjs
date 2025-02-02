@@ -27,8 +27,8 @@
 
 import dotenv from 'dotenv';
 dotenv.config();
-import { existsSync, readFileSync, writeFileSync, copyFileSync } from 'fs';
-import { join } from 'path';
+import { existsSync, readFileSync, writeFileSync, copyFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 // Validate environment
 if (!process.env.OBSIDIAN_PLUGIN_ROOT || !process.env.PACKAGE_NAME) {
@@ -65,7 +65,7 @@ try {
           const manifestContent = readFileSync(src, 'utf8');
           const json = JSON.parse(manifestContent);
           json.version = `${json.version}-${new Date().toISOString().replace(/[-:.TZ]/g, '')}`;
-          writeFileSync(destPath, JSON.stringify(json, null, 4) + '\n');
+          writeFileSync(destPath, `${JSON.stringify(json, null, 4)}\n`);
           console.log(`Written ${src} to ${destPath} with updated version ${json.version}`);
         } catch (err) {
           throw new Error(`Failed to process manifest.json: ${err.message}`);

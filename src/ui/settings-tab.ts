@@ -1,9 +1,9 @@
 import { DEFAULT_SETTINGS, FRONTMATTER_TO_ESCAPE } from 'constants/index';
-import ReadwiseMirror from 'main';
+import type ReadwiseMirror from 'main';
 import { Template } from 'nunjucks';
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { type App, PluginSettingTab, Setting } from 'obsidian';
 import { sampleMetadata } from 'test/sample-data';
-import Notify from 'ui/notify';
+import type Notify from 'ui/notify';
 import * as YAML from 'yaml';
 
 export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
@@ -35,17 +35,17 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
    * - "Line 1\nLine 2" -> 2 lines
    * - "" (empty) -> minRows
    */
-  private adjustTextareaRows = (textEl: HTMLTextAreaElement, minRows: number = 3) => {
+  private adjustTextareaRows = (textEl: HTMLTextAreaElement, minRows = 3) => {
     const content = textEl.value;
     const width = textEl.cols;
 
     // Calculate wrapped lines
     let totalLines = 0;
-    content.split('\n').forEach((line) => {
+    for (const line of content.split('\n')) {
       // Calculate how many times the line wraps
       const wrappedLines = Math.ceil(line.length / width);
       totalLines += Math.max(1, wrappedLines);
-    });
+    }
 
     // Add 1 to account for the last line and set minimum
     textEl.rows = Math.max(minRows, totalLines + 1);
@@ -85,14 +85,15 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       window.open(`${baseURL}/api_auth?token=${uuid}&service=readwise-mirror`);
     }
 
-    let response, data;
+    let response: Response;
+    let data: Record<string, unknown>;
     try {
       response = await fetch(`${baseURL}/api/auth?token=${uuid}`);
       if (response.ok) {
         data = await response.json();
         if (data.userAccessToken) {
-          this.plugin.settings.apiToken = data.userAccessToken;
-          this.plugin.readwiseApi.setToken(data.userAccessToken);
+          this.plugin.settings.apiToken = data.userAccessToken as string;
+          this.plugin.readwiseApi.setToken(data.userAccessToken as string);
           await this.plugin.saveSettings();
           this.display(); // Refresh the settings page
           return true;
@@ -116,11 +117,11 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     let readwiseMirrorClientId = window.localStorage.getItem('readwise-mirror-obsidian-client-id');
     if (readwiseMirrorClientId) {
       return readwiseMirrorClientId;
-    } else {
-      readwiseMirrorClientId = Math.random().toString(36).substring(2, 15);
-      window.localStorage.setItem('readwise-mirror-obsidian-client-id', readwiseMirrorClientId);
-      return readwiseMirrorClientId;
     }
+    
+    readwiseMirrorClientId = Math.random().toString(36).substring(2, 15);
+    window.localStorage.setItem('readwise-mirror-obsidian-client-id', readwiseMirrorClientId);
+    return readwiseMirrorClientId;
   }
   
   private createTemplateDocumentation(variables: [string, string][], title?: string) {
@@ -146,11 +147,11 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
       const list = container.createEl('ul', { cls: 'template-vars-list' });
 
-      variables.forEach(([key, desc]) => {
+      for (const [key, desc] of variables) {
         const item = list.createEl('li');
         item.createEl('code', { text: `{{ ${key} }}` });
         item.appendText(`: ${desc}`);
-      });
+      }
 
       container.createDiv({
         cls: 'template-syntax-note',
@@ -783,7 +784,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             } catch (error) {
               // Turn Frontmatter toggle off
               if (error instanceof YAML.YAMLParseError) {
-                errorNotice.setText(`Invalid YAML:`);
+                errorNotice.setText('Invalid YAML:');
                 errorDetails.setText(error.message);
                 errorDetails.show();
               } else {
