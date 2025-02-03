@@ -18,7 +18,7 @@
         "@rollup/plugin-commonjs": "^18.0.0",
         "@rollup/plugin-node-resolve": "^11.2.1",
         "@rollup/plugin-typescript": "^8.2.1",
-        "@types/node": "^14.14.37",
+        "@types/node": "^22.13.0",
         "@types/nunjucks": "^3.2.0",
         "cross-env": "^7.0.3",
         "dotenv": "^16.4.7",
