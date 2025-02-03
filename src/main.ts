@@ -41,14 +41,18 @@ export default class ReadwiseMirror extends Plugin {
     // Copy the metadata object to avoid modifying the original
     const processedMetadata = { ...metadata } as ReadwiseMetadata;
     for (const field of fieldsToProcess) {
-      if (
-        field in processedMetadata &&
-        processedMetadata[field as keyof ReadwiseMetadata] &&
-        typeof processedMetadata[field as keyof ReadwiseMetadata] === 'string'
-      ) {
+      if (field in processedMetadata && processedMetadata[field as keyof ReadwiseMetadata]) {
         const key = field as keyof ReadwiseMetadata;
-        if (typeof processedMetadata[key] === 'string') {
-          (processedMetadata[key] as unknown) = this.escapeYamlValue(processedMetadata[key] as string);
+        const value = processedMetadata[key];
+
+        const escapeStringValue = (str: string) => this.escapeYamlValue(str);
+
+        if (Array.isArray(value)) {
+          (processedMetadata[key] as unknown) = value.map(item => 
+            typeof item === 'string' ? escapeStringValue(item) : item
+          );
+        } else if (typeof value === 'string') {
+          (processedMetadata[key] as unknown) = escapeStringValue(value);
         }
       }
     }
