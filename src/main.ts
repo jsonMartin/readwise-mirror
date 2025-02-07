@@ -202,7 +202,7 @@ export default class ReadwiseMirror extends Plugin {
       const { title, highlights } = book;
       const num_highlights = highlights.length;
       console.warn(`Readwise: Replacing colon with ${this.settings.colonSubstitute}`);
-      const sanitizedTitle = title.replace(/:/g, this.settings.colonSubstitute ?? '-').replace(/[<>"'/\\|?*]+/g, '');
+      const sanitizedTitle = this.sanitizeTitle(book.title);
       const contents = `\n- [[${sanitizedTitle}]] *(${num_highlights} highlights)*`;
       logString += contents;
     }
@@ -389,19 +389,7 @@ export default class ReadwiseMirror extends Plugin {
 
 
       // Sanitize title, replace colon with substitute from settings
-      const sanitizedTitle = this.settings.useSlugify
-        ? slugify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
-            separator: this.settings.slugifySeparator,
-            lowercase: this.settings.slugifyLowercase,
-          })
-        : // ... else filenamify the title
-          filenamify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
-            replacement: ' ',
-            maxLength: 255,
-          }) // Ensure we remove additional critical characters, replace multiple spaces with one, and trim
-            .replace(/[<>"'/\\|?*#]+/g, '')
-            .replace(/ +/g, ' ')
-            .trim();
+      const sanitizedTitle = this.sanitizeTitle(title);
 
       // Filter highlights
       const filteredHighlights = this.filterHighlights(highlights);
@@ -626,6 +614,25 @@ export default class ReadwiseMirror extends Plugin {
         }
       }
     }
+  }
+
+  // Sanitize title for use as filename
+  private sanitizeTitle(title: string) {
+    return this.settings.useSlugify
+      ? slugify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
+        separator: this.settings.slugifySeparator,
+        lowercase: this.settings.slugifyLowercase,
+      })
+      : // ... else filenamify the title and limit to 255 characters 
+      filenamify(title.replace(/:/g, this.settings.colonSubstitute ?? '-') , {
+        replacement: ' ',
+        maxLength: 255,
+      }) 
+        // Ensure we remove additional critical characters, replace multiple spaces with one, and trim
+        // Replace # as this inrerferes with WikiLinks (other characters are taken care of in "filenamify")
+        .replace(/[#]+/g, ' ')
+        .replace(/ +/g, ' ')
+        .trim();
   }
 
   async deleteLibraryFolder() {
