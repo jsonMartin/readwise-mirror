@@ -84,8 +84,8 @@ Tags: {{ tags }}
   syncPropertiesToReadwise: false,
   titleProperty: 'title',
   authorProperty: 'author',
-  normalizeAuthorNames: true,
-  stripTitlesFromAuthors: true,
+  normalizeAuthorNames: false,
+  stripTitlesFromAuthors: false,
 };
 
 export const FRONTMATTER_TO_ESCAPE = ['title', 'sanitized_title', 'author', 'authorStr'];
