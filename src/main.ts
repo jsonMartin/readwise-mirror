@@ -11,11 +11,12 @@ import ReadwiseMirrorSettingTab from 'ui/settings-tab';
 import Notify from 'ui/notify';
 
 // Types
-import { DEFAULT_SETTINGS, FRONTMATTER_TO_ESCAPE, YAML_TOSTRING_OPTIONS } from 'constants/index';
 import type { Export, Highlight, Library, Tag, ReadwiseMetadata } from 'models/readwise';
 import type { PluginSettings } from 'models/settings';
 import type { YamlStringState } from 'models/yaml';
 
+// Constants
+import { DEFAULT_SETTINGS, FRONTMATTER_TO_ESCAPE, YAML_TOSTRING_OPTIONS } from 'constants/index';
 export default class ReadwiseMirror extends Plugin {
   settings: PluginSettings;
   readwiseApi: ReadwiseApi;
