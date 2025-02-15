@@ -404,17 +404,19 @@ export default class ReadwiseMirror extends Plugin {
 
         // get an array with all tags from highlights
         const highlightTags = this.getTagsFromHighlights(filteredHighlights);
-        const authors = author ? author.split(/ and |,/) : [];
+        const authors = author
+          ? author
+              .split(/, and| and |, /)
+              .map((a: string) => a.trim())
+              .filter((a: string) => a.trim() !== '')
+          : [];
 
         const authorStr =
           authors[0] && authors?.length > 1
-            ? authors
-                .filter((authorName: string) => authorName.trim() !== '')
-                .map((authorName: string) => `[[${authorName.trim()}]]`)
-                .join(', ')
+            ? authors.map((authorName: string) => `[[${authorName.trim()}]]`).join(', ')
             : author
-            ? `[[${author}]]`
-            : "";
+              ? `[[${author}]]`
+              : '';
 
         const metadata: ReadwiseMetadata = {
           id: user_book_id,
