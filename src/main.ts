@@ -61,6 +61,15 @@ export default class ReadwiseMirror extends Plugin {
       true
     );;
   }
+
+
+  /**
+   * Formats tags for use in a template
+   * @param tags - The tags to format
+   * @param nohash - Whether to remove the hash from the tag name
+   * @param q - The quote character to use
+   * @returns The formatted tags
+   */
   private formatTags(tags: Tag[], nohash = false, q = '') {
     // use unique list of tags
     const uniqueTags = [...new Set(tags.map((tag) => tag.name.replace(/\s/, '-')))];
@@ -72,6 +81,12 @@ export default class ReadwiseMirror extends Plugin {
     return uniqueTags.map((tag) => `${q}#${tag}${q}`).join(', ');
   }
 
+  /**
+   * Formats a highlight for use in a template
+   * @param highlight - The highlight to format
+   * @param book - The book the highlight belongs to
+   * @returns The formatted highlight
+   */
   private formatHighlight(highlight: Highlight, book: Export) {
     const { id, text, note, location, color, url, tags, highlighted_at, created_at, updated_at } = highlight;
 
@@ -151,7 +166,6 @@ export default class ReadwiseMirror extends Plugin {
       if (highlight.tags) tags = [...tags, ...highlight.tags];
     }
     return tags;
-
   }
 
   async writeLogToMarkdown(library: Library) {
@@ -242,9 +256,7 @@ export default class ReadwiseMirror extends Plugin {
 
       // Get highlight count
       const num_highlights = highlights.length;
-      const created = highlights
-        .map((highlight) => highlight.created_at)
-        .sort()[0]; // No reverse sort: we want the oldest entry
+      const created = highlights.map((highlight) => highlight.created_at).sort()[0]; // No reverse sort: we want the oldest entry
       const updated = highlights
         .map((highlight) => highlight.updated_at)
         .sort()
@@ -254,7 +266,6 @@ export default class ReadwiseMirror extends Plugin {
         .map((highlight) => highlight.highlighted_at)
         .sort()
         .reverse()[0];
-
 
       // Sanitize title, replace colon with substitute from settings
       const sanitizedTitle = this.sanitizeTitle(title);
@@ -391,19 +402,19 @@ export default class ReadwiseMirror extends Plugin {
   private sanitizeTitle(title: string) {
     return this.settings.useSlugify
       ? slugify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
-        separator: this.settings.slugifySeparator,
-        lowercase: this.settings.slugifyLowercase,
-      })
-      : // ... else filenamify the title and limit to 255 characters 
-      filenamify(title.replace(/:/g, this.settings.colonSubstitute ?? '-') , {
-        replacement: ' ',
-        maxLength: 255,
-      }) 
-        // Ensure we remove additional critical characters, replace multiple spaces with one, and trim
-        // Replace # as this inrerferes with WikiLinks (other characters are taken care of in "filenamify")
-        .replace(/[#]+/g, ' ')
-        .replace(/ +/g, ' ')
-        .trim();
+          separator: this.settings.slugifySeparator,
+          lowercase: this.settings.slugifyLowercase,
+        })
+      : // ... else filenamify the title and limit to 255 characters
+        filenamify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
+          replacement: ' ',
+          maxLength: 255,
+        })
+          // Ensure we remove additional critical characters, replace multiple spaces with one, and trim
+          // Replace # as this inrerferes with WikiLinks (other characters are taken care of in "filenamify")
+          .replace(/[#]+/g, ' ')
+          .replace(/ +/g, ' ')
+          .trim();
   }
 
   async deleteLibraryFolder() {
@@ -460,7 +471,7 @@ export default class ReadwiseMirror extends Plugin {
           `Readwise: Downloaded ${library.highlightCount} Highlights from ${Object.keys(library.books).length} Sources`
         );
       } else {
-        this.notify.notice("Readwise: No new content available");
+        this.notify.notice('Readwise: No new content available');
       }
 
       this.settings.lastUpdated = new Date().toISOString();
@@ -473,8 +484,6 @@ export default class ReadwiseMirror extends Plugin {
       // Make sure we reset the sync status in case of error
       this.isSyncing = false;
     }
-
-
   }
 
   async download() {
@@ -503,7 +512,7 @@ export default class ReadwiseMirror extends Plugin {
 
   // Reload settings after external change (e.g. after sync)
   async onExternalSettingsChange() {
-    console.info("Reloading settings due to external change");
+    console.info('Reloading settings due to external change');
     await this.loadSettings();
     if (this.settings.lastUpdated)
       this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()} elsewhere`);
@@ -550,7 +559,7 @@ export default class ReadwiseMirror extends Plugin {
       this._readwiseApi = new ReadwiseApi(this.settings.apiToken, this.notify);
       if (this.settings.lastUpdated)
         this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`);
-      else this.notify.setStatusBarText("Readwise: Click to Sync");
+      else this.notify.setStatusBarText('Readwise: Click to Sync');
     }
 
     this.registerDomEvent(statusBarItem, 'click', this.sync.bind(this));

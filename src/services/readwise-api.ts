@@ -69,7 +69,6 @@ export default class ReadwiseApi {
         queryParams.append('pageCursor', nextPageCursor);
       }
 
-      console.info(`Readwise: Fetching ${contentType}`);
       if (lastUpdated) console.info(`Readwise: Checking for new content since ${lastUpdated}`);
       if (bookId) console.debug(`Readwise: Checking for all highlights on book ID: ${bookId}`);
       let statusBarText = `Readwise: Fetching ${contentType}`;
