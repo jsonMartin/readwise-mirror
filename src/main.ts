@@ -403,7 +403,7 @@ export default class ReadwiseMirror extends Plugin {
 
         // get an array with all tags from highlights
         const highlightTags = this.getTagsFromHighlights(filteredHighlights);
-        const authors = author ? author.split(/and |,/) : [];
+        const authors = author ? author.split(/ and |,/) : [];
 
         const authorStr =
           authors[0] && authors?.length > 1
