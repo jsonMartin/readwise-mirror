@@ -69,3 +69,8 @@ export interface ReadwiseMetadata {
   tags_nohash: string;
   hl_tags_nohash: string;
 }
+
+export interface AuthorParserOptions {
+  removeTitles?: boolean;
+  normalizeCase?: boolean;
+}

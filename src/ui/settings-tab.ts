@@ -276,6 +276,53 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         })
       );
 
+  new Setting(containerEl)
+    .setName('Author Name Settings')
+    .setHeading()
+    .setDesc(createFragment((fragment) => {
+      fragment.appendText(
+        'These settings control how author names are processed. If enabled, titles (Dr., Prof., Mr., Mrs., Ms., Miss, Sir, Lady) will be stripped from author names.'
+      );
+      fragment.createEl('br');
+      fragment.createEl('br');
+      fragment.appendText('Example author string: "Dr. John Doe, and JANE SMITH, Prof. Bob Johnson"');
+      fragment.createEl('br');
+      fragment.createEl('blockquote', {
+        text: 'Default: "Dr. John Doe, JANE SMITH, Prof. Bob Johnson"'
+      });
+      fragment.createEl('blockquote', {
+        text: 'Normalize case: "Dr. John Doe, Jane Smith, Prof. Bob Johnson"'
+      });
+      fragment.createEl('blockquote', {
+        text: 'Strip titles: "John Doe, JANE SMITH, Bob Johnson"'
+      });
+      fragment.createEl('blockquote', {
+        text: 'Both enabled: "John Doe, Jane Smith, Bob Johnson"'
+      });
+    }))
+
+  new Setting(containerEl)
+    .setName('Normalize Author Names')
+    .setClass('indent')
+    .setDesc('If enabled, author names will be normalized to a consistent case.')
+    .addToggle((toggle) =>
+      toggle.setValue(this.plugin.settings.normalizeAuthorNames).onChange(async (value) => {
+        this.plugin.settings.normalizeAuthorNames = value;
+        await this.plugin.saveSettings();
+      })
+    );
+
+  new Setting(containerEl)
+    .setName('Strip Titles from Author Names')
+    .setClass('indent')
+    .setDesc('If enabled, titles (e.g., Dr., Mr., Prof., etc.) will be stripped from author names.')
+    .addToggle((toggle) =>
+      toggle.setValue(this.plugin.settings.stripTitlesFromAuthors).onChange(async (value) => {
+        this.plugin.settings.stripTitlesFromAuthors = value;
+        await this.plugin.saveSettings();
+      })
+    );
+
     new Setting(containerEl)
       .setName('Highlight Organization')
       .setHeading();

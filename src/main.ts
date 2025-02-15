@@ -3,6 +3,7 @@ import filenamify from 'filenamify';
 import spacetime from 'spacetime';
 import { type CachedMetadata, Plugin, normalizePath, TFile } from 'obsidian';
 import { type ConfigureOptions, Template, Environment } from 'nunjucks';
+import { AuthorParser } from 'services/author-parser';
 import * as YAML from 'yaml';
 
 // Plugin classes
@@ -404,12 +405,13 @@ export default class ReadwiseMirror extends Plugin {
 
         // get an array with all tags from highlights
         const highlightTags = this.getTagsFromHighlights(filteredHighlights);
-        const authors = author
-          ? author
-              .split(/, and| and |, /)
-              .map((a: string) => a.trim())
-              .filter((a: string) => a.trim() !== '')
-          : [];
+
+        // Parse Authors, normalize their names and remove titles (configurable in settings)
+        const authorParser = new AuthorParser({
+          normalizeCase: this.settings.normalizeAuthorNames,
+          removeTitles: this.settings.stripTitlesFromAuthors,
+        });
+        const authors = authorParser.parse(author);
 
         const authorStr =
           authors[0] && authors?.length > 1

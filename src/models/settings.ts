@@ -26,4 +26,6 @@ export interface PluginSettings {
   syncPropertiesToReadwise: boolean;  // Sync title/author changes back to Readwise
   titleProperty: string;       // Frontmatter property for syncing title
   authorProperty: string;      // Frontmatter property for syncing author
+  normalizeAuthorNames: boolean; // Normalize author names
+  stripTitlesFromAuthors: boolean; // Strip titles from author names
 }
