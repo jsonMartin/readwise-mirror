@@ -99,6 +99,21 @@ A lot of the value of Readwise highlights lies in the notes associated with them
 
 The option "Only sync highlights with notes" will do exactly that: it will only sync highlights with notes. If an item in your library has only highlights without notes, it will not be synced.
 
+## Author Name Settings
+
+These settings control how author names are processed. If enabled, titles (Dr., Prof., Mr., Mrs., Ms., Miss, Sir, Lady) will be stripped from author names. This is useful for cases where you don't want to change the author names in Readwise (e.g. to avoid duplicate highlights).
+
+For example, given the author string: "Dr. John Doe, and JANE SMITH, Prof. Bob Johnson"
+
+The different settings will produce:
+
+- **Default**: "Dr. John Doe, JANE SMITH, Prof. Bob Johnson"
+- **Normalize case**: "Dr. John Doe, Jane Smith, Prof. Bob Johnson" 
+- **Strip titles**: "John Doe, JANE SMITH, Bob Johnson"
+- **Both enabled**: "John Doe, Jane Smith, Bob Johnson"
+
+The plugin will split the authors returned by Readwise into an array which can be used in Frontmatter and other templates.
+
 ## Slugify Filenames
 
 The plugin provides an option to "slugify" filenames. This means converting the filenames into a URL-friendly format by replacing spaces and special characters with hyphens or other safe characters. This is useful for ensuring compatibility across different filesystems and avoiding issues with special characters.
