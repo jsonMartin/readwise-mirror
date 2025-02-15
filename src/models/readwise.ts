@@ -70,6 +70,12 @@ export interface ReadwiseMetadata {
   hl_tags_nohash: string;
 }
 
+export interface MetadataInput {
+  title: string;
+  author: string | string[];
+  source_url: string;
+}
+
 export interface AuthorParserOptions {
   removeTitles?: boolean;
   normalizeCase?: boolean;

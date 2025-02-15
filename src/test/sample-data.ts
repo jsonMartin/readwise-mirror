@@ -6,7 +6,7 @@
 // TODO: Base it on Readwise API and not internal metadata
 //
 
-import { ReadwiseMetadata, Tag } from 'models/readwise';
+import type { ReadwiseMetadata, Tag } from 'models/readwise';
 
 export const testTags: Tag[] = [
   { id: 1, name: 'important' },

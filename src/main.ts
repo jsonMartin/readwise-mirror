@@ -4,7 +4,8 @@ import spacetime from 'spacetime';
 import { type CachedMetadata, Plugin, normalizePath, TFile } from 'obsidian';
 import { type ConfigureOptions, Template, Environment } from 'nunjucks';
 import { AuthorParser } from 'services/author-parser';
-import * as YAML from 'yaml';
+import { Deduplicator } from 'services/deduplicator';
+import { FrontmatterManager } from 'services/frontmatter-manager';
 
 // Plugin classes
 import ReadwiseApi from 'services/readwise-api';
@@ -14,88 +15,52 @@ import Notify from 'ui/notify';
 // Types
 import type { Export, Highlight, Library, Tag, ReadwiseMetadata } from 'models/readwise';
 import type { PluginSettings } from 'models/settings';
-import type { YamlStringState } from 'models/yaml';
+import type { FrontmatterRecord } from 'models/yaml';
 
 // Constants
-import { DEFAULT_SETTINGS, FRONTMATTER_TO_ESCAPE, YAML_TOSTRING_OPTIONS } from 'constants/index';
+import { DEFAULT_SETTINGS } from 'constants/index';
+
 export default class ReadwiseMirror extends Plugin {
-  settings: PluginSettings;
-  readwiseApi: ReadwiseApi;
-  notify: Notify;
-  env: Environment;
-  frontMatterTemplate: Template;
-  headerTemplate: Template;
-  highlightTemplate: Template;
-  isSyncing = false;
+  private _settings: PluginSettings;
+  private _readwiseApi: ReadwiseApi;
+  private _headerTemplate: Template;
+  private _highlightTemplate: Template;
+  private notify: Notify;
+  private env: Environment;
+  private isSyncing = false;
+  private deduplicator: Deduplicator;
+  private frontmatterManager: FrontmatterManager;
 
-  private analyzeStringForFrontmatter(value: string): YamlStringState {
-    return {
-      hasSingleQuotes: value.includes("'"),
-      hasDoubleQuotes: value.includes('"'),
-      isValueEscapedAlready:
-        value.length > 1 &&
-        ((value.startsWith("'") && value.endsWith("'")) || (value.startsWith('"') && value.endsWith('"'))), // Basic YAML escape validation
-    };
+  // Getters and setters for settings and templates
+  get settings() {
+    return this._settings;
   }
 
-  // Before metadata is used
-  public escapeFrontmatter(metadata: ReadwiseMetadata, fieldsToProcess: Array<string>): ReadwiseMetadata {
-    // Copy the metadata object to avoid modifying the original
-    const processedMetadata = { ...metadata } as ReadwiseMetadata;
-    for (const field of fieldsToProcess) {
-      if (field in processedMetadata && processedMetadata[field as keyof ReadwiseMetadata]) {
-        const key = field as keyof ReadwiseMetadata;
-        const value = processedMetadata[key];
-
-        const escapeStringValue = (str: string) => this.escapeYamlValue(str);
-
-        if (Array.isArray(value)) {
-          (processedMetadata[key] as unknown) = value.map(item => 
-            typeof item === 'string' ? escapeStringValue(item) : item
-          );
-        } else if (typeof value === 'string') {
-          (processedMetadata[key] as unknown) = escapeStringValue(value);
-        }
-      }
-    }
-    return processedMetadata;
+  set settings(settings: PluginSettings) {
+    this._settings = settings;
   }
 
-  private escapeYamlValue(value: string, multiline = false): string {
-    if (!value) return '""';
-
-    const state = this.analyzeStringForFrontmatter(value);
-
-    // Already properly quoted and valid YAML
-    if (state.isValueEscapedAlready) return value;
-
-    // Handle multi-line strings
-    if (value.includes('\n') && multiline) {
-      const indent = '  ';
-      return `>-\n${indent}${value.replace(/\n/g, `\n${indent}`)}`;
-    }
-
-    const cleanValue = value.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-
-    // No quotes in string - use simple double quotes
-    if (!state.hasSingleQuotes && !state.hasDoubleQuotes) {
-      return `"${cleanValue}"`;
-    }
-
-    // Has double quotes but no single quotes - use single quotes
-    if (state.hasDoubleQuotes && !state.hasSingleQuotes) {
-      return `'${cleanValue}'`;
-    }
-
-    // Has single quotes but no double quotes - use double quotes
-    if (state.hasSingleQuotes && !state.hasDoubleQuotes) {
-      return `"${cleanValue}"`;
-    }
-
-    // Has both types of quotes - escape double quotes and use double quotes
-    return `"${cleanValue.replace(/"/g, '\\"')}"`;
+  get readwiseApi() {
+    return this._readwiseApi;
   }
 
+  set headerTemplate(template: string) {
+    this._headerTemplate = new Template(
+      template,
+      this.env,
+      null,
+      true
+    );
+  }
+
+  set highlightTemplate(template: string) {
+    this._highlightTemplate = new Template(
+      template,
+      this.env,
+      null,
+      true
+    );;
+  }
   private formatTags(tags: Tag[], nohash = false, q = '') {
     // use unique list of tags
     const uniqueTags = [...new Set(tags.map((tag) => tag.name.replace(/\s/, '-')))];
@@ -115,7 +80,7 @@ export default class ReadwiseMirror extends Plugin {
     const formattedTags = tags.filter((tag) => tag.name !== color);
     const formattedTagStr = this.formatTags(formattedTags);
 
-    return this.highlightTemplate.render({
+    return this._highlightTemplate.render({
       // Highlight fields
       id,
       text,
@@ -221,110 +186,11 @@ export default class ReadwiseMirror extends Plugin {
         vault.create(path, logString);
       }
     } catch (err) {
-      console.error("Readwise: Error writing to sync log file", err);
+      console.error('Readwise: Error writing to sync log file', err);
     }
   }
 
-  /**
-   * Writes updated frontmatter of a file with new values
-   * @param file TFile to update
-   * @param updates Record of key-value pairs to update/add in frontmatter
-   * @returns Promise<void>
-   *
-   * Example:
-   * ```typescript
-   * await updateFrontmatter(file, {
-   *   duplicate: true,
-   *   lastUpdated: '2024-03-15'
-   * });
-   * ```
-   *
-   * Behavior:
-   * - If file has no frontmatter, creates new frontmatter section
-   * - If key exists, updates value (unless protected)
-   * - If key doesn't exist, adds new key-value pair
-   * - Preserves existing frontmatter formatting and values
-   * - Maintains file content after frontmatter unchanged
-   *
-   * Protection:
-   * - When frontmatter protection is enabled, specified fields are preserved
-   * - Protected fields are not updated even if included in updates
-   * - Protection is configured in plugin settings
-   * - Example protected fields: status, tags, categories
-   */
-  private async writeUpdatedFrontmatter(file: TFile, updates: Record<string, unknown>): Promise<void> {
-    const { frontmatter, body } = await this.updateFrontmatter(file, updates);
 
-    // Combine and write back
-    await this.app.vault.modify(file, `${frontmatter}\n${body}`);
-  }
-
-  private async updateFrontmatter(file: TFile, updates: Record<string, unknown>) {
-    const content = await this.app.vault.read(file);
-    const frontmatterRegex = /^(---\n[\s\S]*?\n---)/;
-    const match = content.match(frontmatterRegex);
-
-    let frontmatter = '';
-    let body = content;
-
-    // If frontmatter exists, update it
-    if (match) {
-      frontmatter = match[1];
-      body = content.slice(match[0].length);
-
-      // Parse existing frontmatter
-      const currentFrontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter || {};
-
-      // Remove protected fields from updates (but only if they exist)
-      if (this.settings.protectFrontmatter) {
-        const protectedFields = this.settings.protectedFields
-          .split('\n')
-          .map((f) => f.trim())
-          .filter((f) => f.length > 0);
-
-        for (const field of protectedFields) {
-          // only delete if the field is not present in currentFrontmatter
-          if (field in currentFrontmatter) delete updates[field];
-        }
-      }
-
-      // Create new frontmatter
-      const newFrontmatter = {
-        ...currentFrontmatter,
-        ...updates,
-      };
-
-      frontmatter = ['---', YAML.stringify(newFrontmatter, YAML_TOSTRING_OPTIONS), '---'].join('\n');
-    } else {
-      frontmatter = ['---', YAML.stringify(updates, YAML_TOSTRING_OPTIONS), '---'].join('\n');
-    }
-    return { frontmatter, body };
-  }
-
-  private async findDuplicates(book: Export): Promise<TFile[]> {
-    const canTrack = this.settings.trackFiles;
-    const trackingProperty = this.settings.trackingProperty;
-
-    // Return early if deduplication is disabled or no property is set
-    if (!canTrack || !trackingProperty || !book.readwise_url) {
-      return Promise.resolve([]);
-    }
-
-    const duplicateFiles: TFile[] = [];
-    const files = this.app.vault.getMarkdownFiles();
-
-    for (const file of files) {
-      const metadata = this.app.metadataCache.getFileCache(file);
-      const frontmatterValue = metadata?.frontmatter?.[trackingProperty];
-
-      // Only match if the property exists and matches exactly
-      if (frontmatterValue && frontmatterValue === book.readwise_url) {
-        duplicateFiles.push(file);
-      }
-    }
-
-    return duplicateFiles;
-  }
 
   async writeLibraryToMarkdown(library: Library) {
     const vault = this.app.vault;
@@ -445,32 +311,15 @@ export default class ReadwiseMirror extends Plugin {
         };
 
         // Escape specific fields used in frontmatter
-        // TODO: Tidy up code. It doesn't make sense to remove the frontmatter markers and then add them back
-        let frontmatterYaml: Record<string, unknown>;
-        try {
-          const renderedTemplate = this.frontMatterTemplate.render(
-            this.escapeFrontmatter(metadata, FRONTMATTER_TO_ESCAPE)
-          );
-          const cleanedTemplate = renderedTemplate
-            .replace(/^---\n/, '')
-            .replace(/\n---\n*$/, '');
-          frontmatterYaml = YAML.parse(cleanedTemplate);
-        } catch (error) {
-          if (error instanceof YAML.YAMLParseError) {
-            console.error('Failed to parse YAML frontmatter:', error.message);
-            throw new Error(`Invalid YAML frontmatter: ${error.message}`);
-          } 
-          if (error instanceof Error) {
-            console.error('Error processing frontmatter template:', error.message);
-            throw new Error(`Failed to process frontmatter: ${error.message}`);
-          }
-          console.error('Unknown error processing frontmatter:', error);
-          throw new Error('Failed to process frontmatter due to unknown error');
-        }
+        let frontmatterYaml: FrontmatterRecord;
+        frontmatterYaml = this.frontmatterManager.renderFrontmatter(metadata); // Updated line
+
+        // Stringify Frontmatter YAML
         const frontMatterContents = this.settings.frontMatter
-          ? ['---', YAML.stringify(frontmatterYaml, YAML_TOSTRING_OPTIONS), '---'].join('\n')
+          ? FrontmatterManager.stringifyFrontmatter(frontmatterYaml) // Updated line
           : '';
-        const headerContents = this.headerTemplate.render(metadata);
+
+        const headerContents = this._headerTemplate.render(metadata);
         const contents = `${frontMatterContents}${headerContents}${formattedHighlights}`;
 
         const path = `${this.settings.baseFolderName}/${
@@ -479,138 +328,55 @@ export default class ReadwiseMirror extends Plugin {
 
         const abstractFile = vault.getAbstractFileByPath(normalizePath(path));
 
-        // Try to find duplicates: local duplicates (e.g. copies of files), and remote duplicates (e.g. readwise items with the same title)
+        // Try to find duplicates: local duplicates (e.g. copies of files), and remote duplicates
         try {
-          const duplicates = await this.findDuplicates(book);
+          const duplicates = await this.deduplicator.findDuplicates(book);
 
-          // Deduplicate files
-          if (duplicates.length > 0) {
-            let deduplicated = false;
-            const filesToDeleteOrLabel: TFile[] = [];
+          // Handle duplicates
+          const isDeduplicated = await this.deduplicator.handleDuplicates(
+            duplicates,
+            path,
+            contents,
+            frontmatterYaml,
+            metadata
+          );
 
-            // First: Check if target file is in duplicates (i.e. has the same name)
-            const targetFileIndex = duplicates.findIndex((f) => f.path === path);
-            if (targetFileIndex >= 0 && abstractFile instanceof TFile) {
-              deduplicated = true;
-              // Update target file
+          // If not deduplicated, handle as new/existing file
+          if (!isDeduplicated) {
+            if (abstractFile && abstractFile instanceof TFile) {
+              // File exists
               try {
-                // Update frontmatter if enabled
                 if (this.settings.updateFrontmatter) {
-                  const { frontmatter } = await this.updateFrontmatter(abstractFile, frontmatterYaml);
-                  const contents = `${frontmatter}${headerContents}${formattedHighlights}`;
+                  const frontmatter = await this.frontmatterManager.updateFrontmatter(
+                    abstractFile,
+                    frontmatterYaml
+                  );
+                  const updatedContents = `${frontmatter}${headerContents}${formattedHighlights}`;
+                  await vault.process(abstractFile, () => updatedContents);
+                } else {
                   await vault.process(abstractFile, () => contents);
-                } else await vault.process(abstractFile, () => contents);
+                }
               } catch (err) {
                 console.error(`Readwise: Attempt to overwrite file ${path} failed`, err);
                 this.notify.notice(`Readwise: Failed to update file '${path}'. ${err}`);
-              } finally {
-                // Remove target file from duplicates
-                duplicates.splice(targetFileIndex, 1);
               }
-            }
-
-            // Second: Handle remaining duplicates (if any)
-            if (duplicates.length > 0) {
-              // Keep first duplicate if we haven't updated a file yet, and write it
-              if (!deduplicated && duplicates[0]) {
-                try {
-                  // Write the new contents to the first duplicate
-                  if (this.settings.updateFrontmatter) {
-                    await this.updateFrontmatter(duplicates[0], frontmatterYaml).then(({ frontmatter }) => {
-                      const contents = `${frontmatter}${headerContents}${formattedHighlights}`;
-                      vault
-                        .process(duplicates[0], () => contents)
-                        .then(() => {
-                          deduplicated = true;
-                        });
-                    });
-                  } else
-                    await vault
-                      .process(duplicates[0], () => contents)
-                      .then(() => {
-                        deduplicated = true;
-                      });
-
-                  // Rename the file if we have updated it
-                  await this.app.fileManager.renameFile(duplicates[0], path).catch(async () => {
-                    // We couldn't rename – check if we happen to have a file with "identical" (case-insenstivie) names
-                    if (vault.adapter.exists(normalizePath(path))) {
-                      // Replace the sanitized title
-                      const incrementPath = path.replace(`${sanitizedTitle}.md`, `${sanitizedTitle} ${metadata.id}.md`);
-                      if (incrementPath !== path) {
-                        await this.app.fileManager.renameFile(duplicates[0], incrementPath);
-                        console.warn(`Readwise: Processed remote duplicate ${incrementPath}`);
-                        this.notify.notice(`Readwise: Processed remote duplicate into ${incrementPath}`);
-                      } else {
-                        console.warn(
-                          `Readwise: file '${await vault.create(
-                            path,
-                            contents
-                          )}' for remote duplicate will not be renamed.`
-                        );
-                      }
-                    }
-                  });
-                  // Remove the file we just updated from duplicates
-                  duplicates.shift();
-                } catch (err) {
-                  // Verify if file exists: if yes, we might have a duplicate in Readwise (i.e. same title (minus case))
-                  console.error(`Readwise: Failed to rename local duplicate ${duplicates[0].path}`, err);
-                  this.notify.notice(`Readwise: Failed to rename local duplicate ${duplicates[0].path}`);
-                }
-              }
-              // Add remaining duplicates to deletion list
-              filesToDeleteOrLabel.push(...duplicates);
-            }
-
-            // Delete extra duplicates or mark as "duplicate" in the Vault
-            for (const file of filesToDeleteOrLabel) {
+            } else {
               try {
-                if (this.settings.deleteDuplicates) {
-                  await vault.trash(file, true);
-                } else {
-                  await this.writeUpdatedFrontmatter(file, { ...frontmatterYaml, duplicate: true });
-                }
+                await vault.create(path, contents).catch(async () => {
+                  if (vault.adapter.exists(normalizePath(path))) {
+                    const incrementPath = path.replace(`${sanitizedTitle}.md`, `${sanitizedTitle} ${metadata.id}.md`);
+                    await vault.create(incrementPath, contents);
+                    console.warn(`Readwise: Processed remote duplicate ${incrementPath}`);
+                    this.notify.notice(`Readwise: Processed remote duplicate into ${incrementPath}`);
+                  }
+                });
               } catch (err) {
-                console.error(`Readwise: Failed to delete local duplicate ${file.path}`, err);
-                this.notify.notice(`Readwise: Failed to delete local duplicate ${file.path}`);
+                console.error(
+                  `Readwise: Attempt to create file ${path} *DE NOVO* failed (uri: ${metadata.highlights_url})`,
+                  err
+                );
+                this.notify.notice(`Readwise: Failed to create file '${path}'. ${err}`);
               }
-            }
-          }
-          // Overwrite existing file with remote changes, or
-          // Create new file if not existing
-          else if (abstractFile && abstractFile instanceof TFile) {
-            // File exists
-            try {
-              // Update frontmatter if enabled
-              if (this.settings.updateFrontmatter) {
-                const { frontmatter } = await this.updateFrontmatter(abstractFile, frontmatterYaml);
-                const contents = `${frontmatter}${headerContents}${formattedHighlights}`;
-                await vault.process(abstractFile, () => contents);
-              } else await vault.process(abstractFile, () => contents);
-            } catch (err) {
-              console.error(`Readwise: Attempt to overwrite file ${path} failed`, err);
-              this.notify.notice(`Readwise: Failed to update file '${path}'. ${err}`);
-            }
-          } else {
-            try {
-              // File does not exist
-              await vault.create(path, contents).catch(async () => {
-                // We might have a file that already exists but with different cased filename … check
-                if (vault.adapter.exists(normalizePath(path))) {
-                  // Replace the sanitized title
-                  const incrementPath = path.replace(`${sanitizedTitle}.md`, `${sanitizedTitle} ${metadata.id}.md`);
-                  await vault.create(incrementPath, contents);
-                  console.warn(`Readwise: Processed remote duplicate ${incrementPath}`);
-                  this.notify.notice(`Readwise: Processed remote duplicate into ${incrementPath}`);
-                }
-              });
-            } catch (err) {
-              console.error(
-                `Readwise: Attempt to create file ${path} *DE NOVO* failed (uri: ${metadata.highlights_url})`,
-                err
-              );
-              this.notify.notice(`Readwise: Failed to create file '${path}'. ${err}`);
             }
           }
         } catch (err) {
@@ -667,7 +433,7 @@ export default class ReadwiseMirror extends Plugin {
 
     this.isSyncing = true;
     try {
-      if (!this.readwiseApi.hasValidToken()) {
+      if (!this._readwiseApi.hasValidToken()) {
         this.notify.notice('Readwise: Valid API Token Required');
 
         return;
@@ -678,11 +444,11 @@ export default class ReadwiseMirror extends Plugin {
 
       if (!lastUpdated) {
         this.notify.notice('Readwise: Previous sync not detected...\nDownloading full Readwise library');
-        library = await this.readwiseApi.downloadFullLibrary();
+        library = await this._readwiseApi.downloadFullLibrary();
       } else {
         // Load Upadtes and cache
         this.notify.notice(`Readwise: Checking for new updates since ${this.lastUpdatedHumanReadableFormat()}`);
-        library = await this.readwiseApi.downloadUpdates(lastUpdated);
+        library = await this._readwiseApi.downloadUpdates(lastUpdated);
       }
 
       if (Object.keys(library.books).length > 0) {
@@ -743,52 +509,6 @@ export default class ReadwiseMirror extends Plugin {
       this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()} elsewhere`);
   }
 
-  public addSyncPropertiesToFrontmatterTemplate(template: string): string {
-    const lines = template.split('\n');
-    const frontmatterStart = lines.findIndex((line) => line.trim() === '---');
-    const frontmatterEnd =
-      lines.slice(frontmatterStart + 1).findIndex((line) => line.trim() === '---') + frontmatterStart + 1;
-
-    if (frontmatterStart === -1 || frontmatterEnd <= frontmatterStart) return template;
-
-    const propertiesToAdd: string[] = [];
-
-    // Add tracking property if enabled
-    if (this.settings.trackFiles) {
-      console.warn('Adding tracking property to frontmatter template');
-      const trackingProperty = `${this.settings.trackingProperty}: {{ highlights_url }}`;
-      propertiesToAdd.push(trackingProperty);
-    }
-
-    // If no properties to add, return original template
-    if (propertiesToAdd.length === 0) return template;
-
-    // Remove any existing properties
-    const propertyNames = [
-      this.settings.trackingProperty,
-    ];
-    
-    const filteredLines = lines.filter((line, index) => {
-      if (index < frontmatterStart || index > frontmatterEnd) return true;
-      return !propertyNames.some(prop => line.trim().startsWith(`${prop}:`));
-    });
-
-    // Add new properties before closing ---
-    filteredLines.splice(frontmatterEnd, 0, ...propertiesToAdd);
-
-    return filteredLines.join('\n');
-  }
-
-  // Update the frontmatter template with the sync properties
-  public updateFrontmatteTemplate() {
-    this.frontMatterTemplate = new Template(
-      this.addSyncPropertiesToFrontmatterTemplate(this.settings.frontMatterTemplate),
-      this.env,
-      null,
-      true
-    );
-  }
-
   // Dedicated function to handle metadata change events
   private onMetadataChange(file: TFile) {
     const metadata: CachedMetadata = this.app.metadataCache.getFileCache(file);
@@ -814,10 +534,12 @@ export default class ReadwiseMirror extends Plugin {
     // Add a nunjucks filter to convert ".qa" notes to Q& A
     this.env.addFilter('qa', (str) => str.replace(/\.qa(.*)\?(.*)/g, '**Q:**$1?\r\n\r\n**A:**$2'));
 
-    this.updateFrontmatteTemplate();
+    this.frontmatterManager = new FrontmatterManager(this.app, this.settings, this.env);
+    this.deduplicator = new Deduplicator(this.app, this.settings, this.env);
+    this.frontmatterManager.updateFrontmatteTemplate(this.settings.frontMatterTemplate);
 
-    this.headerTemplate = new Template(this.settings.headerTemplate, this.env, null, true);
-    this.highlightTemplate = new Template(this.settings.highlightTemplate, this.env, null, true);
+    this.headerTemplate = this.settings.headerTemplate;
+    this.highlightTemplate = this.settings.highlightTemplate;
 
     this.notify = new Notify(statusBarItem);
 
@@ -825,7 +547,7 @@ export default class ReadwiseMirror extends Plugin {
       this.notify.notice('Readwise: API Token not detected\nPlease enter in configuration page');
       this.notify.setStatusBarText('Readwise: API Token Required');
     } else {
-      this.readwiseApi = new ReadwiseApi(this.settings.apiToken, this.notify);
+      this._readwiseApi = new ReadwiseApi(this.settings.apiToken, this.notify);
       if (this.settings.lastUpdated)
         this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`);
       else this.notify.setStatusBarText("Readwise: Click to Sync");
@@ -843,7 +565,7 @@ export default class ReadwiseMirror extends Plugin {
       id: 'test',
       name: 'Test Readwise API key',
       callback: async () => {
-        const isTokenValid = await this.readwiseApi.hasValidToken();
+        const isTokenValid = await this._readwiseApi.hasValidToken();
         this.notify.notice(`Readwise: ${isTokenValid ? 'Token is valid' : 'INVALID TOKEN'}`);
       },
     });
@@ -868,7 +590,7 @@ export default class ReadwiseMirror extends Plugin {
       }, 1000)
     );
 
-    this.addSettingTab(new ReadwiseMirrorSettingTab(this.app, this, this.notify));
+    this.addSettingTab(new ReadwiseMirrorSettingTab(this.app, this, this.notify, this.frontmatterManager));
 
     if (this.settings.autoSync) this.sync();
   }

@@ -1,19 +1,19 @@
-import { DEFAULT_SETTINGS, FRONTMATTER_TO_ESCAPE } from 'constants/index';
+import { DEFAULT_SETTINGS } from 'constants/index';
+import { type App, Modal, PluginSettingTab, Setting } from 'obsidian';
 import type ReadwiseMirror from 'main';
-import { Template } from 'nunjucks';
-import { type App, PluginSettingTab, Setting } from 'obsidian';
-import { sampleMetadata } from 'test/sample-data';
+import type { FrontmatterManager } from 'services/frontmatter-manager';
+import type { TemplateValidationResult } from 'models/yaml';
 import type Notify from 'ui/notify';
-import * as YAML from 'yaml';
 
 export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
   plugin: ReadwiseMirror;
-  notify: Notify;
-
-  constructor(app: App, plugin: ReadwiseMirror, notify: Notify) {
+  notify: Notify;  
+  frontmatterManager: FrontmatterManager;
+  constructor(app: App, plugin: ReadwiseMirror, notify: Notify, manager: FrontmatterManager) {
     super(app, plugin);
     this.plugin = plugin;
     this.notify = notify;
+    this.frontmatterManager = manager
   }
 
   /**
@@ -50,31 +50,6 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     // Add 1 to account for the last line and set minimum
     textEl.rows = Math.max(minRows, totalLines + 1);
   };
-
-  private validateFrontmatterTemplate(template: string): { isValid: boolean; error?: string; preview?: string } {
-    const renderedTemplate = new Template(template, this.plugin.env, null, true).render(
-      this.plugin.escapeFrontmatter(sampleMetadata, FRONTMATTER_TO_ESCAPE)
-    );
-    const yamlContent = renderedTemplate
-      .replace(/^---\n/, '') // Remove opening ---
-      .replace(/\n---\n*$/, ''); // Remove closing --- and any trailing newlines
-    try {
-      YAML.parse(yamlContent);
-      return { isValid: true };
-    } catch (error) {
-      if (error instanceof YAML.YAMLParseError) {
-        return {
-          isValid: false,
-          error: `Invalid YAML: ${error.message}`,
-          preview: yamlContent,
-        };
-      }
-      return {
-        isValid: false,
-        error: `Template error: ${error.message}`,
-      };
-    }
-  }
 
   // Button-based authentication inspired by the official Readwise plugin
   private async getUserAuthToken(button: HTMLElement, attempt = 0): Promise<boolean> {
@@ -523,14 +498,14 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.frontMatter).onChange(async (value) => {
           // Test template with sample data
-          const { isValid, error } = this.validateFrontmatterTemplate(this.plugin.settings.frontMatterTemplate);
+          const { isValid, error } = this.frontmatterManager.validateFrontmatterTemplate(this.plugin.settings.frontMatterTemplate);
           if ((value && isValid) || !value) {
             this.plugin.settings.frontMatter = value;
             await this.plugin.saveSettings();
             // Trigger re-render to show/hide frontmatter settings
             this.display();
           } else if (value && !isValid) {
-            this.plugin.notify.notice(`Invalid frontmatter template: ${error}`);
+            this.notify.notice(`Invalid frontmatter template: ${error}`);
             toggle.setValue(false);
             // Trigger re-render to show/hide property selector
             this.display();
@@ -678,7 +653,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.trackFiles = value;
             await this.plugin.saveSettings();
-            this.plugin.updateFrontmatteTemplate();
+            this.frontmatterManager.updateFrontmatteTemplate(this.plugin.settings.frontMatterTemplate);
             this.display();
           })
       );
@@ -697,7 +672,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               .onChange(async (value) => {
                 this.plugin.settings.trackingProperty = value || 'uri';
                 await this.plugin.saveSettings();
-                this.plugin.updateFrontmatteTemplate();
+                this.frontmatterManager.updateFrontmatteTemplate(this.plugin.settings.frontMatterTemplate);
               })
           );
 
@@ -710,17 +685,46 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
                 'When enabled, duplicate files will be removed. Otherwise, they will be marked with duplicate: true in frontmatter.'
               );
               fragment.createEl('br');
-              fragment.createEl('blockquote', { text: 'Default: Remove duplicates' });
+              fragment.createEl('blockquote', { text: 'Default: Mark duplicates in frontmatter' });
             })
           )
           .addToggle((toggle) =>
             toggle.setValue(this.plugin.settings.deleteDuplicates).onChange(async (value) => {
-              this.plugin.settings.deleteDuplicates = value;
-              await this.plugin.saveSettings();
+              if (value) {
+                const modal = new Modal(this.app);
+                modal.titleEl.setText("Warning");
+                modal.contentEl.createEl("p", {
+                  text: "This will permanently delete duplicate files instead of marking them. If enabled, files in your Vault will be deleted when duplicates are found. Are you sure you want to continue?"
+                });
+                
+                const buttonContainer = modal.contentEl.createDiv();
+                buttonContainer.style.display = "flex";
+                buttonContainer.style.justifyContent = "flex-end";
+                buttonContainer.style.gap = "10px";
+                buttonContainer.style.marginTop = "20px";
+
+                const cancelButton = buttonContainer.createEl("button", { text: "Cancel" });
+                const confirmButton = buttonContainer.createEl("button", { text: "Confirm" });
+                confirmButton.style.backgroundColor = "var(--background-modifier-error)";
+
+                cancelButton.onclick = () => {
+                  toggle.setValue(false);
+                  modal.close();
+                };
+
+                confirmButton.onclick = async () => {
+                  this.plugin.settings.deleteDuplicates = true;
+                  await this.plugin.saveSettings();
+                  modal.close();
+                };
+
+                modal.open();
+              } else {
+                this.plugin.settings.deleteDuplicates = false;
+                await this.plugin.saveSettings();
+              }
             })
           );
-
-
       }
 
       }
@@ -816,42 +820,35 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           errorDetails.hide();
 
           // Update preview on template changes
-          const updatePreview = (template: string) => {
-            const rendered = new Template(template, this.plugin.env, null, true).render(
-              this.plugin.escapeFrontmatter(sampleMetadata, FRONTMATTER_TO_ESCAPE)
-            );
-            const yamlContent = rendered
-              .replace(/^---\n/, '') // Remove opening ---
-              .replace(/\n---\n*$/, ''); // Remove closing --- and any trailing newlines
+          const updatePreview = (result: TemplateValidationResult) => {
+            if (!result.isValid) {
+              errorNotice.setText('Your Frontmatter contains invalid YAML');
+              errorDetails.setText(result.error);
+              errorDetails.show();
 
-            try {
-              YAML.parse(yamlContent);
-              errorNotice.setText('');
-              previewContainer.hide();
-            } catch (error) {
-              // Turn Frontmatter toggle off
-              if (error instanceof YAML.YAMLParseError) {
-                errorNotice.setText('Invalid YAML:');
-                errorDetails.setText(error.message);
-                errorDetails.show();
-              } else {
-                errorNotice.setText(`Template error: ${error.message}`);
-                errorDetails.hide();
+              if (result.preview) {
+                previewContent.setText(result.preview);
+                previewContainer.show();
               }
-              previewContent.setText(yamlContent);
-              previewContainer.show();
-            }
+              return;
+            } 
+
+            errorNotice.setText('');
+            errorDetails.setText('');
+            errorDetails.hide();
+            previewContainer.hide();
           };
 
           // Display rendered template on load
-          updatePreview(this.plugin.settings.frontMatterTemplate);
+          const validationResult: TemplateValidationResult = this.frontmatterManager.validateFrontmatterTemplate(this.plugin.settings.frontMatterTemplate);
+          updatePreview(validationResult);
           text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
-            const validation = this.validateFrontmatterTemplate(value);
+            const validationResult: TemplateValidationResult = this.frontmatterManager.validateFrontmatterTemplate(value);
 
             // Update validation notice
             const noticeEl = containerEl.querySelector('.validation-notice');
             if (noticeEl) {
-              noticeEl.setText(validation.isValid ? '' : validation.error);
+              noticeEl.setText(validationResult.isValid ? '' : validationResult.error);
             }
 
             if (!value) {
@@ -860,9 +857,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               this.plugin.settings.frontMatterTemplate = value.replace(/\n*$/, '\n');
             }
 
-            updatePreview(value);
+            updatePreview(validationResult);
 
-            this.plugin.updateFrontmatteTemplate();
+            this.frontmatterManager.updateFrontmatteTemplate(value);
             await this.plugin.saveSettings();
           });
 
@@ -918,7 +915,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           } else {
             this.plugin.settings.headerTemplate = value;
           }
-          this.plugin.headerTemplate = new Template(this.plugin.settings.headerTemplate, this.plugin.env, null, true);
+          this.plugin.headerTemplate = this.plugin.settings.headerTemplate;
           await this.plugin.saveSettings();
         });
 
@@ -970,12 +967,8 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           } else {
             this.plugin.settings.highlightTemplate = value;
           }
-          this.plugin.highlightTemplate = new Template(
-            this.plugin.settings.highlightTemplate,
-            this.plugin.env,
-            null,
-            true
-          );
+
+          this.plugin.highlightTemplate = this.plugin.settings.highlightTemplate;
           await this.plugin.saveSettings();
         });
 
