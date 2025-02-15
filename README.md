@@ -108,7 +108,7 @@ For example, given the author string: "Dr. John Doe, and JANE SMITH, Prof. Bob J
 The different settings will produce:
 
 - **Default**: "Dr. John Doe, JANE SMITH, Prof. Bob Johnson"
-- **Normalize case**: "Dr. John Doe, Jane Smith, Prof. Bob Johnson" 
+- **Normalize case**: "Dr. John Doe, Jane Smith, Prof. Bob Johnson"
 - **Strip titles**: "John Doe, JANE SMITH, Bob Johnson"
 - **Both enabled**: "John Doe, Jane Smith, Bob Johnson"
 
@@ -445,7 +445,7 @@ If File Tracking is enabled, the plugin prevents duplicate files when articles a
 2. **Update Strategy**
    - If exact filename match exists: Updates content in place
    - If different filename exists: Updates first matching file, and changes this file's filename to the new filename
-   - Additional matches: Either deleted or marked as duplicates (with the `duplicate` property)
+   - Additional matches: Either deleted or marked as duplicates (default, with the `duplicate` property set to `true`)
 
 3. **Link Preservation**
    - Maintains existing internal links
