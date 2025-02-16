@@ -1,11 +1,11 @@
 import slugify from '@sindresorhus/slugify';
 import filenamify from 'filenamify';
-import spacetime from 'spacetime';
+import { type ConfigureOptions, Environment, Template } from 'nunjucks';
 import { type CachedMetadata, Plugin, type TFile } from 'obsidian';
-import { type ConfigureOptions, Template, Environment } from 'nunjucks';
 import { AuthorParser } from 'services/author-parser';
-import { DeduplicatingVaultWriter } from 'services/deduplicating-vault';
+import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
 import { FrontmatterManager } from 'services/frontmatter-manager';
+import spacetime from 'spacetime';
 
 // Plugin classes
 import ReadwiseApi from 'services/readwise-api';
@@ -13,8 +13,7 @@ import ReadwiseMirrorSettingTab from 'ui/settings-tab';
 import Notify from 'ui/notify';
 
 // Types
-import type { Export, Highlight, Library, Tag, ReadwiseItem } from 'models/readwise';
-import type { PluginSettings } from 'models/settings';
+import type { Export, Highlight, Library, PluginSettings, ReadwiseDocument, Tag } from 'types';
 
 
 // Constants
@@ -293,7 +292,7 @@ export default class ReadwiseMirror extends Plugin {
               ? `[[${author}]]`
               : '';
 
-        const metadata: ReadwiseItem = {
+        const metadata: ReadwiseDocument = {
           id: user_book_id,
           title,
           sanitized_title: filename,

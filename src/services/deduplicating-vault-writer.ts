@@ -1,7 +1,6 @@
-import { type App, normalizePath, TFile, type Vault } from 'obsidian';
-import { FrontmatterManager, type Frontmatter } from 'services/frontmatter-manager';
-import type { ReadwiseItem } from 'models/readwise';
-import type { PluginSettings } from 'models/settings';
+import { type App, TFile, type Vault, normalizePath } from 'obsidian';
+import { type Frontmatter, FrontmatterManager } from 'services/frontmatter-manager';
+import type { PluginSettings, ReadwiseDocument } from 'types';
 
 export class DeduplicatingVaultWriter {
   readonly vault: Vault;
@@ -22,7 +21,7 @@ export class DeduplicatingVaultWriter {
    * @param readwiseItem The book to find duplicates for
    * @returns An array of duplicate files
    */
-  private async findDuplicates(readwiseItem: ReadwiseItem): Promise<TFile[]> {
+  private async findDuplicates(readwiseItem: ReadwiseDocument): Promise<TFile[]> {
     const files = this.vault.getMarkdownFiles();
 
     // Try file tracking if enabled
@@ -48,7 +47,7 @@ export class DeduplicatingVaultWriter {
    * @param metadata - The metadata of the file
    * @returns The file that was written
    */
-  public async create(filename: string, contents: string, metadata: ReadwiseItem): Promise<TFile> {
+  public async create(filename: string, contents: string, metadata: ReadwiseDocument): Promise<TFile> {
     const path = `${this.settings.baseFolderName}/${
       metadata.category.charAt(0).toUpperCase() + metadata.category.slice(1)
     }/${filename}.md`;

@@ -1,5 +1,5 @@
+import type { PluginSettings } from 'types';
 import type { ToStringOptions } from 'yaml';
-import type { PluginSettings } from 'models/settings';
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   baseFolderName: 'Readwise',

@@ -1,4 +1,4 @@
-import type { MetadataInput } from 'models/readwise';
+import type { MetadataInput } from 'types';
 
 export class MetadataKeyGenerator {
   /**

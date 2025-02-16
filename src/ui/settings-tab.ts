@@ -2,7 +2,7 @@ import { DEFAULT_SETTINGS } from 'constants/index';
 import { type App, Modal, PluginSettingTab, Setting } from 'obsidian';
 import type ReadwiseMirror from 'main';
 import type { FrontmatterManager } from 'services/frontmatter-manager';
-import type { TemplateValidationResult } from 'models/yaml';
+import type { TemplateValidationResult } from 'types';
 import type Notify from 'ui/notify';
 
 export default class ReadwiseMirrorSettingTab extends PluginSettingTab {

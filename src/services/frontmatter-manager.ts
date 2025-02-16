@@ -1,11 +1,9 @@
-import type { App, TFile } from 'obsidian';
-import * as YAML from 'yaml';
 import { FRONTMATTER_TO_ESCAPE, YAML_TOSTRING_OPTIONS } from 'constants/index';
-import type { YamlStringState } from 'models/yaml';
-import type { ReadwiseItem } from 'models/readwise';
-import type { PluginSettings } from 'models/settings';
-import { Template, type Environment } from 'nunjucks';
+import { type Environment, Template } from 'nunjucks';
+import type { App, TFile } from 'obsidian';
 import { sampleMetadata } from 'test/sample-data';
+import type { PluginSettings, ReadwiseDocument, YamlStringState } from 'types';
+import * as YAML from 'yaml';
 
 interface YamlEscapeOptions {
   multiline?: boolean;
@@ -122,12 +120,12 @@ export class FrontmatterManager {
   }
 
   // Before metadata is used
-  public escapeMetadata(metadata: ReadwiseItem, fieldsToProcess: Array<string>): ReadwiseItem {
+  public escapeMetadata(metadata: ReadwiseDocument, fieldsToProcess: Array<string>): ReadwiseDocument {
     // Copy the metadata object to avoid modifying the original
-    const processedMetadata = { ...metadata } as ReadwiseItem;
+    const processedMetadata = { ...metadata } as ReadwiseDocument;
     for (const field of fieldsToProcess) {
-      if (field in processedMetadata && processedMetadata[field as keyof ReadwiseItem]) {
-        const key = field as keyof ReadwiseItem;
+      if (field in processedMetadata && processedMetadata[field as keyof ReadwiseDocument]) {
+        const key = field as keyof ReadwiseDocument;
         const value = processedMetadata[key];
 
         const escapeStringValue = (str: string) => this.escapeValue(str);
@@ -302,7 +300,7 @@ export class FrontmatterManager {
    * @param metadata - The metadata to process
    * @returns The frontmatter record
    */
-  public renderFrontmatter(metadata: ReadwiseItem): Frontmatter {
+  public renderFrontmatter(metadata: ReadwiseDocument): Frontmatter {
     return this.settings.updateFrontmatter ? this.processTemplate(metadata, this.frontMatterTemplate) : {};
   }
 
@@ -312,7 +310,7 @@ export class FrontmatterManager {
    * @param template - The template to process
    * @returns The frontmatter record
    */
-  private processTemplate(metadata: ReadwiseItem, template: Template): Frontmatter {
+  private processTemplate(metadata: ReadwiseDocument, template: Template): Frontmatter {
     try {
       // Render template if provided, otherwise use the default frontmatter template
       const cleanedTemplate = template

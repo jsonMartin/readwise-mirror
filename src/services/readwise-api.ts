@@ -1,5 +1,6 @@
-import type { Export, Library } from 'models/readwise';
+import type { Export, Library } from 'types';
 import type Notify from 'ui/notify';
+
 
 const API_ENDPOINT = 'https://readwise.io/api/v2';
 const API_PAGE_SIZE = 1000; // number of results per page, default 100 / max 1000

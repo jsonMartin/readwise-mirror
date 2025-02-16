@@ -1,4 +1,4 @@
-import type { AuthorParserOptions } from 'models/readwise';
+import type { AuthorParserOptions } from 'types';
 
 export class AuthorParser {
   private readonly AUTHOR_SEPARATORS = /,\s*and\s*|\s+and\s+|,\s*/;
