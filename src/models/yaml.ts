@@ -4,8 +4,6 @@ export interface YamlStringState {
 	isValueEscapedAlready: boolean;
 }
 
-export type FrontmatterRecord = Record<string, unknown>;
-
 export interface TemplateValidationResult {
 	isValid: boolean;
 	error?: string;

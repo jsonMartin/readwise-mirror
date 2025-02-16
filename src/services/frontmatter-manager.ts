@@ -1,8 +1,8 @@
 import type { App, TFile } from 'obsidian';
 import * as YAML from 'yaml';
 import { FRONTMATTER_TO_ESCAPE, YAML_TOSTRING_OPTIONS } from 'constants/index';
-import type { YamlStringState, FrontmatterRecord } from 'models/yaml';
-import type { ReadwiseMetadata } from 'models/readwise';
+import type { YamlStringState } from 'models/yaml';
+import type { ReadwiseItem } from 'models/readwise';
 import type { PluginSettings } from 'models/settings';
 import { Template, type Environment } from 'nunjucks';
 import { sampleMetadata } from 'test/sample-data';
@@ -10,6 +10,7 @@ import { sampleMetadata } from 'test/sample-data';
 interface YamlEscapeOptions {
   multiline?: boolean;
 }
+
 
 class FrontmatterError extends Error {
   constructor(
@@ -21,8 +22,10 @@ class FrontmatterError extends Error {
   }
 }
 
+// TODO: Make this a proper class 
+export type Frontmatter = Record<string, unknown>;
 export class FrontmatterManager {
-  private static readonly FRONTMATTER_REGEX = /^---\n([\s\S]*?)\n---\s*/;
+  private static readonly FRONTMATTER_REGEX = /^(---\n([\s\S]*?)\n---\s*)/;
   private static readonly FRONTMATTER_DELIMITER = '---';
   private frontMatterTemplate: Template;
 
@@ -119,12 +122,12 @@ export class FrontmatterManager {
   }
 
   // Before metadata is used
-  public escapeMetadata(metadata: ReadwiseMetadata, fieldsToProcess: Array<string>): ReadwiseMetadata {
+  public escapeMetadata(metadata: ReadwiseItem, fieldsToProcess: Array<string>): ReadwiseItem {
     // Copy the metadata object to avoid modifying the original
-    const processedMetadata = { ...metadata } as ReadwiseMetadata;
+    const processedMetadata = { ...metadata } as ReadwiseItem;
     for (const field of fieldsToProcess) {
-      if (field in processedMetadata && processedMetadata[field as keyof ReadwiseMetadata]) {
-        const key = field as keyof ReadwiseMetadata;
+      if (field in processedMetadata && processedMetadata[field as keyof ReadwiseItem]) {
+        const key = field as keyof ReadwiseItem;
         const value = processedMetadata[key];
 
         const escapeStringValue = (str: string) => this.escapeValue(str);
@@ -144,9 +147,9 @@ export class FrontmatterManager {
   /**
    * Updates frontmatter of a file
    */
-  public async updateFrontmatter(file: TFile, updates: FrontmatterRecord): Promise<string> {
+  public async getUpdatedFrontmatter(file: TFile, updates: Frontmatter): Promise<Frontmatter> {
     try {
-      const currentFrontmatter: FrontmatterRecord = this.app.metadataCache.getFileCache(file)?.frontmatter || {};
+      const currentFrontmatter: Frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter || {};
 
       if (Object.keys(currentFrontmatter).length > 0) {
         const filteredUpdates = this.settings.protectFrontmatter ? this.filterProtectedFields(updates) : updates;
@@ -156,10 +159,10 @@ export class FrontmatterManager {
           ...filteredUpdates,
         };
 
-        return FrontmatterManager.stringifyFrontmatter(newFrontmatter);
+        return newFrontmatter;
       }
 
-      return FrontmatterManager.stringifyFrontmatter(updates);
+      return updates;
     } catch (error) {
       throw new FrontmatterError('Failed to update frontmatter', error);
     }
@@ -169,7 +172,7 @@ export class FrontmatterManager {
     const renderedTemplate = new Template(template, this.env, null, true).render(
       this.escapeMetadata(sampleMetadata, FRONTMATTER_TO_ESCAPE)
     );
-    const yamlContent = renderedTemplate.replace(FrontmatterManager.FRONTMATTER_REGEX, '$1');
+    const yamlContent = renderedTemplate.replace(FrontmatterManager.FRONTMATTER_REGEX, '$2');
     try {
       YAML.parse(yamlContent);
       return { isValid: true };
@@ -191,7 +194,7 @@ export class FrontmatterManager {
   /**
    * Filters out protected fields from updates
    */
-  private filterProtectedFields(updates: FrontmatterRecord): FrontmatterRecord {
+  private filterProtectedFields(updates: Frontmatter): Frontmatter {
     const protectedFields = this.settings.protectedFields
       .split('\n')
       .map((f) => f.trim())
@@ -202,7 +205,7 @@ export class FrontmatterManager {
   /**
    * Generates frontmatter string
    */
-  public static stringifyFrontmatter(data: Record<string, unknown>): string {
+  public static toString(data: Record<string, unknown>): string {
     return [
       FrontmatterManager.FRONTMATTER_DELIMITER,
       YAML.stringify(data, YAML_TOSTRING_OPTIONS),
@@ -214,14 +217,14 @@ export class FrontmatterManager {
    * Writes updated frontmatter to a file
    * TODO: Should go into a ReadwiseMirrorWriter class
    */
-  public async writeUpdatedFrontmatter(file: TFile, updates: FrontmatterRecord): Promise<void> {
+  public async writeUpdatedFrontmatter(file: TFile, updates: Frontmatter): Promise<void> {
     try {
       const content = await this.app.vault.read(file);
       const match = content.match(FrontmatterManager.FRONTMATTER_REGEX);
       const frontmatterStr = match?.[1] || '';
       const body = content.slice(frontmatterStr.length);
 
-      const frontmatter = FrontmatterManager.stringifyFrontmatter(updates);
+      const frontmatter = FrontmatterManager.toString(updates);
       await this.app.vault.modify(file, `${frontmatter}\n${body}`);
     } catch (error) {
       throw new FrontmatterError('Failed to write frontmatter', error);
@@ -299,8 +302,8 @@ export class FrontmatterManager {
    * @param metadata - The metadata to process
    * @returns The frontmatter record
    */
-  public renderFrontmatter(metadata: ReadwiseMetadata): FrontmatterRecord {
-    return this.processTemplate(metadata, this.frontMatterTemplate);
+  public renderFrontmatter(metadata: ReadwiseItem): Frontmatter {
+    return this.settings.updateFrontmatter ? this.processTemplate(metadata, this.frontMatterTemplate) : {};
   }
 
   /**
@@ -309,12 +312,12 @@ export class FrontmatterManager {
    * @param template - The template to process
    * @returns The frontmatter record
    */
-  private processTemplate(metadata: ReadwiseMetadata, template: Template): FrontmatterRecord {
+  private processTemplate(metadata: ReadwiseItem, template: Template): Frontmatter {
     try {
       // Render template if provided, otherwise use the default frontmatter template
       const cleanedTemplate = template
         .render(this.escapeMetadata(metadata, FRONTMATTER_TO_ESCAPE))
-        .replace(FrontmatterManager.FRONTMATTER_REGEX, '$1');
+        .replace(FrontmatterManager.FRONTMATTER_REGEX, '$2');
       return YAML.parse(cleanedTemplate);
     } catch (error) {
       if (error instanceof YAML.YAMLParseError) {

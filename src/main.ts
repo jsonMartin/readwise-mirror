@@ -1,10 +1,10 @@
 import slugify from '@sindresorhus/slugify';
 import filenamify from 'filenamify';
 import spacetime from 'spacetime';
-import { type CachedMetadata, Plugin, normalizePath, TFile } from 'obsidian';
+import { type CachedMetadata, Plugin, type TFile } from 'obsidian';
 import { type ConfigureOptions, Template, Environment } from 'nunjucks';
 import { AuthorParser } from 'services/author-parser';
-import { Deduplicator } from 'services/deduplicator';
+import { DeduplicatingVaultWriter } from 'services/deduplicating-vault';
 import { FrontmatterManager } from 'services/frontmatter-manager';
 
 // Plugin classes
@@ -13,9 +13,9 @@ import ReadwiseMirrorSettingTab from 'ui/settings-tab';
 import Notify from 'ui/notify';
 
 // Types
-import type { Export, Highlight, Library, Tag, ReadwiseMetadata } from 'models/readwise';
+import type { Export, Highlight, Library, Tag, ReadwiseItem } from 'models/readwise';
 import type { PluginSettings } from 'models/settings';
-import type { FrontmatterRecord } from 'models/yaml';
+
 
 // Constants
 import { DEFAULT_SETTINGS } from 'constants/index';
@@ -28,8 +28,8 @@ export default class ReadwiseMirror extends Plugin {
   private notify: Notify;
   private env: Environment;
   private isSyncing = false;
-  private deduplicator: Deduplicator;
   private frontmatterManager: FrontmatterManager;
+  private deduplicatingVault: DeduplicatingVaultWriter;
 
   // Getters and setters for settings and templates
   get settings() {
@@ -183,7 +183,7 @@ export default class ReadwiseMirror extends Plugin {
       const { title, highlights } = book;
       const num_highlights = highlights.length;
       console.warn(`Readwise: Replacing colon with ${this.settings.colonSubstitute}`);
-      const sanitizedTitle = this.sanitizeTitle(book.title);
+      const sanitizedTitle = this.filenameFromTitle(book.title);
       const contents = `\n- [[${sanitizedTitle}]] *(${num_highlights} highlights)*`;
       logString += contents;
     }
@@ -268,7 +268,7 @@ export default class ReadwiseMirror extends Plugin {
         .reverse()[0];
 
       // Sanitize title, replace colon with substitute from settings
-      const sanitizedTitle = this.sanitizeTitle(title);
+      const filename = this.filenameFromTitle(title);
 
       // Filter highlights
       const filteredHighlights = this.filterHighlights(highlights);
@@ -276,10 +276,6 @@ export default class ReadwiseMirror extends Plugin {
       if (filteredHighlights.length === 0) {
         console.debug(`Readwise: No highlights found for '${title}' (${source_url})`);
       } else {
-        const formattedHighlights = this.sortHighlights(filteredHighlights)
-          .map((highlight: Highlight) => this.formatHighlight(highlight, book))
-          .join('\n');
-
         // get an array with all tags from highlights
         const highlightTags = this.getTagsFromHighlights(filteredHighlights);
 
@@ -297,10 +293,10 @@ export default class ReadwiseMirror extends Plugin {
               ? `[[${author}]]`
               : '';
 
-        const metadata: ReadwiseMetadata = {
+        const metadata: ReadwiseItem = {
           id: user_book_id,
           title,
-          sanitized_title: sanitizedTitle,
+          sanitized_title: filename,
           author: authors,
           authorStr,
           document_note,
@@ -321,85 +317,27 @@ export default class ReadwiseMirror extends Plugin {
           hl_tags_nohash: this.formatTags(highlightTags, true, "'"),
         };
 
-        // Escape specific fields used in frontmatter
-        let frontmatterYaml: FrontmatterRecord;
-        frontmatterYaml = this.frontmatterManager.renderFrontmatter(metadata); // Updated line
-
-        // Stringify Frontmatter YAML
-        const frontMatterContents = this.settings.frontMatter
-          ? FrontmatterManager.stringifyFrontmatter(frontmatterYaml) // Updated line
-          : '';
-
+        // Render header, and highlights
         const headerContents = this._headerTemplate.render(metadata);
-        const contents = `${frontMatterContents}${headerContents}${formattedHighlights}`;
+        const formattedHighlights = this.sortHighlights(filteredHighlights)
+          .map((highlight: Highlight) => this.formatHighlight(highlight, book))
+          .join('\n');
 
-        const path = `${this.settings.baseFolderName}/${
-          category.charAt(0).toUpperCase() + category.slice(1)
-        }/${sanitizedTitle}.md`;
-
-        const abstractFile = vault.getAbstractFileByPath(normalizePath(path));
+        const contents = `${headerContents}${formattedHighlights}`;
 
         // Try to find duplicates: local duplicates (e.g. copies of files), and remote duplicates
         try {
-          const duplicates = await this.deduplicator.findDuplicates(book);
-
-          // Handle duplicates
-          const isDeduplicated = await this.deduplicator.handleDuplicates(
-            duplicates,
-            path,
-            contents,
-            frontmatterYaml,
-            metadata
-          );
-
-          // If not deduplicated, handle as new/existing file
-          if (!isDeduplicated) {
-            if (abstractFile && abstractFile instanceof TFile) {
-              // File exists
-              try {
-                if (this.settings.updateFrontmatter) {
-                  const frontmatter = await this.frontmatterManager.updateFrontmatter(
-                    abstractFile,
-                    frontmatterYaml
-                  );
-                  const updatedContents = `${frontmatter}${headerContents}${formattedHighlights}`;
-                  await vault.process(abstractFile, () => updatedContents);
-                } else {
-                  await vault.process(abstractFile, () => contents);
-                }
-              } catch (err) {
-                console.error(`Readwise: Attempt to overwrite file ${path} failed`, err);
-                this.notify.notice(`Readwise: Failed to update file '${path}'. ${err}`);
-              }
-            } else {
-              try {
-                await vault.create(path, contents).catch(async () => {
-                  if (vault.adapter.exists(normalizePath(path))) {
-                    const incrementPath = path.replace(`${sanitizedTitle}.md`, `${sanitizedTitle} ${metadata.id}.md`);
-                    await vault.create(incrementPath, contents);
-                    console.warn(`Readwise: Processed remote duplicate ${incrementPath}`);
-                    this.notify.notice(`Readwise: Processed remote duplicate into ${incrementPath}`);
-                  }
-                });
-              } catch (err) {
-                console.error(
-                  `Readwise: Attempt to create file ${path} *DE NOVO* failed (uri: ${metadata.highlights_url})`,
-                  err
-                );
-                this.notify.notice(`Readwise: Failed to create file '${path}'. ${err}`);
-              }
-            }
-          }
+          this.deduplicatingVault.create(filename, contents, metadata); 
         } catch (err) {
-          console.error(`Readwise: Writing file ${path} (${metadata.highlights_url}) failed`, err);
-          this.notify.notice(`Readwise: Writing to '${path}' failed. ${err}`);
+          console.error(`Readwise: Writing file ${book.title} (${metadata.highlights_url}) failed`, err);
+          this.notify.notice(`Readwise: Writing '${book.title}' failed. ${err}`);
         }
       }
     }
   }
 
   // Sanitize title for use as filename
-  private sanitizeTitle(title: string) {
+  private filenameFromTitle(title: string) {
     return this.settings.useSlugify
       ? slugify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
           separator: this.settings.slugifySeparator,
@@ -544,13 +482,13 @@ export default class ReadwiseMirror extends Plugin {
     this.env.addFilter('qa', (str) => str.replace(/\.qa(.*)\?(.*)/g, '**Q:**$1?\r\n\r\n**A:**$2'));
 
     this.frontmatterManager = new FrontmatterManager(this.app, this.settings, this.env);
-    this.deduplicator = new Deduplicator(this.app, this.settings, this.env);
     this.frontmatterManager.updateFrontmatteTemplate(this.settings.frontMatterTemplate);
 
     this.headerTemplate = this.settings.headerTemplate;
     this.highlightTemplate = this.settings.highlightTemplate;
 
     this.notify = new Notify(statusBarItem);
+    this.deduplicatingVault = new DeduplicatingVaultWriter(this.app, this.settings, this.frontmatterManager);
 
     if (!this.settings.apiToken) {
       this.notify.notice('Readwise: API Token not detected\nPlease enter in configuration page');

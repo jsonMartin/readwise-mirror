@@ -46,7 +46,13 @@ export interface Library {
   highlightCount: number;
 }
 
-export interface ReadwiseMetadata {
+/**
+ * ReadwiseItem is the metadata of a book from the Readwise API, 
+ * formatted for use in the nunjucks templates.
+ * 
+ * @see https://readwise.io/api/docs/highlights
+ */
+export interface ReadwiseItem {
   id: number; // book id from Readwise API
   title: string;
   sanitized_title: string;
@@ -59,7 +65,7 @@ export interface ReadwiseMetadata {
   created: string;
   updated: string;
   cover_image_url: string;
-  highlights_url: string;
+  highlights_url: string; // Readwise URL for the highlights page (unique across readwise)
   highlights: Highlight[];
   last_highlight_at: string;
   source_url: string;
