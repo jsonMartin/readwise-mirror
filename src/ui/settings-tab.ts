@@ -140,12 +140,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
     containerEl.empty();
 
-    containerEl.createEl('h1', { text: 'Readwise Sync Configuration' });
-
     // Authentication section inspired by the official Readwise plugin
     new Setting(containerEl).setName('Authentication').setHeading();
 
-   
     const hasValidToken = await this.plugin.readwiseApi.hasValidToken();
 
     const tokenValidationError = containerEl.createDiv({ 
@@ -164,7 +161,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     });
 
     new Setting(containerEl)
-      .setName('Readwise Authentication')
+      .setName('Readwise authentication')
       .setDesc(createFragment((fragment) => {
         fragment.createEl('br');
         fragment.createEl('br');
@@ -219,12 +216,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
     
 
-    new Setting(containerEl)
-      .setName('Library Settings')
-      .setHeading();
+    new Setting(containerEl).setName('Library').setHeading();
 
     new Setting(containerEl)
-      .setName('Readwise library folder name')
+      .setName('Library folder name')
       .setDesc('Default: Readwise')
       .addText((text) =>
         text
@@ -237,12 +232,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           })
       );
 
-    new Setting(containerEl)
-      .setName('Sync Settings')
-      .setHeading();
+    new Setting(containerEl).setName('Sync').setHeading();
 
     new Setting(containerEl)
-      .setName('Auto Sync when starting')
+      .setName('Auto sync when starting')
       .setDesc('Automatically syncs new highlights after opening Obsidian')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.autoSync).onChange(async (value) => {
@@ -251,9 +244,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         })
       );
 
-  new Setting(containerEl)
-    .setName('Author Name Settings')
-    .setHeading()
+  new Setting(containerEl).setName('Author names').setHeading()
     .setDesc(createFragment((fragment) => {
       fragment.appendText(
         'These settings control how author names are processed. If enabled, titles (Dr., Prof., Mr., Mrs., Ms., Miss, Sir, Lady) will be stripped from author names.'
@@ -277,7 +268,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     }))
 
   new Setting(containerEl)
-    .setName('Normalize Author Names')
+    .setName('Normalize author names')
     .setClass('indent')
     .setDesc('If enabled, author names will be normalized to a consistent case.')
     .addToggle((toggle) =>
@@ -288,7 +279,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     );
 
   new Setting(containerEl)
-    .setName('Strip Titles from Author Names')
+    .setName('Strip titles from author names')
     .setClass('indent')
     .setDesc('If enabled, titles (e.g., Dr., Mr., Prof., etc.) will be stripped from author names.')
     .addToggle((toggle) =>
@@ -298,12 +289,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       })
     );
 
-    new Setting(containerEl)
-      .setName('Highlight Organization')
-      .setHeading();
+    new Setting(containerEl).setName('Highlight organization').setHeading();
 
     new Setting(containerEl)
-      .setName('Sort Highlights in notes from Oldest to Newest')
+      .setName('Sort highlights from oldest to newest')
       .setDesc(
         'If checked, highlights will be listed from oldest to newest. Unchecked, newest highlights will appear first.'
       )
@@ -315,7 +304,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Sort Highlights by Location')
+      .setName('Sort highlights by location')
       .setDesc(
         'If checked, highlights will be listed in order of Location. Combine with above Sort Highlights from Oldest to Newest option to reverse order.'
       )
@@ -327,7 +316,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Filter Discarded Highlights')
+      .setName('Filter discarded highlights')
       .setDesc('If enabled, do not display discarded highlights in the Readwise library.')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.highlightDiscard).onChange(async (value) => {
@@ -337,7 +326,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Only sync highlights with notes')
+      .setName('Sync highlights with notes only')
       .setDesc(
         'If checked, highlights will only be synced if they have a note. This makes it easier to use these notes for Zettelkasten.'
       )
@@ -348,13 +337,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         })
       );
 
-    new Setting(containerEl)
-      .setName('Filename Settings')
-      .setDesc('Controls how filenames are generated from the title')
-      .setHeading();
+    new Setting(containerEl).setName('Filenames').setHeading();
 
     new Setting(containerEl)
-      .setName('Replacement string for colons in filenames')
+      .setName('Colon replacement in filenames')
       .setDesc(
         "Set the string to be used for replacement of colon (:) in filenames derived from the title. The default value for this setting is '-'."
       )
@@ -375,7 +361,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       );
 
       new Setting(containerEl)
-        .setName('Use Slugify for filenames')
+        .setName('Use slugify for filenames')
         .setDesc(
           createFragment((fragment) => {
             fragment.appendText(
@@ -411,7 +397,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       if (this.plugin.settings.useSlugify) {
         new Setting(containerEl)
           .setClass('indent')
-          .setName('Slugify Separator')
+          .setName('Slugify separator')
           .setDesc('Character to use as separator in slugified filenames (default: -)')
           .addText((text) =>
             text
@@ -425,7 +411,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
   
         new Setting(containerEl)
           .setClass('indent')
-          .setName('Slugify Lowercase')
+          .setName('Slugify lowercase')
           .setDesc('Convert slugified filenames to lowercase')
           .addToggle((toggle) =>
             toggle.setValue(this.plugin.settings.slugifyLowercase).onChange(async (value) => {
@@ -435,12 +421,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           );
       }
 
-    new Setting(containerEl)
-      .setName('Sync Logging')
-      .setHeading();
+    new Setting(containerEl).setName('Sync logging').setHeading();
 
     new Setting(containerEl)
-      .setName('Sync Log')
+      .setName('Sync log')
       .setDesc('Save sync log to file in Library')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.logFile).onChange(async (value) => {
@@ -452,7 +436,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     if (this.plugin.settings.logFile) {
       new Setting(containerEl)
         .setClass('indent')
-        .setName('Sync Log File Name')
+        .setName('Log filename')
         .setDesc('Default: Sync.md')
         .addText((text) =>
           text
@@ -484,7 +468,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     // Documentation block for templates
 
     new Setting(containerEl)
-      .setName('Frontmatter Settings')
+      .setName('Frontmatter settings')
       .setDesc(
         createFragment((fragment) => {
           fragment.appendText('Controls the YAML metadata at the top of each note.');
@@ -493,7 +477,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setHeading();
 
     new Setting(containerEl)
-      .setName('Frontmatter')
+      .setName('Add frontmatter')
       .setDesc('Add frontmatter (defined with the Frontmatter Template below)')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.frontMatter).onChange(async (value) => {
@@ -516,7 +500,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     if (this.plugin.settings.frontMatter) {
       new Setting(containerEl)
         .setClass('indent')
-        .setName('Update Frontmatter')
+        .setName('Update frontmatter')
         .setDesc(
           createFragment((fragment) => {
             fragment.appendText('Update frontmatter when syncing existing files');
@@ -538,7 +522,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       if (this.plugin.settings.updateFrontmatter) {
         new Setting(containerEl)
           .setClass('indent')
-          .setName('Protect Frontmatter Fields')
+          .setName('Protect frontmatter fields')
           .setDesc(
             createFragment((fragment) => {
               fragment.appendText('Prevent existing frontmatter fields from being overwritten during sync');
@@ -583,7 +567,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           const container = containerEl.createDiv();
           new Setting(container)
             .setClass('indent')
-            .setName('Protected Fields')
+            .setName('Protected fields')
             .setDesc('Enter one field name per line')
             .addTextArea((text) => {
               const errorDiv = container.createDiv({
@@ -626,12 +610,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       }
     
 
-    new Setting(containerEl)
-      .setName('File Tracking')
-      .setHeading();
+    new Setting(containerEl).setName('File tracking').setHeading();
 
     new Setting(containerEl)
-      .setName('Enable File Tracking')
+      .setName('Enable file tracking')
       .setDesc(
         createFragment((fragment) => {
           fragment.appendText(
@@ -661,7 +643,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       if (this.plugin.settings.trackFiles && this.plugin.settings.frontMatter) {
         new Setting(containerEl)
           .setClass('indent')
-          .setName('Tracking Property')
+          .setName('Tracking property')
           .setDesc(
             'Frontmatter property to store the unique Readwise URL (default: uri). This field will be automatically managed in the frontmatter.'
           )
@@ -678,7 +660,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
           .setClass('indent')
-          .setName('Remove Duplicate Files')
+          .setName('Remove duplicate files')
           .setDesc(
             createFragment((fragment) => {
               fragment.appendText(
@@ -730,7 +712,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       }
 
       new Setting(containerEl)
-        .setName('Frontmatter Template')
+        .setName('Frontmatter template')
         .setDesc(
           createFragment((fragment) => {
             fragment.appendText('Controls YAML frontmatter metadata. The same variables are available as for the Header template, with specific versions optimised for YAML frontmatter (tags), and escaped values for YAML compatibility.');
@@ -876,7 +858,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       
 
     new Setting(containerEl)
-      .setName('Header Template')
+      .setName('Header template')
       .setDesc(
         createFragment((fragment) => {
           fragment.appendText('Controls document metadata and structure.');
@@ -931,7 +913,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName('Highlight Template')
+      .setName('Highlight template')
       .setDesc(
         createFragment((fragment) => {
           fragment.appendText('Controls individual highlight formatting.');
