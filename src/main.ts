@@ -15,7 +15,6 @@ import Notify from 'ui/notify';
 // Types
 import type { Export, Highlight, Library, PluginSettings, ReadwiseDocument, Tag } from 'types';
 
-
 // Constants
 import { DEFAULT_SETTINGS } from 'constants/index';
 
@@ -44,23 +43,12 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   set headerTemplate(template: string) {
-    this._headerTemplate = new Template(
-      template,
-      this.env,
-      null,
-      true
-    );
+    this._headerTemplate = new Template(template, this.env, null, true);
   }
 
   set highlightTemplate(template: string) {
-    this._highlightTemplate = new Template(
-      template,
-      this.env,
-      null,
-      true
-    );;
+    this._highlightTemplate = new Template(template, this.env, null, true);
   }
-
 
   /**
    * Formats tags for use in a template
@@ -194,7 +182,7 @@ export default class ReadwiseMirror extends Plugin {
         console.log('logFile:', logFile);
 
         const logFileContents = await vault.read(logFile);
-        vault.modify(logFile, `${logFileContents}\n\n${logString}`);
+        await vault.process(logFile, (content) => `${content}\n\n${logString}`);
       } else {
         vault.create(path, logString);
       }
@@ -202,8 +190,6 @@ export default class ReadwiseMirror extends Plugin {
       console.error('Readwise: Error writing to sync log file', err);
     }
   }
-
-
 
   async writeLibraryToMarkdown(library: Library) {
     const vault = this.app.vault;
@@ -326,7 +312,7 @@ export default class ReadwiseMirror extends Plugin {
 
         // Try to find duplicates: local duplicates (e.g. copies of files), and remote duplicates
         try {
-          this.deduplicatingVault.create(filename, contents, metadata); 
+          this.deduplicatingVault.create(filename, contents, metadata);
         } catch (err) {
           console.error(`Readwise: Writing file ${book.title} (${metadata.highlights_url}) failed`, err);
           this.notify.notice(`Readwise: Writing '${book.title}' failed. ${err}`);
@@ -364,7 +350,7 @@ export default class ReadwiseMirror extends Plugin {
     if (abstractFile) {
       try {
         console.info('Readwise: Attempting to delete entire library at:', abstractFile);
-        await vault.delete(abstractFile, true);
+        await this.app.fileManager.trashFile(abstractFile);
         return true;
       } catch (err) {
         console.error(`Readwise: Attempted to delete file ${path} but no file was found`, err);
@@ -466,7 +452,10 @@ export default class ReadwiseMirror extends Plugin {
   async onload() {
     await this.loadSettings();
 
-    const statusBarItem = this.addStatusBarItem();
+    // Move UI setup to onLayoutReady
+    this.app.workspace.onLayoutReady(() => {
+      this.initializeUI();
+    });
 
     // Setup templating
     this.env = new Environment(null, { autoescape: false } as ConfigureOptions);
@@ -485,6 +474,10 @@ export default class ReadwiseMirror extends Plugin {
 
     this.headerTemplate = this.settings.headerTemplate;
     this.highlightTemplate = this.settings.highlightTemplate;
+  }
+
+  private initializeUI() {
+    const statusBarItem = this.addStatusBarItem();
 
     this.notify = new Notify(statusBarItem);
     this.deduplicatingVault = new DeduplicatingVaultWriter(this.app, this.settings, this.frontmatterManager);

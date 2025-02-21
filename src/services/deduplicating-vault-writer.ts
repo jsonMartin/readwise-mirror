@@ -180,7 +180,7 @@ export class DeduplicatingVaultWriter {
     for (const file of filesToDeleteOrLabel) {
       try {
         if (this.settings.deleteDuplicates) {
-          await this.vault.trash(file, true);
+          await this.app.fileManager.trashFile(file);
         } else {
           await this.frontmatterManager.writeUpdatedFrontmatter(file, { ...frontmatter, duplicate: true });
         }
