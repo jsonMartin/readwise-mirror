@@ -67,6 +67,7 @@ export class DeduplicatingVaultWriter {
      *  - the file exists: process the unknown duplicate, keep frontmatter but overwrite contents if selected to do so
      */
 
+    // FIXME: On initial sync, not all (remote) duplicates are downloaded / saved, or they are overwritten
     // Write the file if there are no duplicates and the file doesn't exist yet
     if (duplicates.length === 0) {
       if (!readwiseItemFile) {
