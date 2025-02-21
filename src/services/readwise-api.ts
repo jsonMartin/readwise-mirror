@@ -13,6 +13,9 @@ export class TokenValidationError extends Error {
   }
 }
 
+/**
+ * Readwise API class
+ */ 
 export default class ReadwiseApi {
   private apiToken: string;
   private validToken: boolean | undefined;
@@ -31,11 +34,19 @@ export default class ReadwiseApi {
     });
   }
 
+  /**
+   * Sets the API token for the Readwise API instance
+   * @param apiToken - The API token to set
+   */
   setToken(apiToken: string) {
     this.apiToken = apiToken;
     this.validToken = undefined;
   }
 
+  /**
+   * Returns the options object for the Readwise API instance
+   * @returns {Record<string, unknown>} - Returns an object containing the headers for the API request
+   */
   get options() {
     return {
       headers: {
@@ -44,6 +55,11 @@ export default class ReadwiseApi {
       },
     };
   }
+
+  /**
+   * Validates and updates the validation status of the token in the Readwise API instance
+   * @returns {Promise<boolean>} - Returns a promise that resolves to a boolean indicating if the token is valid
+   */
   async hasValidToken(): Promise<boolean> {
     if (this.validToken === undefined) {
       this.validateToken().then((value) => {
@@ -54,6 +70,10 @@ export default class ReadwiseApi {
     return this.validToken;
   }
 
+  /**
+   * Checks if the token is valid by making a request to the Readwise API
+   * @returns {Promise<boolean>} - Returns a promise that resolves to a boolean indicating if the token is valid
+   */
   async validateToken(): Promise<boolean> {
     try {
       const response = await requestUrl({ url: `${API_ENDPOINT}/auth`, ...this.options });
@@ -66,7 +86,14 @@ export default class ReadwiseApi {
     }
   }
 
-  // If lastUpdated or bookID aren't provided, fetch everything.
+  /**
+   * Fetches data from the Readwise API - if lastUpdated or bookID aren't provided, fetch everything.
+   * @param contentType - The type of content to fetch from the API
+   * @param lastUpdated - The date to fetch updates from
+   * @param bookId - The ID of the book to fetch highlights from
+   * @returns {Promise<Export[]>} - Returns a promise that resolves to an array of Export objects 
+   * @throws {Error} - Throws an error if the request fails
+   */
   async fetchData(contentType = 'export', lastUpdated?: string, bookId?: number[]): Promise<Export[]> {
     const url = `${API_ENDPOINT}/${contentType}?`;
     let data: Record<string, unknown>;
@@ -134,6 +161,11 @@ export default class ReadwiseApi {
     return results;
   }
 
+  /**
+   * Builds a library object from the fetched data
+   * @param results - The fetched data from the Readwise API
+   * @returns {Promise<Library>} - Returns a promise that resolves to a Library object 
+   */
   async buildLibrary(results: Export[]): Promise<Library> {
     const library: Library = {
       categories: new Set(),
@@ -149,12 +181,22 @@ export default class ReadwiseApi {
 
     return library;
   }
+
+  /**
+   * Fetches all highlights from Readwise API
+   * @returns {Promise<Library>} - Returns a promise that resolves to a Library object 
+   */
   async downloadFullLibrary(): Promise<Library> {
     const records = (await this.fetchData('export')) as Export[];
 
     return this.buildLibrary(records);
   }
 
+  /**
+   * Fetches updates from Readwise API
+   * @param lastUpdated - The date to fetch updates from  
+   * @returns {Promise<Library>} - Returns a promise that resolves to a Library object 
+   */
   async downloadUpdates(lastUpdated: string): Promise<Library> {
     // Fetch updated books and then fetch all their highlights
     const recordsUpdated = (await this.fetchData('export', lastUpdated)) as Export[];
