@@ -1,13 +1,14 @@
 import { DEFAULT_SETTINGS } from 'constants/index';
-import { type App, Modal, PluginSettingTab, Setting } from 'obsidian';
+import { type App, type ButtonComponent, Modal, PluginSettingTab, Setting } from 'obsidian';
 import type ReadwiseMirror from 'main';
 import type { FrontmatterManager } from 'services/frontmatter-manager';
 import type { TemplateValidationResult } from 'types';
 import type Notify from 'ui/notify';
+import { TokenValidationError } from 'services/readwise-api';
 
 export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
   plugin: ReadwiseMirror;
-  notify: Notify;  
+  notify: Notify;
   frontmatterManager: FrontmatterManager;
   constructor(app: App, plugin: ReadwiseMirror, notify: Notify, manager: FrontmatterManager) {
     super(app, plugin);
@@ -93,12 +94,12 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     if (readwiseMirrorClientId) {
       return readwiseMirrorClientId;
     }
-    
+
     readwiseMirrorClientId = Math.random().toString(36).substring(2, 15);
     window.localStorage.setItem('readwise-mirror-obsidian-client-id', readwiseMirrorClientId);
     return readwiseMirrorClientId;
   }
-  
+
   private createTemplateDocumentation(variables: [string, string][], title?: string) {
     return createFragment((fragment) => {
       const documentationContainer = fragment.createDiv({
@@ -143,71 +144,125 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     // Authentication section inspired by the official Readwise plugin
     new Setting(containerEl).setName('Authentication').setHeading();
 
-    const hasValidToken = await this.plugin.readwiseApi.hasValidToken();
+    let hasValidToken: boolean | null = null;
+    let validationButton: ButtonComponent;
 
-    const tokenValidationError = containerEl.createDiv({ 
+    const tokenValidationInvalid = containerEl.createDiv({
       cls: 'setting-item-description validation-error',
-      text: 'Invalid token. Please try authenticating again.',
-      attr: { 
-        style: 'color: var(--text-error); margin-top: 0.5em; display: none;'
-      }
-    });;
+      text: 'Invalid token',
+      attr: {
+        style: 'color: var(--text-error); margin-top: 0.5em; display: none;',
+      },
+    });
     const tokenValidationSuccess = containerEl.createDiv({
       cls: 'setting-item-description validation-success',
       text: 'Token validated successfully',
       attr: {
-        style: 'color: var(--text-success); margin-top: 0.5em; display: none;'
-      }
+        style: 'color: var(--text-success); margin-top: 0.5em; display: none;',
+      },
+    });
+    const tokenValidationRunning = containerEl.createDiv({
+      cls: 'setting-item-description validation-running',
+      text: 'Validating token...',
+      attr: {
+        style: 'color: var(--text-accent); margin-top: 0.5em; display: none;',
+      },
+    });
+    const tokenValidationError = containerEl.createDiv({
+      cls: 'setting-item-description validation-error',
+      text: 'Token validation error',
+      attr: {
+        style: 'color: var(--text-error); margin-top: 0.5em; display: none;',
+      },
     });
 
     new Setting(containerEl)
       .setName('Readwise authentication')
-      .setDesc(createFragment((fragment) => {
-        fragment.createEl('br');
-        fragment.createEl('br');
-        fragment.createEl('strong', { text: 'Important: ' });
-        fragment.appendText('After successful authentication, a window with an error message will appear.');
-        fragment.createEl('br');
-        fragment.appendText('This is expected and can be safely closed.');
-        fragment.createEl('br');
-        fragment.createEl('br');
-        fragment.append(tokenValidationError);
-        fragment.append(tokenValidationSuccess);
+      .setDesc(
+        createFragment((fragment) => {
+          fragment.createEl('br');
+          fragment.createEl('br');
+          fragment.createEl('strong', { text: 'Important: ' });
+          fragment.appendText('After successful authentication, a window with an error message will appear.');
+          fragment.createEl('br');
+          fragment.appendText('This is expected and can be safely closed.');
+          fragment.createEl('br');
+          fragment.createEl('br');
+          fragment.append(tokenValidationRunning);
+          fragment.append(tokenValidationInvalid);
+          fragment.append(tokenValidationSuccess);
+          fragment.append(tokenValidationError);
 
-        // Show success or error message based on token validity
-        if(hasValidToken) {
-          tokenValidationSuccess.show();
-          tokenValidationError.hide();
-        } else {
-          tokenValidationSuccess.hide();
-          tokenValidationError.show();
-        } 
-      }))
+          // Show success or error message based on token validity
+          tokenValidationRunning.show();
+          validationButton?.setDisabled(true);
+
+          // Validate the token on load
+          this.plugin.readwiseApi
+            .validateToken()
+            .then((isValid) => {
+              hasValidToken = isValid;
+              validationButton?.setDisabled(isValid);
+              validationButton?.setButtonText(isValid ? 'Re-authenticate with Readwise' : 'Authenticate with Readwise');
+              tokenValidationSuccess.toggle(isValid);
+              tokenValidationInvalid.toggle(!isValid);
+              tokenValidationRunning.hide();
+            })
+            .catch((error) => {
+              // Validation error (timeout or something else)
+              validationButton?.setDisabled(true);
+              tokenValidationRunning.hide();
+              tokenValidationSuccess.hide();
+              tokenValidationInvalid.hide();
+              if (error instanceof TokenValidationError) {
+                tokenValidationError.setText(error.message);
+              } else {
+                tokenValidationError.setText('Token validation error');
+              }
+              tokenValidationError.show();
+            });
+        })
+      )
       .addButton((button) => {
-        button
-          .setButtonText(!hasValidToken ? 'Re-authenticate with Readwise' : 'Authenticate with Readwise')
+        validationButton = button;
+        validationButton
+          .setButtonText(!hasValidToken === false ? 'Re-authenticate with Readwise' : 'Authenticate with Readwise')
           .setCta()
           .onClick(async (evt) => {
             const buttonEl = evt.target as HTMLElement;
-            const token = await this.getUserAuthToken(buttonEl);
-            if (token) {
-              if (!hasValidToken) {
-                tokenValidationError.show();
+
+            // Reset validation messages
+            tokenValidationSuccess.hide();
+            tokenValidationInvalid.hide();
+            tokenValidationRunning.show();
+            tokenValidationError.hide();
+
+            this.getUserAuthToken(buttonEl)
+              .then((isValid) => {
+                validationButton?.setDisabled(isValid);
+                validationButton?.setButtonText(
+                  isValid ? 'Re-authenticate with Readwise' : 'Authenticate with Readwise'
+                );
+                tokenValidationSuccess.toggle(isValid);
+                tokenValidationInvalid.toggle(!isValid);
+                tokenValidationRunning.hide();
+              })
+              .catch(() => {
+                tokenValidationRunning.hide();
+                tokenValidationInvalid.hide();
                 tokenValidationSuccess.hide();
-              } else {
-                tokenValidationError.hide();
-                tokenValidationSuccess.show();
-              }
-            }
-          }).setDisabled(hasValidToken);
-        return button;
+                tokenValidationError.show();
+              });
+          })
+          .setDisabled(true);
+        return validationButton;
       })
       .addText((text) => {
         const token = this.plugin.settings.apiToken;
         const maskedToken = token 
           ? token.slice(0, 6) + '*'.repeat(token.length - 6)
           : '';
-        
+
         text
           .setPlaceholder('Token will be filled automatically after authentication')
           .setValue(maskedToken)
@@ -246,48 +301,48 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
   new Setting(containerEl).setName('Author names').setHeading()
     .setDesc(createFragment((fragment) => {
-      fragment.appendText(
-        'These settings control how author names are processed. If enabled, titles (Dr., Prof., Mr., Mrs., Ms., Miss, Sir, Lady) will be stripped from author names.'
-      );
-      fragment.createEl('br');
-      fragment.createEl('br');
-      fragment.appendText('Example author string: "Dr. John Doe, and JANE SMITH, Prof. Bob Johnson"');
-      fragment.createEl('br');
-      fragment.createEl('blockquote', {
+          fragment.appendText(
+            'These settings control how author names are processed. If enabled, titles (Dr., Prof., Mr., Mrs., Ms., Miss, Sir, Lady) will be stripped from author names.'
+          );
+          fragment.createEl('br');
+          fragment.createEl('br');
+          fragment.appendText('Example author string: "Dr. John Doe, and JANE SMITH, Prof. Bob Johnson"');
+          fragment.createEl('br');
+          fragment.createEl('blockquote', {
         text: 'Default: "Dr. John Doe, JANE SMITH, Prof. Bob Johnson"'
-      });
-      fragment.createEl('blockquote', {
+          });
+          fragment.createEl('blockquote', {
         text: 'Normalize case: "Dr. John Doe, Jane Smith, Prof. Bob Johnson"'
-      });
-      fragment.createEl('blockquote', {
+          });
+          fragment.createEl('blockquote', {
         text: 'Strip titles: "John Doe, JANE SMITH, Bob Johnson"'
-      });
-      fragment.createEl('blockquote', {
+          });
+          fragment.createEl('blockquote', {
         text: 'Both enabled: "John Doe, Jane Smith, Bob Johnson"'
-      });
+          });
     }))
 
-  new Setting(containerEl)
-    .setName('Normalize author names')
-    .setClass('indent')
-    .setDesc('If enabled, author names will be normalized to a consistent case.')
-    .addToggle((toggle) =>
-      toggle.setValue(this.plugin.settings.normalizeAuthorNames).onChange(async (value) => {
-        this.plugin.settings.normalizeAuthorNames = value;
-        await this.plugin.saveSettings();
-      })
-    );
+    new Setting(containerEl)
+      .setName('Normalize author names')
+      .setClass('indent')
+      .setDesc('If enabled, author names will be normalized to a consistent case.')
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.normalizeAuthorNames).onChange(async (value) => {
+          this.plugin.settings.normalizeAuthorNames = value;
+          await this.plugin.saveSettings();
+        })
+      );
 
-  new Setting(containerEl)
-    .setName('Strip titles from author names')
-    .setClass('indent')
-    .setDesc('If enabled, titles (e.g., Dr., Mr., Prof., etc.) will be stripped from author names.')
-    .addToggle((toggle) =>
-      toggle.setValue(this.plugin.settings.stripTitlesFromAuthors).onChange(async (value) => {
-        this.plugin.settings.stripTitlesFromAuthors = value;
-        await this.plugin.saveSettings();
-      })
-    );
+    new Setting(containerEl)
+      .setName('Strip titles from author names')
+      .setClass('indent')
+      .setDesc('If enabled, titles (e.g., Dr., Mr., Prof., etc.) will be stripped from author names.')
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.stripTitlesFromAuthors).onChange(async (value) => {
+          this.plugin.settings.stripTitlesFromAuthors = value;
+          await this.plugin.saveSettings();
+        })
+      );
 
     new Setting(containerEl).setName('Highlight organization').setHeading();
 
@@ -360,66 +415,66 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           })
       );
 
-      new Setting(containerEl)
-        .setName('Use slugify for filenames')
-        .setDesc(
-          createFragment((fragment) => {
-            fragment.appendText(
-              'Use slugify to create clean filenames. This removes diacritics and other special characters, including emojis.'
-            );
-            fragment.createEl('br');
-            fragment.createEl('br');
-            fragment.appendText('Example filename: "Déjà Vu with a 🦄"');
-            fragment.createEl('br');
-            fragment.createEl('blockquote', {
-              text: 'Slugify disabled: "Deja Vu with a "',
-            });
-            fragment.createEl('blockquote', {
-              text: 'Slugify enabled (default settings): "deja-vu-with-a"',
-            });
-            fragment.createEl('blockquote', {
-              text: 'Slugify + custom separator "_": "deja_vu_with_a"',
-            });
-            fragment.createEl('blockquote', {
-              text: 'Slugify + lowercase disabled: "Deja-Vu-With-A"',
-            });
-          })
-        )
-        .addToggle((toggle) =>
-          toggle.setValue(this.plugin.settings.useSlugify).onChange(async (value) => {
-            this.plugin.settings.useSlugify = value;
-            await this.plugin.saveSettings();
-            // Trigger re-render to show/hide property selector
-            this.display();
-          })
-        );
-  
-      if (this.plugin.settings.useSlugify) {
-        new Setting(containerEl)
-          .setClass('indent')
-          .setName('Slugify separator')
-          .setDesc('Character to use as separator in slugified filenames (default: -)')
-          .addText((text) =>
-            text
-              .setPlaceholder('-')
-              .setValue(this.plugin.settings.slugifySeparator)
-              .onChange(async (value) => {
-                this.plugin.settings.slugifySeparator = value || '-';
-                await this.plugin.saveSettings();
-              })
+    new Setting(containerEl)
+      .setName('Use slugify for filenames')
+      .setDesc(
+        createFragment((fragment) => {
+          fragment.appendText(
+            'Use slugify to create clean filenames. This removes diacritics and other special characters, including emojis.'
           );
-  
-        new Setting(containerEl)
-          .setClass('indent')
-          .setName('Slugify lowercase')
-          .setDesc('Convert slugified filenames to lowercase')
-          .addToggle((toggle) =>
-            toggle.setValue(this.plugin.settings.slugifyLowercase).onChange(async (value) => {
-              this.plugin.settings.slugifyLowercase = value;
+          fragment.createEl('br');
+          fragment.createEl('br');
+          fragment.appendText('Example filename: "Déjà Vu with a 🦄"');
+          fragment.createEl('br');
+          fragment.createEl('blockquote', {
+            text: 'Slugify disabled: "Deja Vu with a "',
+          });
+          fragment.createEl('blockquote', {
+            text: 'Slugify enabled (default settings): "deja-vu-with-a"',
+          });
+          fragment.createEl('blockquote', {
+            text: 'Slugify + custom separator "_": "deja_vu_with_a"',
+          });
+          fragment.createEl('blockquote', {
+            text: 'Slugify + lowercase disabled: "Deja-Vu-With-A"',
+          });
+        })
+      )
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.useSlugify).onChange(async (value) => {
+          this.plugin.settings.useSlugify = value;
+          await this.plugin.saveSettings();
+          // Trigger re-render to show/hide property selector
+          this.display();
+        })
+      );
+
+    if (this.plugin.settings.useSlugify) {
+      new Setting(containerEl)
+        .setClass('indent')
+        .setName('Slugify separator')
+        .setDesc('Character to use as separator in slugified filenames (default: -)')
+        .addText((text) =>
+          text
+            .setPlaceholder('-')
+            .setValue(this.plugin.settings.slugifySeparator)
+            .onChange(async (value) => {
+              this.plugin.settings.slugifySeparator = value || '-';
               await this.plugin.saveSettings();
             })
-          );
-      }
+        );
+
+      new Setting(containerEl)
+        .setClass('indent')
+        .setName('Slugify lowercase')
+        .setDesc('Convert slugified filenames to lowercase')
+        .addToggle((toggle) =>
+          toggle.setValue(this.plugin.settings.slugifyLowercase).onChange(async (value) => {
+            this.plugin.settings.slugifyLowercase = value;
+            await this.plugin.saveSettings();
+          })
+        );
+    }
 
     new Setting(containerEl).setName('Sync logging').setHeading();
 
@@ -456,11 +511,11 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setDesc(
         createFragment((fragment) => {
           fragment.createEl('p', { text: 'The plugin uses three templates to control how your Readwise content is formatted:' });
-          
+
           fragment.createEl('p', { text: '1. Frontmatter Template: Controls the YAML metadata at the top of each note' });
           fragment.createEl('p', { text: '2. Header Template: Controls the main document structure and metadata below the frontmatter' });
           fragment.createEl('p', { text: '3. Highlight Template: Controls how individual highlights are formatted within the note' });
-          
+
           fragment.createEl('p', { text: 'Each template supports Nunjucks templating syntax and provides access to specific variables relevant to that section.' });
         })
       );
@@ -595,8 +650,8 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
               const validation = validateProtectedFields(this.plugin.settings.protectedFields);
               errorDiv.setText(validation.error || '');
-              
-                // Initial row adjustment
+
+              // Initial row adjustment
               this.adjustTextareaRows(text.inputEl, initialRows);
 
               // Adjust on content change
@@ -610,35 +665,35 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       }
     
 
-    new Setting(containerEl).setName('File tracking').setHeading();
+      new Setting(containerEl).setName('File tracking').setHeading();
 
-    new Setting(containerEl)
-      .setName('Enable file tracking')
-      .setDesc(
-        createFragment((fragment) => {
-          fragment.appendText(
-            'Track files using their unique Readwise URL to maintain consistency when titles or properties change.'
-          );
-          fragment.createEl('br');
-          fragment.appendText(
-            'This prevents duplicate files and maintains links when articles are updated in Readwise.'
-          );
-          fragment.createEl('br');
-          fragment.createEl('br');
-          fragment.appendText('Note: Requires frontmatter to be enabled');
-        })
-      )
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.trackFiles && this.plugin.settings.frontMatter)
-          .setDisabled(!this.plugin.settings.frontMatter)
-          .onChange(async (value) => {
-            this.plugin.settings.trackFiles = value;
-            await this.plugin.saveSettings();
-            this.frontmatterManager.updateFrontmatteTemplate(this.plugin.settings.frontMatterTemplate);
-            this.display();
+      new Setting(containerEl)
+        .setName('Enable file tracking')
+        .setDesc(
+          createFragment((fragment) => {
+            fragment.appendText(
+              'Track files using their unique Readwise URL to maintain consistency when titles or properties change.'
+            );
+            fragment.createEl('br');
+            fragment.appendText(
+              'This prevents duplicate files and maintains links when articles are updated in Readwise.'
+            );
+            fragment.createEl('br');
+            fragment.createEl('br');
+            fragment.appendText('Note: Requires frontmatter to be enabled');
           })
-      );
+        )
+        .addToggle((toggle) =>
+          toggle
+            .setValue(this.plugin.settings.trackFiles && this.plugin.settings.frontMatter)
+            .setDisabled(!this.plugin.settings.frontMatter)
+            .onChange(async (value) => {
+              this.plugin.settings.trackFiles = value;
+              await this.plugin.saveSettings();
+              this.frontmatterManager.updateFrontmatteTemplate(this.plugin.settings.frontMatterTemplate);
+              this.display();
+            })
+        );
 
       if (this.plugin.settings.trackFiles && this.plugin.settings.frontMatter) {
         new Setting(containerEl)
@@ -678,7 +733,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
                 modal.contentEl.createEl("p", {
                   text: "This will permanently delete duplicate files instead of marking them. If enabled, files in your Vault will be deleted when duplicates are found. Are you sure you want to continue?"
                 });
-                
+
                 const buttonContainer = modal.contentEl.createDiv();
                 buttonContainer.style.display = "flex";
                 buttonContainer.style.justifyContent = "flex-end";
@@ -709,152 +764,152 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           );
       }
 
-      }
+    }
 
-      new Setting(containerEl)
-        .setName('Frontmatter template')
-        .setDesc(
-          createFragment((fragment) => {
+    new Setting(containerEl)
+      .setName('Frontmatter template')
+      .setDesc(
+        createFragment((fragment) => {
             fragment.appendText('Controls YAML frontmatter metadata. The same variables are available as for the Header template, with specific versions optimised for YAML frontmatter (tags), and escaped values for YAML compatibility.');
-          })
-        )
-        .setHeading();
+        })
+      )
+      .setHeading();
 
-      new Setting(containerEl)
-        .setDesc(
-          createFragment((fragment) => {
-            fragment.append(
+    new Setting(containerEl)
+      .setDesc(
+        createFragment((fragment) => {
+          fragment.append(
               this.createTemplateDocumentation( 
                 [
-                  ['id', 'Document ID'],
-                  ['created', 'Creation timestamp'],
-                  ['updated', 'Last update timestamp'],
-                  ['last_highlight_at', 'Last highlight timestamp'],
-                  ['title', 'Document title (escaped for YAML)'],
-                  ['sanitized_title', 'Title safe for file system (escaped for YAML)'],
-                  ['author', 'Author name(s) (escaped for YAML)'],
-                  ['authorStr', 'Author names with wiki links (escaped for YAML)'],
-                  ['category', 'Content type'],
-                  ['num_highlights', 'Number of highlights'],
-                  ['source_url', 'Original content URL'],
-                  ['unique_url', 'Unique identifier URL'],
-                  ['tags', 'Tags with # prefix'],
-                  ['tags_nohash', 'Tags without # prefix (compatible with frontmatter)'],
-                  ['highlight_tags', 'Tags from highlights with # prefix'],
-                  ['hl_tags_nohash', 'Tags from highlights without # prefix (compatible with frontmatter)'],
-                  ['highlights_url', 'Readwise URL (auto-injected if deduplication enabled)'],
-                  [
-                    'Note:',
-                    'If deduplication is enabled, the specified property will be automatically added or updated in the frontmatter template.',
-                  ],
+              ['id', 'Document ID'],
+              ['created', 'Creation timestamp'],
+              ['updated', 'Last update timestamp'],
+              ['last_highlight_at', 'Last highlight timestamp'],
+              ['title', 'Document title (escaped for YAML)'],
+              ['sanitized_title', 'Title safe for file system (escaped for YAML)'],
+              ['author', 'Author name(s) (escaped for YAML)'],
+              ['authorStr', 'Author names with wiki links (escaped for YAML)'],
+              ['category', 'Content type'],
+              ['num_highlights', 'Number of highlights'],
+              ['source_url', 'Original content URL'],
+              ['unique_url', 'Unique identifier URL'],
+              ['tags', 'Tags with # prefix'],
+              ['tags_nohash', 'Tags without # prefix (compatible with frontmatter)'],
+              ['highlight_tags', 'Tags from highlights with # prefix'],
+              ['hl_tags_nohash', 'Tags from highlights without # prefix (compatible with frontmatter)'],
+              ['highlights_url', 'Readwise URL (auto-injected if deduplication enabled)'],
+              [
+                'Note:',
+                'If deduplication is enabled, the specified property will be automatically added or updated in the frontmatter template.',
+              ],
                 ]
               )
-            );
-          })
-        )
-        .addTextArea((text) => {
-          const initialRows = 12;
-          text.inputEl.addClass('settings-template-input');
-          text.inputEl.rows = initialRows;
-          text.inputEl.cols = 50;
+          );
+        })
+      )
+      .addTextArea((text) => {
+        const initialRows = 12;
+        text.inputEl.addClass('settings-template-input');
+        text.inputEl.rows = initialRows;
+        text.inputEl.cols = 50;
 
-          const container = containerEl.createDiv();
+        const container = containerEl.createDiv();
 
-          text.inputEl.addClass('settings-template-input');
-          text.inputEl.rows = 12;
-          text.inputEl.cols = 50;
+        text.inputEl.addClass('settings-template-input');
+        text.inputEl.rows = 12;
+        text.inputEl.cols = 50;
 
-          // Create preview elements below textarea
-          const previewContainer = container.createDiv('template-preview');
-          const previewTitle = previewContainer.createDiv({
-            text: 'Template Preview (Error):',
-            cls: 'template-preview-title',
-            attr: {
-              style: 'color: var(--text-error);',
-            },
-          });
-          previewTitle.style.fontWeight = 'bold';
-          previewTitle.style.marginTop = '1em';
+        // Create preview elements below textarea
+        const previewContainer = container.createDiv('template-preview');
+        const previewTitle = previewContainer.createDiv({
+          text: 'Template Preview (Error):',
+          cls: 'template-preview-title',
+          attr: {
+            style: 'color: var(--text-error);',
+          },
+        });
+        previewTitle.style.fontWeight = 'bold';
+        previewTitle.style.marginTop = '1em';
 
-          const errorNotice = previewContainer.createDiv({
-            cls: 'validation-notice',
-            attr: {
-              style: 'color: var(--text-error); margin-top: 1em;',
-            },
-          });
+        const errorNotice = previewContainer.createDiv({
+          cls: 'validation-notice',
+          attr: {
+            style: 'color: var(--text-error); margin-top: 1em;',
+          },
+        });
 
-          const previewContent = previewContainer.createEl('pre', {
-            cls: ['template-preview-content', 'settings-template-input'],
-            attr: {
+        const previewContent = previewContainer.createEl('pre', {
+          cls: ['template-preview-content', 'settings-template-input'],
+          attr: {
               style:
                 'background-color: var(--background-secondary); padding: 1em; border-radius: 4px; overflow-x: auto;',
-            },
-          });
-
-          const errorDetails = previewContainer.createEl('pre', {
-            cls: ['error-details'],
-            attr: {
-              style:
-                'color: var(--text-error); background-color: var(--background-primary-alt); padding: 0.5em; border-radius: 4px; margin-top: 0.5em; font-family: monospace; white-space: pre-wrap;',
-            },
-          });
-
-          errorDetails.hide();
-
-          // Update preview on template changes
-          const updatePreview = (result: TemplateValidationResult) => {
-            if (!result.isValid) {
-              errorNotice.setText('Your Frontmatter contains invalid YAML');
-              errorDetails.setText(result.error);
-              errorDetails.show();
-
-              if (result.preview) {
-                previewContent.setText(result.preview);
-                previewContainer.show();
-              }
-              return;
-            } 
-
-            errorNotice.setText('');
-            errorDetails.setText('');
-            errorDetails.hide();
-            previewContainer.hide();
-          };
-
-          // Display rendered template on load
-          const validationResult: TemplateValidationResult = this.frontmatterManager.validateFrontmatterTemplate(this.plugin.settings.frontMatterTemplate);
-          updatePreview(validationResult);
-          text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
-            const validationResult: TemplateValidationResult = this.frontmatterManager.validateFrontmatterTemplate(value);
-
-            // Update validation notice
-            const noticeEl = containerEl.querySelector('.validation-notice');
-            if (noticeEl) {
-              noticeEl.setText(validationResult.isValid ? '' : validationResult.error);
-            }
-
-            if (!value) {
-              this.plugin.settings.frontMatterTemplate = DEFAULT_SETTINGS.frontMatterTemplate;
-            } else {
-              this.plugin.settings.frontMatterTemplate = value.replace(/\n*$/, '\n');
-            }
-
-            updatePreview(validationResult);
-
-            this.frontmatterManager.updateFrontmatteTemplate(value);
-            await this.plugin.saveSettings();
-          });
-
-          // Initial row adjustment
-          this.adjustTextareaRows(text.inputEl, initialRows);
-
-          // Adjust on content change
-          text.inputEl.addEventListener('input', () => {
-            this.adjustTextareaRows(text.inputEl, initialRows);
-          });
-
-          return text;
+          },
         });
+
+        const errorDetails = previewContainer.createEl('pre', {
+          cls: ['error-details'],
+          attr: {
+            style:
+              'color: var(--text-error); background-color: var(--background-primary-alt); padding: 0.5em; border-radius: 4px; margin-top: 0.5em; font-family: monospace; white-space: pre-wrap;',
+          },
+        });
+
+        errorDetails.hide();
+
+        // Update preview on template changes
+        const updatePreview = (result: TemplateValidationResult) => {
+          if (!result.isValid) {
+            errorNotice.setText('Your Frontmatter contains invalid YAML');
+            errorDetails.setText(result.error);
+            errorDetails.show();
+
+            if (result.preview) {
+              previewContent.setText(result.preview);
+              previewContainer.show();
+            }
+            return;
+          }
+
+          errorNotice.setText('');
+          errorDetails.setText('');
+          errorDetails.hide();
+          previewContainer.hide();
+        };
+
+        // Display rendered template on load
+          const validationResult: TemplateValidationResult = this.frontmatterManager.validateFrontmatterTemplate(this.plugin.settings.frontMatterTemplate);
+        updatePreview(validationResult);
+        text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
+          const validationResult: TemplateValidationResult = this.frontmatterManager.validateFrontmatterTemplate(value);
+
+          // Update validation notice
+          const noticeEl = containerEl.querySelector('.validation-notice');
+          if (noticeEl) {
+            noticeEl.setText(validationResult.isValid ? '' : validationResult.error);
+          }
+
+          if (!value) {
+            this.plugin.settings.frontMatterTemplate = DEFAULT_SETTINGS.frontMatterTemplate;
+          } else {
+            this.plugin.settings.frontMatterTemplate = value.replace(/\n*$/, '\n');
+          }
+
+          updatePreview(validationResult);
+
+          this.frontmatterManager.updateFrontmatteTemplate(value);
+          await this.plugin.saveSettings();
+        });
+
+        // Initial row adjustment
+        this.adjustTextareaRows(text.inputEl, initialRows);
+
+        // Adjust on content change
+        text.inputEl.addEventListener('input', () => {
+          this.adjustTextareaRows(text.inputEl, initialRows);
+        });
+
+        return text;
+      });
       
 
     new Setting(containerEl)

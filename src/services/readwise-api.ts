@@ -5,6 +5,13 @@ import type Notify from 'ui/notify';
 const API_ENDPOINT = 'https://readwise.io/api/v2';
 const API_PAGE_SIZE = 1000; // number of results per page, default 100 / max 1000
 
+export class TokenValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TokenValidationError';
+  }
+}
+
 export default class ReadwiseApi {
   private apiToken: string;
   private notify: Notify;
@@ -17,7 +24,7 @@ export default class ReadwiseApi {
 
     this.setToken(apiToken);
     this.notify = notify;
-    this.checkToken().then((isValid) => {
+    this.validateToken().then((isValid) => {
       this.validToken = isValid;
     });
   }
@@ -27,26 +34,37 @@ export default class ReadwiseApi {
     this.validToken = undefined;
   }
 
-  get headers() {
+  get options() {
     return {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Token ${this.apiToken}`,
       },
+      signal: AbortSignal.timeout(5000),
     };
   }
 
-  async hasValidToken() {
+  async hasValidToken(): Promise<boolean> {
     if (this.validToken === undefined) {
-      this.validToken = await this.checkToken();
+      this.validateToken().then((value) => {
+        this.validToken = value;
+        return value;
+      });
     }
     return this.validToken;
   }
 
-  private async checkToken() {
-    const results = await fetch(`${API_ENDPOINT}/auth`, this.headers);
-
-    return results.status === 204; // Returns a 204 response if token is valid
+  async validateToken(): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_ENDPOINT}/auth`, this.options);
+  
+      return response.status === 204;
+  
+    } catch (error) {
+      throw new TokenValidationError(
+        `Token validation failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   }
 
   // If lastUpdated or bookID aren't provided, fetch everything.
@@ -76,7 +94,7 @@ export default class ReadwiseApi {
       if (data?.count) statusBarText += ` (${results.length})`;
       this.notify.setStatusBarText(statusBarText);
 
-      const response = await fetch(url + queryParams.toString(), this.headers);
+      const response = await fetch(url + queryParams.toString(), this.options);
       data = await response.json();
 
       if (!response.ok && response.status !== 429) {
