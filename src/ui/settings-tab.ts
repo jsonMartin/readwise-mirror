@@ -150,13 +150,14 @@ async display(): Promise<void> {
     new Setting(containerEl)
       .setName('Debug mode')
       .setDesc('Enable debug logging')
-      .addToggle(toggle => toggle
-        .setValue(this.plugin.settings.debugMode)
-        .onChange(async (value) => {
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.debugMode).onChange(async (value) => {
           this.plugin.settings.debugMode = value;
             this.plugin.logger.setDebugMode(value);
+          this.plugin.logger.warn('Debug mode:', value ? 'enabled' : 'disabled');
           await this.plugin.saveSettings();
-        }));
+        })
+      );
   
     // Rest of settings...
 
