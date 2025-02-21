@@ -1,5 +1,5 @@
 import { DEFAULT_SETTINGS } from 'constants/index';
-import { type App, type ButtonComponent, Modal, PluginSettingTab, Setting } from 'obsidian';
+import { type App, type ButtonComponent, Modal, PluginSettingTab, requestUrl, type RequestUrlResponse, Setting } from 'obsidian';
 import type ReadwiseMirror from 'main';
 import type { FrontmatterManager } from 'services/frontmatter-manager';
 import type { TemplateValidationResult } from 'types';
@@ -61,11 +61,11 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       window.open(`${baseURL}/api_auth?token=${uuid}&service=readwise-mirror`);
     }
 
-    let response: Response;
+    let response: RequestUrlResponse;
     let data: Record<string, unknown>;
     try {
-      response = await fetch(`${baseURL}/api/auth?token=${uuid}`);
-      if (response.ok) {
+      response = await requestUrl({'url': `${baseURL}/api/auth?token=${uuid}`});
+      if (response.status === 200) {
         data = await response.json();
         if (data.userAccessToken) {
           this.plugin.settings.apiToken = data.userAccessToken as string;

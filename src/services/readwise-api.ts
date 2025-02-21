@@ -1,3 +1,4 @@
+import { requestUrl, type RequestUrlResponse } from 'obsidian';
 import type { Export, Library } from 'types';
 import type Notify from 'ui/notify';
 
@@ -39,8 +40,7 @@ export default class ReadwiseApi {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Token ${this.apiToken}`,
-      },
-      signal: AbortSignal.timeout(5000),
+      }
     };
   }
 
@@ -56,7 +56,7 @@ export default class ReadwiseApi {
 
   async validateToken(): Promise<boolean> {
     try {
-      const response = await fetch(`${API_ENDPOINT}/auth`, this.options);
+      const response = await requestUrl( { 'url': `${API_ENDPOINT}/auth`, ... this.options});
   
       return response.status === 204;
   
@@ -94,17 +94,17 @@ export default class ReadwiseApi {
       if (data?.count) statusBarText += ` (${results.length})`;
       this.notify.setStatusBarText(statusBarText);
 
-      const response = await fetch(url + queryParams.toString(), this.options);
-      data = await response.json();
+      const response: RequestUrlResponse = await requestUrl({ 'url': url + queryParams.toString(), ... this.options});
+      data = response.json;
 
-      if (!response.ok && response.status !== 429) {
-        console.error(`Readwise: Failed to fetch data. Status: ${response.status} - ${response.statusText}`);
+      if (!response && response.status !== 429) {
+        console.error(`Readwise: Failed to fetch data. Status: ${response.status}`);
         throw new Error(`Failed to fetch data. Status: ${response.status}`);
       }
 
       if (response.status === 429) {
         // Error handling for rate limit throttling
-        let rateLimitedDelayTime = Number.parseInt(response.headers.get('Retry-After')) * 1000 + 1000;
+        let rateLimitedDelayTime = Number.parseInt(response.headers['Retry-After']) * 1000 + 1000;
         if (Number.isNaN(rateLimitedDelayTime)) {
           // Default to a 1-second delay if 'Retry-After' is missing or invalid
           console.warn("Readwise: 'Retry-After' header is missing or invalid. Defaulting to 1 second delay.");
