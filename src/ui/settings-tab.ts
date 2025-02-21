@@ -7,9 +7,15 @@ import type Notify from 'ui/notify';
 import { TokenValidationError } from 'services/readwise-api';
 
 export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
-  plugin: ReadwiseMirror;
-  notify: Notify;
-  frontmatterManager: FrontmatterManager;
+  private plugin: ReadwiseMirror;
+  private notify: Notify;
+  private frontmatterManager: FrontmatterManager;
+
+  // Add logger reference
+  private get logger() {
+    return this.plugin.logger;
+  }
+
   constructor(app: App, plugin: ReadwiseMirror, notify: Notify, manager: FrontmatterManager) {
     super(app, plugin);
     this.plugin = plugin;
@@ -76,7 +82,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         }
       }
     } catch (e) {
-      console.log('Failed to authenticate with Readwise:', e);
+      this.logger.error('Failed to authenticate with Readwise:', e);
     }
 
     if (attempt > 20) {
@@ -136,10 +142,23 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     });
   }
 
-  async display(): Promise<void> {
+async display(): Promise<void> {
     const { containerEl } = this;
-
     containerEl.empty();
+  
+    // Add debug mode setting
+    new Setting(containerEl)
+      .setName('Debug mode')
+      .setDesc('Enable debug logging')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.debugMode)
+        .onChange(async (value) => {
+          this.plugin.settings.debugMode = value;
+            this.plugin.logger.setDebugMode(value);
+          await this.plugin.saveSettings();
+        }));
+  
+    // Rest of settings...
 
     // Authentication section inspired by the official Readwise plugin
     new Setting(containerEl).setName('Authentication').setHeading();
@@ -405,10 +424,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.colonSubstitute)
           .onChange(async (value) => {
             if (!value || /[:<>"/\\|?*]/.test(value)) {
-              console.warn(`Readwise: colon replacement: empty or invalid value: ${value}`);
+              this.logger.warn(`Colon replacement: empty or invalid value: ${value}`);
               this.plugin.settings.colonSubstitute = DEFAULT_SETTINGS.colonSubstitute;
             } else {
-              console.info(`Readwise: colon replacement: setting value: ${value}`);
+              this.logger.info(`Colon replacement: setting value: ${value}`);
               this.plugin.settings.colonSubstitute = value;
             }
             await this.plugin.saveSettings();

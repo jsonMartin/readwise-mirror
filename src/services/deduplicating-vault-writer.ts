@@ -1,6 +1,7 @@
 import { type App, TFile, type Vault, normalizePath } from 'obsidian';
 import { type Frontmatter, FrontmatterManager } from 'services/frontmatter-manager';
 import type { PluginSettings, ReadwiseDocument } from 'types';
+import type Logger from 'services/logger';
 
 export class DeduplicatingVaultWriter {
   readonly vault: Vault;
@@ -8,7 +9,8 @@ export class DeduplicatingVaultWriter {
   constructor(
     private app: App,
     private settings: PluginSettings,
-    private frontmatterManager: FrontmatterManager
+    private frontmatterManager: FrontmatterManager,
+    private logger: Logger
   ) {
     this.vault = app.vault;
     this.settings = settings;
@@ -71,8 +73,8 @@ export class DeduplicatingVaultWriter {
         try {
           return await this.vault.create(normalizePath(path), `${FrontmatterManager.toString(frontmatter)}${contents}`);
         } catch (err) {
-          console.error(
-            `Readwise: Attempt to create file ${path} *DE NOVO* failed (uri: ${metadata.highlights_url})`,
+          this.logger.error(
+            `Attempt to create file ${path} *DE NOVO* failed (uri: ${metadata.highlights_url})`,
             err
           );
           throw err;
@@ -95,7 +97,7 @@ export class DeduplicatingVaultWriter {
           const incrementPath = `${this.settings.baseFolderName}/${
             metadata.category.charAt(0).toUpperCase() + metadata.category.slice(1)
           }/${filename} ${metadata.id}.md`;
-          console.warn(`Readwise: Processed unknown duplicate ${incrementPath}`);
+          this.logger.warn(`Processed unknown duplicate ${incrementPath}`);
           return await this.vault.create(normalizePath(incrementPath), `${FrontmatterManager.toString(frontmatter)}${contents}`);
         }
       }
@@ -119,7 +121,7 @@ export class DeduplicatingVaultWriter {
           await this.vault.process(readwiseItemFile, () => contents);
         }
       } catch (err) {
-        console.error(`Readwise: Attempt to overwrite file ${path} failed`, err);
+        this.logger.error(`Attempt to overwrite file ${path} failed`, err);
         throw err;
       } finally {
         // Remove target file from duplicates
@@ -161,14 +163,14 @@ export class DeduplicatingVaultWriter {
               const incrementPath = path.replace(`${sanitizedTitle}.md`, `${sanitizedTitle} ${metadata.id}.md`);
               if (incrementPath !== path) {
                 await this.app.fileManager.renameFile(duplicates[0], incrementPath);
-                console.warn(`Readwise: Processed remote duplicate ${incrementPath}`);
+                this.logger.warn(`Processed remote duplicate ${incrementPath}`);
               }
             }
           });
           // Remove the file we just updated from duplicates
           duplicates.shift();
         } catch (err) {
-          console.error(`Readwise: Failed to rename local duplicate ${duplicates[0].path}`, err);
+          this.logger.error(`Failed to rename local duplicate ${duplicates[0].path}`, err);
           throw err;
         }
       }
@@ -185,7 +187,7 @@ export class DeduplicatingVaultWriter {
           await this.frontmatterManager.writeUpdatedFrontmatter(file, { ...frontmatter, duplicate: true });
         }
       } catch (err) {
-        console.error(`Readwise: Failed to delete local duplicate ${file.path}`, err);
+        this.logger.error(`Failed to delete local duplicate ${file.path}`, err);
         throw err;
       }
     }
@@ -206,8 +208,8 @@ export class DeduplicatingVaultWriter {
             await this.vault.process(readwiseItemFile, () => contents);
           }
         } catch (err) {
-          console.error(`Readwise: Attempt to overwrite file ${path} failed`, err);
-          Promise.reject(`Readwise: Failed to update file '${path}'. ${err}`);
+          this.logger.error(`Attempt to overwrite file ${path} failed`, err);
+          Promise.reject(`Failed to update file '${path}'. ${err}`);
         }
       } else {
         try {
@@ -215,16 +217,16 @@ export class DeduplicatingVaultWriter {
             if (this.vault.adapter.exists(normalizePath(path))) {
               const incrementPath = path.replace(`${filename}.md`, `${filename} ${metadata.id}.md`);
               await this.vault.create(incrementPath, contents);
-              console.warn(`Readwise: Processed remote duplicate ${incrementPath}`);
-              Promise.reject(`Readwise: Processed remote duplicate into ${incrementPath}`);
+              this.logger.warn(`Processed remote duplicate ${incrementPath}`);
+              Promise.reject(`Processed remote duplicate into ${incrementPath}`);
             }
           });
         } catch (err) {
-          console.error(
-            `Readwise: Attempt to create file ${path} *DE NOVO* failed (uri: ${metadata.highlights_url})`,
+          this.logger.error(
+            `Attempt to create file ${path} *DE NOVO* failed (uri: ${metadata.highlights_url})`,
             err
           );
-          Promise.reject(`Readwise: Failed to create file '${path}'. ${err}`);
+          Promise.reject(`Failed to create file '${path}'. ${err}`);
         }
       }
     }

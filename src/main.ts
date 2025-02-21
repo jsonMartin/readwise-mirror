@@ -11,6 +11,7 @@ import spacetime from 'spacetime';
 import ReadwiseApi from 'services/readwise-api';
 import ReadwiseMirrorSettingTab from 'ui/settings-tab';
 import Notify from 'ui/notify';
+import Logger from 'services/logger';
 
 // Types
 import type { Export, Highlight, Library, PluginSettings, ReadwiseDocument, Tag } from 'types';
@@ -28,6 +29,12 @@ export default class ReadwiseMirror extends Plugin {
   private isSyncing = false;
   private frontmatterManager: FrontmatterManager;
   private deduplicatingVault: DeduplicatingVaultWriter;
+  private _logger: Logger;
+
+  // Add logger getter
+  get logger() {
+    return this._logger;
+  }
 
   // Getters and setters for settings and templates
   get settings() {
@@ -114,7 +121,7 @@ export default class ReadwiseMirror extends Plugin {
 
       // Check if is discarded
       if (this.settings.highlightDiscard && this.highlightIsDiscarded(highlight)) {
-        console.debug('Readwise: Found discarded highlight, removing', highlight);
+        this.logger.debug('Found discarded highlight, removing', highlight);
         return false;
       }
 
@@ -169,7 +176,7 @@ export default class ReadwiseMirror extends Plugin {
 
       const { title, highlights } = book;
       const num_highlights = highlights.length;
-      console.warn(`Readwise: Replacing colon with ${this.settings.colonSubstitute}`);
+      this.logger.warn(`Replacing colon with ${this.settings.colonSubstitute}`);
       const sanitizedTitle = this.filenameFromTitle(book.title);
       const contents = `\n- [[${sanitizedTitle}]] *(${num_highlights} highlights)*`;
       logString += contents;
@@ -179,7 +186,7 @@ export default class ReadwiseMirror extends Plugin {
       if (abstractFile) {
         // If log file already exists, append to the content instead of overwriting
         const logFile = vault.getFiles().filter((file) => file.name === this.settings.logFileName)[0];
-        console.log('logFile:', logFile);
+        this.logger.info('logFile:', logFile);
 
         const logFileContents = await vault.read(logFile);
         await vault.process(logFile, (content) => `${content}\n\n${logString}`);
@@ -187,7 +194,7 @@ export default class ReadwiseMirror extends Plugin {
         vault.create(path, logString);
       }
     } catch (err) {
-      console.error('Readwise: Error writing to sync log file', err);
+      this.logger.error('Error writing to sync log file', err);
     }
   }
 
@@ -203,11 +210,11 @@ export default class ReadwiseMirror extends Plugin {
 
         if (!abstractFolder) {
           await vault.createFolder(path);
-          console.info('Readwise: Successfully created folder', path);
+          this.logger.info('Successfully created folder', path);
         }
       }
     } catch (err) {
-      console.error('Readwise: Failed to create category folders', err);
+      this.logger.error('Failed to create category folders', err);
       this.notify.notice('Readwise: Failed to create category folders. Sync aborted.');
       return;
     }
@@ -259,7 +266,7 @@ export default class ReadwiseMirror extends Plugin {
       const filteredHighlights = this.filterHighlights(highlights);
 
       if (filteredHighlights.length === 0) {
-        console.debug(`Readwise: No highlights found for '${title}' (${source_url})`);
+        this.logger.debug(`No highlights found for '${title}' (${source_url})`);
       } else {
         // get an array with all tags from highlights
         const highlightTags = this.getTagsFromHighlights(filteredHighlights);
@@ -314,7 +321,7 @@ export default class ReadwiseMirror extends Plugin {
         try {
           this.deduplicatingVault.create(filename, contents, metadata);
         } catch (err) {
-          console.error(`Readwise: Writing file ${book.title} (${metadata.highlights_url}) failed`, err);
+          this.logger.error(`Writing file ${book.title} (${metadata.highlights_url}) failed`, err);
           this.notify.notice(`Readwise: Writing '${book.title}' failed. ${err}`);
         }
       }
@@ -349,11 +356,11 @@ export default class ReadwiseMirror extends Plugin {
     // Delete old instance of file
     if (abstractFile) {
       try {
-        console.info('Readwise: Attempting to delete entire library at:', abstractFile);
+        this.logger.info('Attempting to delete entire library at:', abstractFile);
         await this.app.fileManager.trashFile(abstractFile);
         return true;
       } catch (err) {
-        console.error(`Readwise: Attempted to delete file ${path} but no file was found`, err);
+        this.logger.error(`Attempted to delete file ${path} but no file was found`, err);
         return false;
       }
     }
@@ -401,7 +408,7 @@ export default class ReadwiseMirror extends Plugin {
       await this.saveSettings();
       this.notify.setStatusBarText(`Readwise: Synced ${this.lastUpdatedHumanReadableFormat()}`);
     } catch (error) {
-      console.error('Error during sync:', error);
+      this.logger.error('Error during sync:', error);
       this.notify.notice(`Readwise: Sync failed. ${error}`);
     } finally {
       // Make sure we reset the sync status in case of error
@@ -435,7 +442,7 @@ export default class ReadwiseMirror extends Plugin {
 
   // Reload settings after external change (e.g. after sync)
   async onExternalSettingsChange() {
-    console.info('Reloading settings due to external change');
+    this.logger.info('Reloading settings due to external change');
     await this.loadSettings();
     if (this.settings.lastUpdated)
       this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()} elsewhere`);
@@ -445,12 +452,15 @@ export default class ReadwiseMirror extends Plugin {
   private onMetadataChange(file: TFile) {
     const metadata: CachedMetadata = this.app.metadataCache.getFileCache(file);
     if (metadata && !this.isSyncing) {
-      console.log(`Updated metadata cache for file: ${file.path}: ${JSON.stringify(metadata?.frontmatter)}`);
+      this.logger.info(`Updated metadata cache for file: ${file.path}: ${JSON.stringify(metadata?.frontmatter)}`);
     }
   }
 
   async onload() {
     await this.loadSettings();
+
+    // Initialize logger with debug mode from settings
+    this._logger = new Logger(this.settings.debugMode || false);
 
     // Move UI setup to onLayoutReady
     this.app.workspace.onLayoutReady(() => {
@@ -480,13 +490,19 @@ export default class ReadwiseMirror extends Plugin {
     const statusBarItem = this.addStatusBarItem();
 
     this.notify = new Notify(statusBarItem);
-    this.deduplicatingVault = new DeduplicatingVaultWriter(this.app, this.settings, this.frontmatterManager);
+    this.deduplicatingVault = new DeduplicatingVaultWriter(
+      this.app,
+      this.settings,
+      this.frontmatterManager,
+      this._logger
+    );
 
     if (!this.settings.apiToken) {
       this.notify.notice('Readwise: API Token not detected\nPlease enter in configuration page');
       this.notify.setStatusBarText('Readwise: API Token Required');
     } else {
-      this._readwiseApi = new ReadwiseApi(this.settings.apiToken, this.notify);
+      this._readwiseApi = new ReadwiseApi(this.settings.apiToken, this.notify, this._logger);
+
       if (this.settings.lastUpdated)
         this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`);
       else this.notify.setStatusBarText('Readwise: Click to Sync');

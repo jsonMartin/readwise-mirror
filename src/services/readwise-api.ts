@@ -1,7 +1,7 @@
 import { requestUrl, type RequestUrlResponse } from 'obsidian';
 import type { Export, Library } from 'types';
 import type Notify from 'ui/notify';
-
+import type Logger from 'services/logger';
 
 const API_ENDPOINT = 'https://readwise.io/api/v2';
 const API_PAGE_SIZE = 1000; // number of results per page, default 100 / max 1000
@@ -15,16 +15,17 @@ export class TokenValidationError extends Error {
 
 export default class ReadwiseApi {
   private apiToken: string;
+  private validToken: boolean | undefined;
   private notify: Notify;
-  private validToken: boolean = undefined;
+  private logger: Logger;
 
-  constructor(apiToken: string, notify: Notify) {
+  constructor(apiToken: string, notify: Notify, logger: Logger) {
     if (!apiToken) {
       throw new Error('API Token Required!');
     }
-
-    this.setToken(apiToken);
+    this.apiToken = apiToken;
     this.notify = notify;
+    this.logger = logger;
     this.validateToken().then((isValid) => {
       this.validToken = isValid;
     });
@@ -40,10 +41,9 @@ export default class ReadwiseApi {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Token ${this.apiToken}`,
-      }
+      },
     };
   }
-
   async hasValidToken(): Promise<boolean> {
     if (this.validToken === undefined) {
       this.validateToken().then((value) => {
@@ -56,10 +56,9 @@ export default class ReadwiseApi {
 
   async validateToken(): Promise<boolean> {
     try {
-      const response = await requestUrl( { 'url': `${API_ENDPOINT}/auth`, ... this.options});
-  
+      const response = await requestUrl({ url: `${API_ENDPOINT}/auth`, ...this.options });
+
       return response.status === 204;
-  
     } catch (error) {
       throw new TokenValidationError(
         `Token validation failed: ${error instanceof Error ? error.message : String(error)}`
@@ -88,17 +87,17 @@ export default class ReadwiseApi {
         queryParams.append('pageCursor', nextPageCursor);
       }
 
-      if (lastUpdated) console.info(`Readwise: Checking for new content since ${lastUpdated}`);
-      if (bookId) console.debug(`Readwise: Checking for all highlights on book ID: ${bookId}`);
+      if (lastUpdated) this.logger.info(`Checking for new content since ${lastUpdated}`);
+      if (bookId) this.logger.debug(`Checking for all highlights on book ID: ${bookId}`);
       let statusBarText = `Readwise: Fetching ${contentType}`;
       if (data?.count) statusBarText += ` (${results.length})`;
       this.notify.setStatusBarText(statusBarText);
 
-      const response: RequestUrlResponse = await requestUrl({ 'url': url + queryParams.toString(), ... this.options});
+      const response: RequestUrlResponse = await requestUrl({ url: url + queryParams.toString(), ...this.options });
       data = response.json;
 
       if (!response && response.status !== 429) {
-        console.error(`Readwise: Failed to fetch data. Status: ${response.status}`);
+        this.logger.error(`Failed to fetch data. Status: ${response.status}`);
         throw new Error(`Failed to fetch data. Status: ${response.status}`);
       }
 
@@ -107,32 +106,31 @@ export default class ReadwiseApi {
         let rateLimitedDelayTime = Number.parseInt(response.headers['Retry-After']) * 1000 + 1000;
         if (Number.isNaN(rateLimitedDelayTime)) {
           // Default to a 1-second delay if 'Retry-After' is missing or invalid
-          console.warn("Readwise: 'Retry-After' header is missing or invalid. Defaulting to 1 second delay.");
+          this.logger.warn("'Retry-After' header is missing or invalid. Defaulting to 1 second delay.");
           rateLimitedDelayTime = 1000;
         } else {
-          console.warn(`Readwise: API Rate Limited, waiting to retry for ${rateLimitedDelayTime}`);
+          this.logger.warn(`API Rate Limited, waiting to retry for ${rateLimitedDelayTime}`);
         }
         this.notify.setStatusBarText(`Readwise: API Rate Limited, waiting ${rateLimitedDelayTime}`);
 
         await new Promise((_) => setTimeout(_, rateLimitedDelayTime));
-        console.info('Readwise: Trying to fetch highlights again...');
-        this.notify.setStatusBarText("Readwise: Attempting to retry...");
+        this.logger.info('Trying to fetch highlights again...');
+        this.notify.setStatusBarText('Readwise: Attempting to retry...');
       } else {
         if (data.results && Array.isArray(data.results)) {
           results.push(...data.results);
         } else {
-          console.warn('Readwise: No results found in the response data.');
+          this.logger.warn('No results found in the response data.');
         }
         nextPageCursor = data.nextPageCursor as string;
         if (!nextPageCursor) {
           break;
         }
-        console.debug(`Readwise: There are more records left, proceeding to next page: ${data.nextPageCursor}`);
+        this.logger.debug(`There are more records left, proceeding to next page: ${data.nextPageCursor}`);
       }
     }
 
-    if (results.length > 0)
-      console.info(`Readwise: Processed ${results.length} total ${contentType} results successfully`);
+    if (results.length > 0) this.logger.info(`Processed ${results.length} total ${contentType} results successfully`);
     return results;
   }
 
@@ -169,5 +167,5 @@ export default class ReadwiseApi {
     }
     // Essentially return an empty library
     return this.buildLibrary(recordsUpdated);
-}
+  }
 }

@@ -117,6 +117,7 @@ export interface PluginSettings {
   authorProperty: string;      // Frontmatter property for syncing author
   normalizeAuthorNames: boolean; // Normalize author names
   stripTitlesFromAuthors: boolean; // Strip titles from author names
+  debugMode: boolean;
 }
 
 export interface YamlStringState {
