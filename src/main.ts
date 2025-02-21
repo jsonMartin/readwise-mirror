@@ -466,6 +466,18 @@ export default class ReadwiseMirror extends Plugin {
     this.app.workspace.onLayoutReady(() => {
       this.initializeUI();
     });
+  }
+
+  private initializeUI() {
+    const statusBarItem = this.addStatusBarItem();
+
+    this.notify = new Notify(statusBarItem);
+    this.deduplicatingVault = new DeduplicatingVaultWriter(
+      this.app,
+      this.settings,
+      this.frontmatterManager,
+      this._logger
+    );
 
     // Setup templating
     this.env = new Environment(null, { autoescape: false } as ConfigureOptions);
@@ -484,18 +496,6 @@ export default class ReadwiseMirror extends Plugin {
 
     this.headerTemplate = this.settings.headerTemplate;
     this.highlightTemplate = this.settings.highlightTemplate;
-  }
-
-  private initializeUI() {
-    const statusBarItem = this.addStatusBarItem();
-
-    this.notify = new Notify(statusBarItem);
-    this.deduplicatingVault = new DeduplicatingVaultWriter(
-      this.app,
-      this.settings,
-      this.frontmatterManager,
-      this._logger
-    );
 
     if (!this.settings.apiToken) {
       this.notify.notice('Readwise: API Token not detected\nPlease enter in configuration page');
