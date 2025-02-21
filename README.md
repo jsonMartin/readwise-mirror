@@ -489,6 +489,6 @@ Currently, the following limitations apply to deduplication:
 
 ### Readwise (remote) duplicates
 
-In Readwise, multiple items with the same title but different `id`'s can exist. This leads to a filename collision in `readwise-mirror`. If a such a duplicate ('remote dupliacate') is detected (because a file already exists with the "same" filename), the plugin will write a file which has the Readwise id value added to the filename of all detected duplicates.
+In Readwise, multiple items with the same title but different `id`s can exist. This leads to a filename collision in `readwise-mirror`. If such a duplicate ('remote duplicate') is detected (because a file already exists with the "same" filename), the plugin will write a file which has a short hash of the Readwise `id` value added to the filename of all detected duplicates.
 
-The filename of two different Readwise items both titled `My Duplicate Book` would thus become `My Duplicate Book.md` and `My Duplicate Book <ID>.md` where `<ID>` would be the id value of the second item the plugin encounters when downloading. As this order can change between runs of the plugin (e.g. because of changes to one item which changes the order in the returned data), the filenames might change as well from run to run.
+The filename of two different Readwise items both titled `My Duplicate Book` would thus become `My Duplicate Book.md` and `My Duplicate Book <HASH>.md` where `<HASH>` would be a short hashed `id` value of the second item the plugin encounters when downloading. As this order can change between runs of the plugin (e.g., because of changes to one item which changes the order in the returned data), the filenames might change as well from run to run.
