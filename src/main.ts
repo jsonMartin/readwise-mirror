@@ -472,12 +472,6 @@ export default class ReadwiseMirror extends Plugin {
     const statusBarItem = this.addStatusBarItem();
 
     this.notify = new Notify(statusBarItem);
-    this.deduplicatingVault = new DeduplicatingVaultWriter(
-      this.app,
-      this.settings,
-      this.frontmatterManager,
-      this._logger
-    );
 
     // Setup templating
     this.env = new Environment(null, { autoescape: false } as ConfigureOptions);
@@ -508,6 +502,13 @@ export default class ReadwiseMirror extends Plugin {
       else this.notify.setStatusBarText('Readwise: Click to Sync');
     }
 
+    this.deduplicatingVault = new DeduplicatingVaultWriter(
+      this.app,
+      this.settings,
+      this.frontmatterManager,
+      this._logger
+    );
+    
     this.registerDomEvent(statusBarItem, 'click', this.sync.bind(this));
 
     this.addCommand({
