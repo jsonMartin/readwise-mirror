@@ -23,15 +23,16 @@ export default class ReadwiseApi {
   private logger: Logger;
 
   constructor(apiToken: string, notify: Notify, logger: Logger) {
-    if (!apiToken) {
-      throw new Error('API Token Required!');
-    }
     this.apiToken = apiToken;
     this.notify = notify;
     this.logger = logger;
     this.validateToken().then((isValid) => {
       this.validToken = isValid;
     });
+
+    if (!apiToken) {
+      throw new Error('API Token Required!');
+    }
   }
 
   /**
@@ -40,7 +41,9 @@ export default class ReadwiseApi {
    */
   setToken(apiToken: string) {
     this.apiToken = apiToken;
-    this.validToken = undefined;
+    this.validateToken().then((isValid) => {
+      this.validToken = isValid;
+    });
   }
 
   /**
@@ -120,6 +123,7 @@ export default class ReadwiseApi {
       if (data?.count) statusBarText += ` (${results.length})`;
       this.notify.setStatusBarText(statusBarText);
 
+      // FIXME: When fetching very long period of data, the request might fail due to an URL which is too long (Error 414)
       const response: RequestUrlResponse = await requestUrl({ url: url + queryParams.toString(), ...this.options });
       data = response.json;
 

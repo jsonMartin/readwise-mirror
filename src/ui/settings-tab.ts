@@ -12,7 +12,7 @@ import type ReadwiseMirror from 'main';
 import type { FrontmatterManager } from 'services/frontmatter-manager';
 import type { TemplateValidationResult } from 'types';
 import type Notify from 'ui/notify';
-import { TokenValidationError } from 'services/readwise-api';
+import ReadwiseApi, { TokenValidationError } from 'services/readwise-api';
 
 export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
   private plugin: ReadwiseMirror;
@@ -80,10 +80,12 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     try {
       response = await requestUrl({ url: `${baseURL}/api/auth?token=${uuid}` });
       if (response.status === 200) {
-        data = await response.json();
+        data = await response.json;
         if (data.userAccessToken) {
+          this.logger.info('Token successfully retrieved');
           this.plugin.settings.apiToken = data.userAccessToken as string;
-          this.plugin.readwiseApi.setToken(data.userAccessToken as string);
+          if (this.plugin.readwiseApi) this.plugin.readwiseApi.setToken(data?.userAccessToken as string);
+          else this.plugin.readwiseApi = new ReadwiseApi(data?.userAccessToken as string, this.notify, this.logger);
           await this.plugin.saveSettings();
           this.display(); // Refresh the settings page
           return true;
@@ -207,7 +209,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Readwise authentication')
       .setDesc(
-        createFragment((fragment) => {
+        createFragment(async (fragment) => {
           fragment.createEl('br');
           fragment.createEl('br');
           fragment.createEl('strong', { text: 'Important: ' });
@@ -222,33 +224,36 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           fragment.append(tokenValidationError);
 
           // Show success or error message based on token validity
-          tokenValidationRunning.show();
+          if (this.plugin.readwiseApi) {
+            tokenValidationRunning.show();
+          } else {
+            tokenValidationError.show();
+          }
           validationButton?.setDisabled(true);
 
           // Validate the token on load
-          this.plugin.readwiseApi
-            .validateToken()
-            .then((isValid) => {
+          if (this.plugin.readwiseApi) {
+            try {
+              const isValid = await this.plugin.readwiseApi.validateToken();
               hasValidToken = isValid;
+              
+              if (isValid) this.notify.setStatusBarText('Readwise: Click to Sync');
               validationButton?.setDisabled(isValid);
               validationButton?.setButtonText(isValid ? 'Re-authenticate with Readwise' : 'Authenticate with Readwise');
               tokenValidationSuccess.toggle(isValid);
               tokenValidationInvalid.toggle(!isValid);
-              tokenValidationRunning.hide();
-            })
-            .catch((error) => {
-              // Validation error (timeout or something else)
+            } catch (error) {
               validationButton?.setDisabled(true);
-              tokenValidationRunning.hide();
-              tokenValidationSuccess.hide();
-              tokenValidationInvalid.hide();
               if (error instanceof TokenValidationError) {
                 tokenValidationError.setText(error.message);
               } else {
                 tokenValidationError.setText('Token validation error');
               }
               tokenValidationError.show();
-            });
+            } finally {
+              tokenValidationRunning.hide();
+            }
+          }
         })
       )
       .addButton((button) => {
@@ -262,7 +267,6 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             // Reset validation messages
             tokenValidationSuccess.hide();
             tokenValidationInvalid.hide();
-            tokenValidationRunning.show();
             tokenValidationError.hide();
 
             this.getUserAuthToken(buttonEl)
@@ -282,7 +286,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
                 tokenValidationError.show();
               });
           })
-          .setDisabled(true);
+          .setDisabled(hasValidToken);
         return validationButton;
       })
       .addText((text) => {

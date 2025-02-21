@@ -24,12 +24,12 @@ export default class ReadwiseMirror extends Plugin {
   private _readwiseApi: ReadwiseApi;
   private _headerTemplate: Template;
   private _highlightTemplate: Template;
+  private _logger: Logger;
   private notify: Notify;
   private env: Environment;
   private isSyncing = false;
   private frontmatterManager: FrontmatterManager;
   private deduplicatingVault: DeduplicatingVaultWriter;
-  private _logger: Logger;
 
   // Add logger getter
   get logger() {
@@ -49,6 +49,10 @@ export default class ReadwiseMirror extends Plugin {
     return this._readwiseApi;
   }
 
+  set readwiseApi(api: ReadwiseApi) {
+    this._readwiseApi = api;
+  }
+  
   set headerTemplate(template: string) {
     this._headerTemplate = new Template(template, this.env, null, true);
   }
@@ -374,7 +378,7 @@ export default class ReadwiseMirror extends Plugin {
 
     this.isSyncing = true;
     try {
-      if (!this._readwiseApi.hasValidToken()) {
+      if (!this._readwiseApi?.hasValidToken()) {
         this.notify.notice('Readwise: Valid API Token Required');
 
         return;
@@ -446,6 +450,13 @@ export default class ReadwiseMirror extends Plugin {
     await this.loadSettings();
     if (this.settings.lastUpdated)
       this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()} elsewhere`);
+    if (!this.settings.apiToken) {
+      this.notify.notice('Readwise: API Token not detected\nPlease enter in configuration page');
+      this.notify.setStatusBarText('Readwise: API Token Required');
+      this._readwiseApi = null; // Invalidate the API instance
+    } else {
+      this._readwiseApi = new ReadwiseApi(this.settings.apiToken, this.notify, this._logger);
+    }
   }
 
   // Dedicated function to handle metadata change events
@@ -508,7 +519,7 @@ export default class ReadwiseMirror extends Plugin {
       this.frontmatterManager,
       this._logger
     );
-    
+
     this.registerDomEvent(statusBarItem, 'click', this.sync.bind(this));
 
     this.addCommand({
