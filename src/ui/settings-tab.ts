@@ -14,7 +14,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     super(app, plugin);
     this.plugin = plugin;
     this.notify = notify;
-    this.frontmatterManager = manager
+    this.frontmatterManager = manager;
   }
 
   /**
@@ -76,15 +76,15 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         }
       }
     } catch (e) {
-      console.log("Failed to authenticate with Readwise:", e);
+      console.log('Failed to authenticate with Readwise:', e);
     }
 
     if (attempt > 20) {
-      this.notify.notice("Authentication timeout. Please try again.");
+      this.notify.notice('Authentication timeout. Please try again.');
       return false;
     }
 
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     return this.getUserAuthToken(button, attempt + 1);
   }
 
@@ -259,17 +259,13 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       })
       .addText((text) => {
         const token = this.plugin.settings.apiToken;
-        const maskedToken = token 
-          ? token.slice(0, 6) + '*'.repeat(token.length - 6)
-          : '';
+        const maskedToken = token ? token.slice(0, 6) + '*'.repeat(token.length - 6) : '';
 
         text
           .setPlaceholder('Token will be filled automatically after authentication')
           .setValue(maskedToken)
           .setDisabled(true);
       });
-
-    
 
     new Setting(containerEl).setName('Library').setHeading();
 
@@ -299,8 +295,11 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         })
       );
 
-  new Setting(containerEl).setName('Author names').setHeading()
-    .setDesc(createFragment((fragment) => {
+    new Setting(containerEl)
+      .setName('Author names')
+      .setHeading()
+      .setDesc(
+        createFragment((fragment) => {
           fragment.appendText(
             'These settings control how author names are processed. If enabled, titles (Dr., Prof., Mr., Mrs., Ms., Miss, Sir, Lady) will be stripped from author names.'
           );
@@ -309,18 +308,19 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           fragment.appendText('Example author string: "Dr. John Doe, and JANE SMITH, Prof. Bob Johnson"');
           fragment.createEl('br');
           fragment.createEl('blockquote', {
-        text: 'Default: "Dr. John Doe, JANE SMITH, Prof. Bob Johnson"'
+            text: 'Default: "Dr. John Doe, JANE SMITH, Prof. Bob Johnson"',
           });
           fragment.createEl('blockquote', {
-        text: 'Normalize case: "Dr. John Doe, Jane Smith, Prof. Bob Johnson"'
+            text: 'Normalize case: "Dr. John Doe, Jane Smith, Prof. Bob Johnson"',
           });
           fragment.createEl('blockquote', {
-        text: 'Strip titles: "John Doe, JANE SMITH, Bob Johnson"'
+            text: 'Strip titles: "John Doe, JANE SMITH, Bob Johnson"',
           });
           fragment.createEl('blockquote', {
-        text: 'Both enabled: "John Doe, Jane Smith, Bob Johnson"'
+            text: 'Both enabled: "John Doe, Jane Smith, Bob Johnson"',
           });
-    }))
+        })
+      );
 
     new Setting(containerEl)
       .setName('Normalize author names')
@@ -510,13 +510,23 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setHeading()
       .setDesc(
         createFragment((fragment) => {
-          fragment.createEl('p', { text: 'The plugin uses three templates to control how your Readwise content is formatted:' });
+          fragment.createEl('p', {
+            text: 'The plugin uses three templates to control how your Readwise content is formatted:',
+          });
 
-          fragment.createEl('p', { text: '1. Frontmatter Template: Controls the YAML metadata at the top of each note' });
-          fragment.createEl('p', { text: '2. Header Template: Controls the main document structure and metadata below the frontmatter' });
-          fragment.createEl('p', { text: '3. Highlight Template: Controls how individual highlights are formatted within the note' });
+          fragment.createEl('p', {
+            text: '1. Frontmatter Template: Controls the YAML metadata at the top of each note',
+          });
+          fragment.createEl('p', {
+            text: '2. Header Template: Controls the main document structure and metadata below the frontmatter',
+          });
+          fragment.createEl('p', {
+            text: '3. Highlight Template: Controls how individual highlights are formatted within the note',
+          });
 
-          fragment.createEl('p', { text: 'Each template supports Nunjucks templating syntax and provides access to specific variables relevant to that section.' });
+          fragment.createEl('p', {
+            text: 'Each template supports Nunjucks templating syntax and provides access to specific variables relevant to that section.',
+          });
         })
       );
 
@@ -537,7 +547,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.frontMatter).onChange(async (value) => {
           // Test template with sample data
-          const { isValid, error } = this.frontmatterManager.validateFrontmatterTemplate(this.plugin.settings.frontMatterTemplate);
+          const { isValid, error } = this.frontmatterManager.validateFrontmatterTemplate(
+            this.plugin.settings.frontMatterTemplate
+          );
           if ((value && isValid) || !value) {
             this.plugin.settings.frontMatter = value;
             await this.plugin.saveSettings();
@@ -663,7 +675,6 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             });
         }
       }
-    
 
       new Setting(containerEl).setName('File tracking').setHeading();
 
@@ -729,20 +740,20 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             toggle.setValue(this.plugin.settings.deleteDuplicates).onChange(async (value) => {
               if (value) {
                 const modal = new Modal(this.app);
-                modal.titleEl.setText("Warning");
-                modal.contentEl.createEl("p", {
-                  text: "This will permanently delete duplicate files instead of marking them. If enabled, files in your Vault will be deleted when duplicates are found. Are you sure you want to continue?"
+                modal.titleEl.setText('Warning');
+                modal.contentEl.createEl('p', {
+                  text: 'This will permanently delete duplicate files instead of marking them. If enabled, files in your Vault will be deleted when duplicates are found. Are you sure you want to continue?',
                 });
 
                 const buttonContainer = modal.contentEl.createDiv();
-                buttonContainer.style.display = "flex";
-                buttonContainer.style.justifyContent = "flex-end";
-                buttonContainer.style.gap = "10px";
-                buttonContainer.style.marginTop = "20px";
+                buttonContainer.style.display = 'flex';
+                buttonContainer.style.justifyContent = 'flex-end';
+                buttonContainer.style.gap = '10px';
+                buttonContainer.style.marginTop = '20px';
 
-                const cancelButton = buttonContainer.createEl("button", { text: "Cancel" });
-                const confirmButton = buttonContainer.createEl("button", { text: "Confirm" });
-                confirmButton.style.backgroundColor = "var(--background-modifier-error)";
+                const cancelButton = buttonContainer.createEl('button', { text: 'Cancel' });
+                const confirmButton = buttonContainer.createEl('button', { text: 'Confirm' });
+                confirmButton.style.backgroundColor = 'var(--background-modifier-error)';
 
                 cancelButton.onclick = () => {
                   toggle.setValue(false);
@@ -763,14 +774,15 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             })
           );
       }
-
     }
 
     new Setting(containerEl)
       .setName('Frontmatter template')
       .setDesc(
         createFragment((fragment) => {
-            fragment.appendText('Controls YAML frontmatter metadata. The same variables are available as for the Header template, with specific versions optimised for YAML frontmatter (tags), and escaped values for YAML compatibility.');
+          fragment.appendText(
+            'Controls YAML frontmatter metadata. The same variables are available as for the Header template, with specific versions optimised for YAML frontmatter (tags), and escaped values for YAML compatibility.'
+          );
         })
       )
       .setHeading();
@@ -779,8 +791,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setDesc(
         createFragment((fragment) => {
           fragment.append(
-              this.createTemplateDocumentation( 
-                [
+            this.createTemplateDocumentation([
               ['id', 'Document ID'],
               ['created', 'Creation timestamp'],
               ['updated', 'Last update timestamp'],
@@ -802,8 +813,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
                 'Note:',
                 'If deduplication is enabled, the specified property will be automatically added or updated in the frontmatter template.',
               ],
-                ]
-              )
+            ])
           );
         })
       )
@@ -841,8 +851,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         const previewContent = previewContainer.createEl('pre', {
           cls: ['template-preview-content', 'settings-template-input'],
           attr: {
-              style:
-                'background-color: var(--background-secondary); padding: 1em; border-radius: 4px; overflow-x: auto;',
+            style: 'background-color: var(--background-secondary); padding: 1em; border-radius: 4px; overflow-x: auto;',
           },
         });
 
@@ -877,7 +886,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         };
 
         // Display rendered template on load
-          const validationResult: TemplateValidationResult = this.frontmatterManager.validateFrontmatterTemplate(this.plugin.settings.frontMatterTemplate);
+        const validationResult: TemplateValidationResult = this.frontmatterManager.validateFrontmatterTemplate(
+          this.plugin.settings.frontMatterTemplate
+        );
         updatePreview(validationResult);
         text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
           const validationResult: TemplateValidationResult = this.frontmatterManager.validateFrontmatterTemplate(value);
@@ -910,7 +921,6 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
         return text;
       });
-      
 
     new Setting(containerEl)
       .setName('Header template')
@@ -1019,6 +1029,5 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
         return text;
       });
-
   }
 }
