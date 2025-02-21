@@ -1,5 +1,13 @@
 import { DEFAULT_SETTINGS } from 'constants/index';
-import { type App, type ButtonComponent, Modal, PluginSettingTab, requestUrl, type RequestUrlResponse, Setting } from 'obsidian';
+import {
+  type App,
+  type ButtonComponent,
+  Modal,
+  PluginSettingTab,
+  requestUrl,
+  type RequestUrlResponse,
+  Setting,
+} from 'obsidian';
 import type ReadwiseMirror from 'main';
 import type { FrontmatterManager } from 'services/frontmatter-manager';
 import type { TemplateValidationResult } from 'types';
@@ -70,7 +78,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     let response: RequestUrlResponse;
     let data: Record<string, unknown>;
     try {
-      response = await requestUrl({'url': `${baseURL}/api/auth?token=${uuid}`});
+      response = await requestUrl({ url: `${baseURL}/api/auth?token=${uuid}` });
       if (response.status === 200) {
         data = await response.json();
         if (data.userAccessToken) {
@@ -142,10 +150,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     });
   }
 
-async display(): Promise<void> {
+  async display(): Promise<void> {
     const { containerEl } = this;
     containerEl.empty();
-  
+
     // Add debug mode setting
     new Setting(containerEl)
       .setName('Debug mode')
@@ -153,12 +161,12 @@ async display(): Promise<void> {
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.debugMode).onChange(async (value) => {
           this.plugin.settings.debugMode = value;
-            this.plugin.logger.setDebugMode(value);
+          this.plugin.logger.setDebugMode(value);
           this.plugin.logger.warn('Debug mode:', value ? 'enabled' : 'disabled');
           await this.plugin.saveSettings();
         })
       );
-  
+
     // Rest of settings...
 
     // Authentication section inspired by the official Readwise plugin
