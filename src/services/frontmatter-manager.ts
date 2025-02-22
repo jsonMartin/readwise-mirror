@@ -1,36 +1,24 @@
-import { FRONTMATTER_TO_ESCAPE, YAML_TOSTRING_OPTIONS } from 'constants/index';
+import { FRONTMATTER_TO_ESCAPE } from 'constants/index';
 import { type Environment, Template } from 'nunjucks';
 import type { App, TFile } from 'obsidian';
+import { Frontmatter, type FrontmatterData, FrontmatterError } from 'services/frontmatter';
 import { sampleMetadata } from 'test/sample-data';
 import type { PluginSettings, ReadwiseDocument, YamlStringState } from 'types';
 import * as YAML from 'yaml';
+import type Logger from 'services/logger';
 
 interface YamlEscapeOptions {
   multiline?: boolean;
 }
 
-
-class FrontmatterError extends Error {
-  constructor(
-    message: string,
-    public readonly cause?: unknown
-  ) {
-    super(message);
-    this.name = 'FrontmatterError';
-  }
-}
-
-// TODO: Make this a proper class 
-export type Frontmatter = Record<string, unknown>;
 export class FrontmatterManager {
-  private static readonly FRONTMATTER_REGEX = /^(---\n([\s\S]*?)\n---\s*)/;
-  private static readonly FRONTMATTER_DELIMITER = '---';
   private frontMatterTemplate: Template;
 
   constructor(
     private readonly app: App,
     private readonly settings: PluginSettings,
-    private readonly env: Environment
+    private readonly env: Environment,
+    private readonly logger: Logger
   ) {}
 
   /**
@@ -41,7 +29,7 @@ export class FrontmatterManager {
   private analyzeString(value: string): YamlStringState {
     if (!value) {
       return {
-        hasSingleQuotes: false,
+        hasSingleQuotes: false,   
         hasDoubleQuotes: false,
         isValueEscapedAlready: false,
       };
@@ -60,7 +48,6 @@ export class FrontmatterManager {
    */
   private isStringEscaped(value: string): boolean {
     if (value.length <= 1) return false;
-
     return (value.startsWith("'") && value.endsWith("'")) || (value.startsWith('"') && value.endsWith('"'));
   }
 
@@ -142,25 +129,19 @@ export class FrontmatterManager {
     return processedMetadata;
   }
 
-  /**
-   * Updates frontmatter of a file
-   */
   public async getUpdatedFrontmatter(file: TFile, updates: Frontmatter): Promise<Frontmatter> {
     try {
-      const currentFrontmatter: Frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter || {};
+      const currentData = this.app.metadataCache.getFileCache(file)?.frontmatter || {};
+      const frontmatter = new Frontmatter(currentData);
 
-      if (Object.keys(currentFrontmatter).length > 0) {
+      if (Object.keys(currentData).length > 0) {
         const filteredUpdates = this.settings.protectFrontmatter ? this.filterProtectedFields(updates) : updates;
-
-        const newFrontmatter = {
-          ...currentFrontmatter,
-          ...filteredUpdates,
-        };
-
-        return newFrontmatter;
+        frontmatter.merge(filteredUpdates);
+      } else {
+        frontmatter.merge(updates);
       }
 
-      return updates;
+      return frontmatter;
     } catch (error) {
       throw new FrontmatterError('Failed to update frontmatter', error);
     }
@@ -170,7 +151,7 @@ export class FrontmatterManager {
     const renderedTemplate = new Template(template, this.env, null, true).render(
       this.escapeMetadata(sampleMetadata, FRONTMATTER_TO_ESCAPE)
     );
-    const yamlContent = renderedTemplate.replace(FrontmatterManager.FRONTMATTER_REGEX, '$2');
+    const yamlContent = renderedTemplate.replace(Frontmatter.REGEX, '$2');
     try {
       YAML.parse(yamlContent);
       return { isValid: true };
@@ -189,41 +170,30 @@ export class FrontmatterManager {
     }
   }
 
-  /**
-   * Filters out protected fields from updates
-   */
   private filterProtectedFields(updates: Frontmatter): Frontmatter {
     const protectedFields = this.settings.protectedFields
       .split('\n')
       .map((f) => f.trim())
       .filter(Boolean);
 
-    return Object.fromEntries(Object.entries(updates).filter(([key]) => !protectedFields.includes(key)));
-  }
-  /**
-   * Generates frontmatter string
-   */
-  public static toString(data: Record<string, unknown>): string {
-    return [
-      FrontmatterManager.FRONTMATTER_DELIMITER,
-      YAML.stringify(data, YAML_TOSTRING_OPTIONS),
-      FrontmatterManager.FRONTMATTER_DELIMITER,
-    ].join('\n');
+    // Using static methods from Frontmatter class
+    return Frontmatter.fromEntries(
+      updates.entries()
+        .filter(([key]) => !protectedFields.includes(key))
+    );
   }
 
-  /**
-   * Writes updated frontmatter to a file
-   * TODO: Should go into a ReadwiseMirrorWriter class
-   */
   public async writeUpdatedFrontmatter(file: TFile, updates: Frontmatter): Promise<void> {
     try {
       const content = await this.app.vault.read(file);
-      const match = content.match(FrontmatterManager.FRONTMATTER_REGEX);
+      const frontmatter = Frontmatter.fromString(content);
+      frontmatter.merge(updates);
+      
+      const match = content.match(Frontmatter.REGEX);
       const frontmatterStr = match?.[1] || '';
       const body = content.slice(frontmatterStr.length);
 
-      const frontmatter = FrontmatterManager.toString(updates);
-      await this.app.vault.modify(file, `${frontmatter}\n${body}`);
+      await this.app.vault.modify(file, `${frontmatter.toString()}\n${body}`);
     } catch (error) {
       throw new FrontmatterError('Failed to write frontmatter', error);
     }
@@ -255,10 +225,10 @@ export class FrontmatterManager {
     start: number;
     end: number;
   } {
-    const start = lines.findIndex((line) => line.trim() === FrontmatterManager.FRONTMATTER_DELIMITER);
+    const start = lines.findIndex((line) => line.trim() === Frontmatter.DELIMITER);
     const end =
       start !== -1
-        ? lines.slice(start + 1).findIndex((line) => line.trim() === FrontmatterManager.FRONTMATTER_DELIMITER) +
+        ? lines.slice(start + 1).findIndex((line) => line.trim() === Frontmatter.DELIMITER) +
           start +
           1
         : -1;
@@ -301,7 +271,9 @@ export class FrontmatterManager {
    * @returns The frontmatter record
    */
   public renderFrontmatter(metadata: ReadwiseDocument): Frontmatter {
-    return this.settings.updateFrontmatter ? this.processTemplate(metadata, this.frontMatterTemplate) : {};
+    return this.settings.updateFrontmatter 
+      ? new Frontmatter(this.processTemplate(metadata, this.frontMatterTemplate))
+      : new Frontmatter();
   }
 
   /**
@@ -310,25 +282,25 @@ export class FrontmatterManager {
    * @param template - The template to process
    * @returns The frontmatter record
    */
-  private processTemplate(metadata: ReadwiseDocument, template: Template): Frontmatter {
+  private processTemplate(metadata: ReadwiseDocument, template: Template): FrontmatterData {
     try {
       // Render template if provided, otherwise use the default frontmatter template
       const cleanedTemplate = template
         .render(this.escapeMetadata(metadata, FRONTMATTER_TO_ESCAPE))
-        .replace(FrontmatterManager.FRONTMATTER_REGEX, '$2');
+        .replace(Frontmatter.REGEX, '$2');
       return YAML.parse(cleanedTemplate);
     } catch (error) {
       if (error instanceof YAML.YAMLParseError) {
-        console.error('Failed to parse YAML frontmatter:', error.message);
+        this.logger.error('Failed to parse YAML frontmatter:', error.message);
         throw new Error(`Invalid YAML frontmatter: ${error.message}`);
       }
 
       if (error instanceof Error) {
-        console.error('Error processing frontmatter template:', error.message);
+        this.logger.error('Error processing frontmatter template:', error.message);
         throw new Error(`Failed to process frontmatter: ${error.message}`);
       }
 
-      console.error('Unknown error processing frontmatter:', error);
+      this.logger.error('Unknown error processing frontmatter:', error);
       throw new Error('Failed to process frontmatter due to unknown error');
     }
   }

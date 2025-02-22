@@ -47,7 +47,21 @@ export interface Library {
 }
 
 /**
- * ReadwiseItem is the metadata of a book from the Readwise API, 
+ * Represents a file that is pending to be written to the vault.
+ * 
+ * @property filename - The name of the file to write
+ * @property doc - The Readwise document metadata
+ * @property contents - The contents of the file to write
+ * @property path - The full path including category
+ */
+export interface ReadwiseFile {
+  filename: string;
+  path?: string; // The full path including category
+  doc: ReadwiseDocument;
+  contents: string; // Rendered contents of the file
+}
+/**
+ *  is the metadata of a book from the Readwise API, 
  * formatted for use in the nunjucks templates.
  * 
  * @see https://readwise.io/api/docs/highlights

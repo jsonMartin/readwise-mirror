@@ -36,6 +36,20 @@ class Logger {
     error(...messages: any[]): void {
         console.error('Readwise Mirror:', ...messages);
     }
+
+    // biome-ignore lint/suspicious/noExplicitAny: console.time accepts any type
+    time(label: string, ...messages: any[]): void {
+        console.time(`Readwise Mirror: ${label}`);
+    }
+
+    // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+    timeLog(label: string, ...messages: any[]): void {
+        console.timeLog(`Readwise Mirror: ${label}`, ...messages);
+    }
+
+    timeEnd(label: string): void {
+        console.timeEnd(`Readwise Mirror: ${label}`);
+    }
 }
 
 export default Logger;

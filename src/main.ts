@@ -1,7 +1,7 @@
 import slugify from '@sindresorhus/slugify';
 import filenamify from 'filenamify';
 import { type ConfigureOptions, Environment, Template } from 'nunjucks';
-import { type CachedMetadata, Plugin, type TFile } from 'obsidian';
+import { type CachedMetadata, Plugin, type TFile, normalizePath } from 'obsidian';
 import { AuthorParser } from 'services/author-parser';
 import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
 import { FrontmatterManager } from 'services/frontmatter-manager';
@@ -14,7 +14,7 @@ import Notify from 'ui/notify';
 import Logger from 'services/logger';
 
 // Types
-import type { Export, Highlight, Library, PluginSettings, ReadwiseDocument, Tag } from 'types';
+import type { Export, Highlight, Library, PluginSettings, ReadwiseDocument, Tag, ReadwiseFile } from 'types';
 
 // Constants
 import { DEFAULT_SETTINGS } from 'constants/index';
@@ -29,7 +29,7 @@ export default class ReadwiseMirror extends Plugin {
   private env: Environment;
   private isSyncing = false;
   private frontmatterManager: FrontmatterManager;
-  private deduplicatingVault: DeduplicatingVaultWriter;
+  private deduplicatingVaultWriter: DeduplicatingVaultWriter;
 
   // Add logger getter
   get logger() {
@@ -52,7 +52,7 @@ export default class ReadwiseMirror extends Plugin {
   set readwiseApi(api: ReadwiseApi) {
     this._readwiseApi = api;
   }
-  
+
   set headerTemplate(template: string) {
     this._headerTemplate = new Template(template, this.env, null, true);
   }
@@ -178,7 +178,7 @@ export default class ReadwiseMirror extends Plugin {
     for (const bookId in library.books) {
       const book = library.books[bookId];
 
-      const { title, highlights } = book;
+      const { highlights } = book;
       const num_highlights = highlights.length;
       this.logger.warn(`Replacing colon with ${this.settings.colonSubstitute}`);
       const sanitizedTitle = this.filenameFromTitle(book.title);
@@ -192,7 +192,6 @@ export default class ReadwiseMirror extends Plugin {
         const logFile = vault.getFiles().filter((file) => file.name === this.settings.logFileName)[0];
         this.logger.info('logFile:', logFile);
 
-        const logFileContents = await vault.read(logFile);
         await vault.process(logFile, (content) => `${content}\n\n${logString}`);
       } else {
         vault.create(path, logString);
@@ -203,29 +202,21 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   async writeLibraryToMarkdown(library: Library) {
-    const vault = this.app.vault;
-
-    // Create parent directories for all categories synchronously
     try {
-      for (const category of library.categories) {
-        const titleCaseCategory = category.charAt(0).toUpperCase() + category.slice(1); // Title Case the directory name
-        const path = `${this.settings.baseFolderName}/${titleCaseCategory}`;
-        const abstractFolder = vault.getAbstractFileByPath(path);
-
-        if (!abstractFolder) {
-          await vault.createFolder(path);
-          this.logger.info('Successfully created folder', path);
-        }
-      }
+      await this.deduplicatingVaultWriter.createCategoryFolders(library.categories);
     } catch (err) {
       this.logger.error('Failed to create category folders', err);
       this.notify.notice('Readwise: Failed to create category folders. Sync aborted.');
       return;
     }
 
+    // Prepare all files first
+    const readwiseFiles: ReadwiseFile[] = [];
+
     // Get total number of records
     const booksTotal = Object.keys(library.books).length;
     let bookCurrent = 1;
+
     for (const bookId in library.books) {
       this.notify.setStatusBarText(
         `Readwise: Processing - ${Math.floor(
@@ -271,70 +262,79 @@ export default class ReadwiseMirror extends Plugin {
 
       if (filteredHighlights.length === 0) {
         this.logger.debug(`No highlights found for '${title}' (${source_url})`);
-      } else {
-        // get an array with all tags from highlights
-        const highlightTags = this.getTagsFromHighlights(filteredHighlights);
-
-        // Parse Authors, normalize their names and remove titles (configurable in settings)
-        const authorParser = new AuthorParser({
-          normalizeCase: this.settings.normalizeAuthorNames,
-          removeTitles: this.settings.stripTitlesFromAuthors,
-        });
-        const authors = authorParser.parse(author);
-
-        const authorStr =
-          authors[0] && authors?.length > 1
-            ? authors.map((authorName: string) => `[[${authorName.trim()}]]`).join(', ')
-            : author
-              ? `[[${author}]]`
-              : '';
-
-        const metadata: ReadwiseDocument = {
-          id: user_book_id,
-          title,
-          sanitized_title: filename,
-          author: authors,
-          authorStr,
-          document_note,
-          summary,
-          category,
-          num_highlights,
-          created: created ? this.formatDate(created) : '',
-          updated: updated ? this.formatDate(updated) : '',
-          cover_image_url: cover_image_url.replace('SL200', 'SL500').replace('SY160', 'SY500'),
-          highlights_url: readwise_url,
-          highlights,
-          last_highlight_at: last_highlight_at ? this.formatDate(last_highlight_at) : '',
-          source_url,
-          unique_url,
-          tags: this.formatTags(book_tags),
-          highlight_tags: this.formatTags(highlightTags),
-          tags_nohash: this.formatTags(book_tags, true, "'"),
-          hl_tags_nohash: this.formatTags(highlightTags, true, "'"),
-        };
-
-        // Render header, and highlights
-        const headerContents = this._headerTemplate.render(metadata);
-        const formattedHighlights = this.sortHighlights(filteredHighlights)
-          .map((highlight: Highlight) => this.formatHighlight(highlight, book))
-          .join('\n');
-
-        const contents = `${headerContents}${formattedHighlights}`;
-
-        // Try to find duplicates: local duplicates (e.g. copies of files), and remote duplicates
-        try {
-          this.deduplicatingVault.create(filename, contents, metadata);
-        } catch (err) {
-          this.logger.error(`Writing file ${book.title} (${metadata.highlights_url}) failed`, err);
-          this.notify.notice(`Readwise: Writing '${book.title}' failed. ${err}`);
-        }
+        continue;
       }
+
+      // get an array with all tags from highlights
+      const highlightTags = this.getTagsFromHighlights(filteredHighlights);
+
+      // Parse Authors, normalize their names and remove titles (configurable in settings)
+      const authorParser = new AuthorParser({
+        normalizeCase: this.settings.normalizeAuthorNames,
+        removeTitles: this.settings.stripTitlesFromAuthors,
+      });
+      const authors = authorParser.parse(author);
+
+      const authorStr =
+        authors[0] && authors?.length > 1
+          ? authors.map((authorName: string) => `[[${authorName.trim()}]]`).join(', ')
+          : author
+            ? `[[${author}]]`
+            : '';
+
+      const metadata: ReadwiseDocument = {
+        id: user_book_id,
+        highlights_url: readwise_url,
+        unique_url,
+        source_url,
+        title,
+        sanitized_title: filename,
+        author: authors,
+        authorStr,
+        document_note,
+        summary,
+        category,
+        num_highlights,
+        created: created ? this.formatDate(created) : '',
+        updated: updated ? this.formatDate(updated) : '',
+        cover_image_url: cover_image_url.replace('SL200', 'SL500').replace('SY160', 'SY500'),
+        highlights,
+        last_highlight_at: last_highlight_at ? this.formatDate(last_highlight_at) : '',
+        tags: this.formatTags(book_tags),
+        highlight_tags: this.formatTags(highlightTags),
+        tags_nohash: this.formatTags(book_tags, true, "'"),
+        hl_tags_nohash: this.formatTags(highlightTags, true, "'"),
+      };
+
+      // Render header, and highlights
+      const headerContents = this._headerTemplate.render(metadata);
+      const formattedHighlights = this.sortHighlights(filteredHighlights)
+        .map((highlight: Highlight) => this.formatHighlight(highlight, book))
+        .join('\n');
+
+      const contents = `${headerContents}${formattedHighlights}`;
+
+      readwiseFiles.push({
+        filename,
+        doc: metadata,
+        contents,
+      });
+    }
+
+    // Process all files in batch
+    try {
+      this.logger.time('process');
+      await this.deduplicatingVaultWriter.process(readwiseFiles);
+      this.logger.timeEnd('process');
+    } catch (err) {
+      this.logger.error('Failed to process files batch', err);
+      this.notify.notice('Readwise: Failed to process some files during sync.');
     }
   }
 
   // Sanitize title for use as filename
   private filenameFromTitle(title: string) {
-    return this.settings.useSlugify
+    const normalizedTitle = this.settings.useSlugify
       ? slugify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
           separator: this.settings.slugifySeparator,
           lowercase: this.settings.slugifyLowercase,
@@ -349,6 +349,9 @@ export default class ReadwiseMirror extends Plugin {
           .replace(/[#]+/g, ' ')
           .replace(/ +/g, ' ')
           .trim();
+
+    // Return normalized version of the title
+    return normalizePath(normalizedTitle);
   }
 
   async deleteLibraryFolder() {
@@ -370,7 +373,7 @@ export default class ReadwiseMirror extends Plugin {
     }
   }
 
-  async sync(full = false) {
+  async sync() {
     if (this.isSyncing) {
       this.notify.notice('Sync already in progress');
       return;
@@ -459,13 +462,6 @@ export default class ReadwiseMirror extends Plugin {
     }
   }
 
-  // Dedicated function to handle metadata change events
-  private onMetadataChange(file: TFile) {
-    const metadata: CachedMetadata = this.app.metadataCache.getFileCache(file);
-    if (metadata && !this.isSyncing) {
-      this.logger.info(`Updated metadata cache for file: ${file.path}: ${JSON.stringify(metadata?.frontmatter)}`);
-    }
-  }
 
   async onload() {
     await this.loadSettings();
@@ -496,7 +492,7 @@ export default class ReadwiseMirror extends Plugin {
     // Add a nunjucks filter to convert ".qa" notes to Q& A
     this.env.addFilter('qa', (str) => str.replace(/\.qa(.*)\?(.*)/g, '**Q:**$1?\r\n\r\n**A:**$2'));
 
-    this.frontmatterManager = new FrontmatterManager(this.app, this.settings, this.env);
+    this.frontmatterManager = new FrontmatterManager(this.app, this.settings, this.env, this.logger);
     this.frontmatterManager.updateFrontmatteTemplate(this.settings.frontMatterTemplate);
 
     this.headerTemplate = this.settings.headerTemplate;
@@ -513,11 +509,12 @@ export default class ReadwiseMirror extends Plugin {
       else this.notify.setStatusBarText('Readwise: Click to Sync');
     }
 
-    this.deduplicatingVault = new DeduplicatingVaultWriter(
+    this.deduplicatingVaultWriter = new DeduplicatingVaultWriter(
       this.app,
       this.settings,
       this.frontmatterManager,
-      this._logger
+      this.logger,
+      this.notify
     );
 
     this.registerDomEvent(statusBarItem, 'click', this.sync.bind(this));

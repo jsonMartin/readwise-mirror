@@ -177,7 +177,10 @@ export default class ReadwiseApi {
       highlightCount: 0,
     };
 
-    for (const record of results) {
+    // Sort results by user_book_id ascending
+    const sortedResults = [...results].sort((a, b) => a.user_book_id - b.user_book_id);
+
+    for (const record of sortedResults) {
       library.books[record.user_book_id] = record;
       library.categories.add(record.category);
       library.highlightCount += record.highlights.length;
