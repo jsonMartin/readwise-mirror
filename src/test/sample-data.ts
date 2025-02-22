@@ -23,8 +23,11 @@ export const testTags: Tag[] = [
 
 export const sampleMetadata: ReadwiseDocument = {
   id: 12345,
+  highlights_url: 'https://readwise.io/bookreview/12345',
+  unique_url: 'https://unique.com/[brackets]',
+  source_url: 'https://test.com/path?q=special chars: & +',
   title: "My Book:\nA Subtitle's Journey",
-  sanitized_title: "My Book - A Subtitle's Journey",
+  sanitized_title: "My Book - A Subtitle's Journey", 
   author: ['O\'Reilly, Tim', '"Doc" Smith'],
   authorStr: '[[O\'Reilly, Tim]] and [["Doc" Smith]]',
   document_note: 'Line 1\nLine 2\nLine 3: Important!',
@@ -34,7 +37,6 @@ export const sampleMetadata: ReadwiseDocument = {
   created: '2024-03-15T10:30:00Z',
   updated: '', // Test empty value
   cover_image_url: 'https://example.com/image?size=large&type=cover',
-  highlights_url: 'https://readwise.io/bookreview/12345',
   highlights: [
     {
       id: 12345,
@@ -66,8 +68,6 @@ export const sampleMetadata: ReadwiseDocument = {
     },
   ],
   last_highlight_at: '2024-03-16T09:15:00Z', // Test null value
-  source_url: 'https://test.com/path?q=special chars: & +',
-  unique_url: 'https://unique.com/[brackets]',
   tags: '#reading, #non-fiction: genre',
   highlight_tags: '#quote, #important: flag',
   tags_nohash: "'reading', 'non-fiction: genre'",

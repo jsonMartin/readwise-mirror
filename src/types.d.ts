@@ -68,6 +68,9 @@ export interface ReadwiseFile {
  */
 export interface ReadwiseDocument {
   id: number; // book id from Readwise API
+  highlights_url: string; // Readwise URL for the highlights page (unique across readwise)
+  unique_url: string; // Readwise URL for the book page (unique across readwise)
+  source_url: string; // URL of the book on the source website
   title: string;
   sanitized_title: string;
   author: string[];
@@ -79,11 +82,8 @@ export interface ReadwiseDocument {
   created: string;
   updated: string;
   cover_image_url: string;
-  highlights_url: string; // Readwise URL for the highlights page (unique across readwise)
   highlights: Highlight[];
   last_highlight_at: string;
-  source_url: string;
-  unique_url: string;
   tags: string;
   highlight_tags: string;
   tags_nohash: string;
