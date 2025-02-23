@@ -27,11 +27,11 @@ jobs:
         run: npm clean-install
         env:
           HUSKY: 0
-      # TODO: Re-enable after https://github.com/blacksmithgu/obsidian-dataview/issues/2288
-      # - name: Audit dependencies
-      #   run: npm audit && npm audit signatures
-      # - name: Audit code coverage
-      #   run: npm run coverage
+      - name: Audit dependencies
+        run: |
+          npm audit --audit-level=high --production
+          npm audit signatures
+        continue-on-error: true  # Don't fail the build, but report issues
       - name: Build plugin
         run: npm run build
       - name: Release update
