@@ -25,7 +25,6 @@ export default {
     'obsidian',
     // Add these built-in Node.js modules as external
     'node:path',
-    'path'
   ],
   plugins: [
     typescript(),
