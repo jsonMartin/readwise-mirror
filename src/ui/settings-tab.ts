@@ -68,6 +68,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
   // Button-based authentication inspired by the official Readwise plugin
   private async getUserAuthToken(button: HTMLElement, attempt = 0): Promise<boolean> {
+    const MAX_ATTEMPTS = 20;
+    const BASE_TIMEOUT = 1000;
+    const MAX_TIMEOUT = 10000;
+
     const baseURL = 'https://readwise.io';
     const uuid = this.getReadwiseMirrorClientId();
 
@@ -95,12 +99,13 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       this.logger.error('Failed to authenticate with Readwise:', e);
     }
 
-    if (attempt > 20) {
+    if (attempt >= MAX_ATTEMPTS) {
       this.notify.notice('Authentication timeout. Please try again.');
       return false;
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const timeout = Math.min(BASE_TIMEOUT * 2 ** attempt, MAX_TIMEOUT);
+    await new Promise((resolve) => setTimeout(resolve, timeout));
     return this.getUserAuthToken(button, attempt + 1);
   }
 
