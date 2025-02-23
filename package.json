@@ -7,8 +7,8 @@
         "dev": "rollup --config rollup.config.mjs -w",
         "build": "rollup --config rollup.config.mjs --environment BUILD:production",
         "deploy:local": "npm run build && cross-env PACKAGE_NAME=$npm_package_name node deploy-local.mjs",
-        "release:local": "npm ci && npm run build && npx -p semantic-release-obsidian-plugin@1.1.0 -p conventional-changelog-conventionalcommits semantic-release --dry-run false",
-        "release:dry-run": "npm ci && npm run build && npx -p semantic-release-obsidian-plugin@1.1.0 -p conventional-changelog-conventionalcommits semantic-release --dry-run"
+        "release:local": "npm ci && npm run build && semantic-release --dry-run false",
+        "release:dry-run": "npm ci && npm run build && semantic-release --dry-run"
     },
     "keywords": [],
     "author": "",
@@ -18,12 +18,16 @@
         "@rollup/plugin-commonjs": "^28.0.2",
         "@rollup/plugin-node-resolve": "^16.0.0",
         "@rollup/plugin-typescript": "^12.1.2",
+        "@semantic-release/git": "^10.0.1",
         "@types/node": "^22.13.4",
         "@types/nunjucks": "^3.2.6",
+        "conventional-changelog-conventionalcommits": "^8.0.0",
         "cross-env": "^7.0.3",
         "dotenv": "^16.4.7",
         "obsidian": "^1.1.1",
         "rollup": "^4.34.8",
+        "semantic-release": "^24.2.3",
+        "semantic-release-obsidian-plugin": "^1.1.0",
         "tslib": "^2.8.1",
         "typescript": "^5.7.3"
     },
