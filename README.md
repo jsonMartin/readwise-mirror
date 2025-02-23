@@ -498,7 +498,7 @@ The plugin implements a robust strategy for handling filename changes:
 
 1. First attempts a direct rename to the new filename
 2. If a file already exists at the target path, creates a new file with a hash suffix
-3. Throughout the process, preserves all metadata and internal links
+3. Throughout the process, preserves all metadata and internal links to Readwise items (please note that Markdown / Wikilinks in your notes can not be preserved, as the plugin can not sync changes to the original Readwise content)
 
 ### Remote Duplicates
 
