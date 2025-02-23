@@ -7,8 +7,8 @@
         "dev": "rollup --config rollup.config.mjs -w",
         "build": "rollup --config rollup.config.mjs --environment BUILD:production",
         "deploy:local": "npm run build && cross-env PACKAGE_NAME=$npm_package_name node deploy-local.mjs",
-        "release:local": "npm ci && npm run build && npx -p semantic-release-obsidian-plugin@1.1.0 semantic-release --dry-run false",
-        "release:dry-run": "npm ci && npm run build && npx -p semantic-release-obsidian-plugin@1.1.0 semantic-release --dry-run"
+        "release:local": "npm ci && npm run build && npx -p semantic-release-obsidian-plugin@1.1.0 -p conventional-changelog-conventionalcommits semantic-release --dry-run false",
+        "release:dry-run": "npm ci && npm run build && npx -p semantic-release-obsidian-plugin@1.1.0 -p conventional-changelog-conventionalcommits semantic-release --dry-run"
     },
     "keywords": [],
     "author": "",

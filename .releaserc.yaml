@@ -7,8 +7,10 @@
 #   dry-run (default):  npx -p github:brianrodri/semantic-release-obsidian-plugin semantic-release 
 #   for real: npx -p github:brianrodri/semantic-release-obsidian-plugin semantic-release --dry-run false
 plugins:
-  - '@semantic-release/commit-analyzer'
-  - '@semantic-release/release-notes-generator'
+  - - '@semantic-release/commit-analyzer'
+    - preset: conventionalcommits
+  - - '@semantic-release/release-notes-generator'
+    - preset: conventionalcommits
   - semantic-release-obsidian-plugin
   - - '@semantic-release/github'
     - assets:
