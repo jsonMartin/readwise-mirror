@@ -64,14 +64,12 @@ export default class ReadwiseApi {
    * @returns {Promise<boolean>} - Returns a promise that resolves to a boolean indicating if the token is valid
    */
   async hasValidToken(): Promise<boolean> {
-    if (this.validToken === undefined) {
-      this.validateToken().then((value) => {
-        this.validToken = value;
-        return value;
-      });
-    }
-    return this.validToken;
-  }
+ async hasValidToken(): Promise<boolean> {
+   if (this.validToken === undefined) {
+     this.validToken = await this.validateToken();
+   }
+   return this.validToken;
+ }
 
   /**
    * Checks if the token is valid by making a request to the Readwise API
