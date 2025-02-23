@@ -15,7 +15,7 @@ export class TokenValidationError extends Error {
 
 /**
  * Readwise API class
- */ 
+ */
 export default class ReadwiseApi {
   private apiToken: string;
   private validToken: boolean | undefined;
@@ -64,12 +64,11 @@ export default class ReadwiseApi {
    * @returns {Promise<boolean>} - Returns a promise that resolves to a boolean indicating if the token is valid
    */
   async hasValidToken(): Promise<boolean> {
- async hasValidToken(): Promise<boolean> {
-   if (this.validToken === undefined) {
-     this.validToken = await this.validateToken();
-   }
-   return this.validToken;
- }
+    if (this.validToken === undefined) {
+      this.validToken = await this.validateToken();
+    }
+    return this.validToken;
+  }
 
   /**
    * Checks if the token is valid by making a request to the Readwise API
@@ -92,7 +91,7 @@ export default class ReadwiseApi {
    * @param contentType - The type of content to fetch from the API
    * @param lastUpdated - The date to fetch updates from
    * @param bookId - The ID of the book to fetch highlights from
-   * @returns {Promise<Export[]>} - Returns a promise that resolves to an array of Export objects 
+   * @returns {Promise<Export[]>} - Returns a promise that resolves to an array of Export objects
    * @throws {Error} - Throws an error if the request fails
    */
   async fetchData(contentType = 'export', lastUpdated?: string, bookId?: number[]): Promise<Export[]> {
@@ -166,7 +165,7 @@ export default class ReadwiseApi {
   /**
    * Builds a library object from the fetched data
    * @param results - The fetched data from the Readwise API
-   * @returns {Promise<Library>} - Returns a promise that resolves to a Library object 
+   * @returns {Promise<Library>} - Returns a promise that resolves to a Library object
    */
   async buildLibrary(results: Export[]): Promise<Library> {
     const library: Library = {
@@ -189,7 +188,7 @@ export default class ReadwiseApi {
 
   /**
    * Fetches all highlights from Readwise API
-   * @returns {Promise<Library>} - Returns a promise that resolves to a Library object 
+   * @returns {Promise<Library>} - Returns a promise that resolves to a Library object
    */
   async downloadFullLibrary(): Promise<Library> {
     const records = (await this.fetchData('export')) as Export[];
@@ -199,8 +198,8 @@ export default class ReadwiseApi {
 
   /**
    * Fetches updates from Readwise API
-   * @param lastUpdated - The date to fetch updates from  
-   * @returns {Promise<Library>} - Returns a promise that resolves to a Library object 
+   * @param lastUpdated - The date to fetch updates from
+   * @returns {Promise<Library>} - Returns a promise that resolves to a Library object
    */
   async downloadUpdates(lastUpdated: string): Promise<Library> {
     // Fetch updated books and then fetch all their highlights
