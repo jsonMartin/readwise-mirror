@@ -15,16 +15,12 @@ class Logger {
 
     // biome-ignore lint/suspicious/noExplicitAny: console.debug accepts any type
     debug(...messages: any[]): void {
-        if (this.debugMode) {
-            console.debug('Readwise Mirror:', ...messages);
-        }
+        this.debugMode ? console.debug('Readwise Mirror:', ...messages) : null;
     }
 
     // biome-ignore lint/suspicious/noExplicitAny: console.info accepts any type
     info(...messages: any[]): void {
-        if (this.debugMode) {
-            console.info('Readwise Mirror:', ...messages);
-        }
+        this.debugMode ? console.info('Readwise Mirror:', ...messages) : null;
     }
 
     // biome-ignore lint/suspicious/noExplicitAny: console.warn accepts any type
