@@ -117,18 +117,18 @@ export class DeduplicatingVaultWriter {
         await this.vault.process(file, () => `${frontmatter.toString()}${readwiseFile.contents}`);
       }
 
-      if (readwiseFile.filename !== file.name) {
-        let newPath = this.getNormalizedPath(file.parent.path, `${readwiseFile.filename}.md`);
+      if (readwiseFile.basename !== file.basename) {
+        let newPath = this.getNormalizedPath(file.parent.path, `${readwiseFile.basename}.md`);
         const newFileExists = await this.app.vault.adapter.exists(newPath, false);
         if (newFileExists) {
           // Add hash to filename if there's a collision
           const hash = this.generateShortHash(readwiseFile.doc);
-          newPath = this.getNormalizedPath(file.parent.path, `${readwiseFile.filename} ${hash}.md`);
+          newPath = this.getNormalizedPath(file.parent.path, `${readwiseFile.basename} ${hash}.md`);
         }
 
         if (newPath !== file.path) {
-          await this.vault.rename(file, newPath);
           this.logger.debug(`Renamed file from ${file.path} to ${newPath}`);
+          await this.vault.rename(file, newPath);
         }
       }
     } catch (err) {
@@ -170,11 +170,11 @@ export class DeduplicatingVaultWriter {
     this.fileCount = 0;
     
     this.notify.setStatusBarText(`Readwise: ${this.totalFileCount} files to process`);
-    
+
     // First, compute paths for all files
     const filesWithPaths: ReadwiseFile[] = readwiseFiles.map((file) => ({
       ...file,
-      path: this.getNormalizedPath(this.getCategoryPath(file.doc.category), `${file.filename}.md`),
+      path: this.getNormalizedPath(this.getCategoryPath(file.doc.category), `${file.basename}.md`),
     }));
     // Group by path (which includes category and filename)
     const groupedByPath = new Map<string, ReadwiseFile[]>();
@@ -269,7 +269,7 @@ export class DeduplicatingVaultWriter {
      * via the DataAdapter, and if it does, we need to check if it's the same file as the one
      * we're trying to write.
      */
-    const path = this.getNormalizedPath(this.getCategoryPath(readwiseFile.doc.category), `${readwiseFile.filename}.md`);
+    const path = this.getNormalizedPath(this.getCategoryPath(readwiseFile.doc.category), `${readwiseFile.basename}.md`);
 
     this.notifyFileCount();
 
@@ -291,7 +291,7 @@ export class DeduplicatingVaultWriter {
         }
         // Create new path with hash
         const hash = this.generateShortHash(readwiseFile.doc);
-        const newPath = this.getNormalizedPath(this.getCategoryPath(readwiseFile.doc.category), `${readwiseFile.filename} ${hash}.md`);
+        const newPath = this.getNormalizedPath(this.getCategoryPath(readwiseFile.doc.category), `${readwiseFile.basename} ${hash}.md`);
         const newFileExists = await this.app.vault.adapter.exists(newPath, false);
         if (newFileExists) {
           const existingNewFile = await this.vault.getFileByPath(newPath);

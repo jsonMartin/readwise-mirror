@@ -255,7 +255,7 @@ export default class ReadwiseMirror extends Plugin {
         .reverse()[0];
 
       // Sanitize title, replace colon with substitute from settings
-      const filename = this.filenameFromTitle(title);
+      const basename = this.filenameFromTitle(title);
 
       // Filter highlights
       const filteredHighlights = this.filterHighlights(highlights);
@@ -282,13 +282,13 @@ export default class ReadwiseMirror extends Plugin {
             ? `[[${author}]]`
             : '';
 
-      const metadata: ReadwiseDocument = {
+      const doc: ReadwiseDocument = {
         id: user_book_id,
         highlights_url: readwise_url,
         unique_url,
         source_url,
         title,
-        sanitized_title: filename,
+        sanitized_title: basename,
         author: authors,
         authorStr,
         document_note,
@@ -307,7 +307,7 @@ export default class ReadwiseMirror extends Plugin {
       };
 
       // Render header, and highlights
-      const headerContents = this._headerTemplate.render(metadata);
+      const headerContents = this._headerTemplate.render(doc);
       const formattedHighlights = this.sortHighlights(filteredHighlights)
         .map((highlight: Highlight) => this.formatHighlight(highlight, book))
         .join('\n');
@@ -315,8 +315,8 @@ export default class ReadwiseMirror extends Plugin {
       const contents = `${headerContents}${formattedHighlights}`;
 
       readwiseFiles.push({
-        filename,
-        doc: metadata,
+        basename,
+        doc,
         contents,
       });
     }

@@ -49,13 +49,13 @@ export interface Library {
 /**
  * Represents a file that is pending to be written to the vault.
  * 
- * @property filename - The name of the file to write
+ * @property basename - The basename of the file to write (consistent with TFile class)
  * @property doc - The Readwise document metadata
  * @property contents - The contents of the file to write
  * @property path - The full path including category
  */
 export interface ReadwiseFile {
-  filename: string;
+  basename: string;   // The basename of the file to write (consistent with TFile class)
   path?: string; // The full path including category
   doc: ReadwiseDocument;
   contents: string; // Rendered contents of the file
