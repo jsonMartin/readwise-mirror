@@ -1,7 +1,9 @@
 import type { AuthorParserOptions } from 'types';
 
 export class AuthorParser {
-  private readonly AUTHOR_SEPARATORS = /,\s*and\s*|\s+and\s+|,\s*/;
+  /** Matches common separators between author names: comma-and, and, or comma */
+  private readonly AUTHOR_SEPARATORS = /(?:,\s*and\s*)|(?:\s+and\s+)|(?:,\s*)/;
+  /** Matches common English titles at the start of a name */
   private readonly TITLES = /^(dr|prof|mr|mrs|ms|miss|sir|lady)\.\s+/i;
 
   constructor(private options: AuthorParserOptions = {}) {
@@ -24,7 +26,12 @@ export class AuthorParser {
     return authorString
       .split(this.AUTHOR_SEPARATORS)
       .map(author => this.processAuthor(author))
-      .filter(Boolean);
+      .filter(author => {
+        if (!author) {
+          return false;
+        }
+        return true;
+      });
   }
 
   /**
