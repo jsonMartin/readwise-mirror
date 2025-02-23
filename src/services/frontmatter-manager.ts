@@ -256,7 +256,8 @@ export class FrontmatterManager {
       return true;
     });
 
-    filteredLines.splice(endIndex, 0, property);
+    const d = lines.length - filteredLines.length;
+    filteredLines.splice(endIndex - d, 0, property);
     return filteredLines.join('\n');
   }
 
