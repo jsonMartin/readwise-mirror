@@ -1,5 +1,8 @@
 # Readwise Mirror Plugin
 
+> [!WARNING]  
+> Readwise Mirror 2.x is a major rewrite of the plugin which might break things due to changes how filenames are generated and validated. The documentation contains a step-by-step guide how you can prepare an existing Readwise library by adding the `uri` tracking property to your items before upgrading to ensure links to items in your Readwise library will be updated. You can find the guide [here](#upgrading-from-1xx-to-2xx).
+
 **Readwise Mirror** is an unoffical open source plugin for the powerful note-taking and knowledge-base application [Obsidian](http://obsidian.md/). This plugin allows a user to "mirror" their entire Readwise library by automatically downloading all highlights/notes and syncing changes directly into an Obsidian vault.
 
 ![example.gif](https://raw.githubusercontent.com/jsonMartin/readwise-mirror/master/example.gif)
@@ -429,66 +432,113 @@ Rendered output:
 
 ## Deduplication
 
-If File Tracking is enabled, the plugin prevents duplicate files when articles are re-imported from Readwise, maintaining link consistency in your vault. This can be useful in a number of cases:
+The plugin implements a deduplication strategy to handle both tracked and untracked files, ensuring consistency in your vault while preserving existing content and links.
 
-- if you change the character used to escape the colon `:` in your titles,
-- when changing to use the "Slugify" feature, or changing its options, and  
-- if the title of a Readwise item changes at the source
+### File Tracking
 
-### How It Works
+When File Tracking is enabled (via `trackFiles` and `trackingProperty` settings), the plugin uses the `highlights_url` property to track unique documents from Readwise.
 
-1. **File Matching**
-   - Uses MetadataCache to find files with matching `readwise_url`
-   - Checks all vault locations, not just the Readwise folder
-   - Honors existing file structure
+## Deduplication Strategy
 
-2. **Update Strategy**
-   - If exact filename match exists: Updates content in place
-   - If different filename exists: Updates first matching file, and changes this file's filename to the new filename
-   - Additional matches: Either deleted or marked as duplicates (default, with the `duplicate` property set to `true`)
+### Path-Based Grouping
 
-3. **Link Preservation**
-   - Maintains existing internal links
-   - Preserves file locations in vault
-   - Updates content while keeping references intact
+Files are first grouped by their normalized path (category + filename), handling potential case-sensitivity issues across different filesystems. This ensures consistent behavior regardless of your operating system but leaves different items with the same filename in different categories untouched (e.g. Books and Supplemental Books).
 
-### Duplicate Handling
+### Processing Logic
 
-If File Tracking is enabled, when duplicates are found:
+#### For Tracked Files (File Tracking Enabled)
 
-1. **Exact Match**
+1. **Existing Files with Matching `highlights_url`**
 
    ```shell
-   📄 "My Article.md" (existing)
-   └── Updates content in place
+   📄 "My Article.md" (primary, matching highlights_url)
+   └── Updates content and frontmatter
+   📄 "Same Article.md" (duplicate, matching highlights_url)
+   └── Either deleted or marked as duplicate: true
    ```
 
-2. **Different Filename**
+2. **Path Collision (Different `highlights_url`)**
 
    ```shell
-   📄 "Article (2024).md" (existing)
-
-   └── Updates content, changes filename to "My Article.md"
+   📄 "My Article.md" (existing file)
+   📄 "My Article <hash>.md" (new file)
+   └── Creates new file with hash suffix
    ```
 
-3. **Multiple Matches**
+#### For Untracked Files (File Tracking Disabled)
 
-   ```shell
-   📄 "My Article.md" (primary)
-   └── Updated with new content
-   📄 "Same Article.md" (duplicate)
-   └── Deleted or marked with duplicate: true
+When multiple files share the same path:
+
+```shell
+📄 "My Article.md" (first file)
+📄 "My Article <hash1>.md" (second file)
+📄 "My Article <hash2>.md" (third file)
+└── First file keeps original name, others get unique hashes
+```
+
+### File Operations
+
+The plugin carefully manages file operations to maintain vault consistency:
+
+1. **Content Updates**
+   - Preserves original file creation and modification timestamps
+   - Selectively updates frontmatter based on `updateFrontmatter` setting
+   - Handles filename changes while maintaining internal links and metadata
+
+2. **Duplicate Management**
+   Based on your settings, duplicates are handled in one of two ways:
+   - When `deleteDuplicates: true`, duplicate files are moved to trash
+   - When `deleteDuplicates: false`, duplicates are marked with `duplicate: true` in frontmatter
+
+## Special Considerations
+
+### Filename Changes
+
+The plugin implements a robust strategy for handling filename changes:
+
+1. First attempts a direct rename to the new filename
+2. If a file already exists at the target path, creates a new file with a hash suffix
+3. Throughout the process, preserves all metadata and internal links
+
+### Remote Duplicates
+
+Readwise can contain multiple items sharing the same title but with different IDs. The plugin handles these cases by:
+
+1. Using the plain filename (e.g. `My Duplicate Book.md`) for the first encountered item
+2. Adding a short hash of the Readwise ID to subsequent files (e.g. `My Duplicate Book <HASH>.md`)
+
+## Deduplication Limitations
+
+The current implementation has several important considerations:
+
+- File ordering affects clean filename assignment, though we mitigate this by sorting by Readwise ID (ascending)
+- Initial setup requires a full sync to establish proper tracking properties
+- During the initial full sync, local modifications may be overwritten
+- Platform differences in case-sensitivity are handled through normalized path comparison
+
+## Best Practices
+
+To get the most out of the deduplication system:
+
+1. Enable File Tracking for the most reliable deduplication experience
+2. Run a full sync when first enabling tracking
+3. Consider maintaining unique titles in Readwise to minimize hash suffix usage
+
+## Upgrading from 1.x.x to 2.x.x
+
+If you are upgrading from 1.x.x to 2.x.x, and want to preserve your existing links to items in your Readwise library, you need to follow these steps before upgrading the plugin:
+
+1. Make sure you have a backup of your vault (or at least your Readwise Mirror folder)
+2. In the plugin settings, add the `uri` tracking property to the Frontmatter template. Just add the following at the end of the template and enable Frontmatter[^1]:
+
+   ```yaml
+   uri: {{ highlights_url }}
    ```
 
-### Deduplication limitations
+3. Run **a full sync** to establish proper tracking properties (this will overwrite your local changes, but will preserve the filenames of your existing files according to the way version 1.4.11 of the plugin creates them)
 
-Currently, the following limitations apply to deduplication:
+4. Upgrade the plugin to 2.x.x and enable File Tracking
 
-- Readwise items with the exact same title will be detected, the first one in the export will be used to write to your vault
-- To start using deduplication, you have to run a full sync to make sure all your files have the deduplication frontmatter property and can thus be deduplicated. This means any changes you made to your local files will be lost (this is not a new behaviour though, but you should be aware of it)
+Your subsequent syncs will then use the `uri` property to track unique files and ensure links to items in your Readwise library will be updated, even if the generated filenames change with the new version of the plugin.
 
-### Readwise (remote) duplicates
-
-In Readwise, multiple items with the same title but different `id`s can exist. This leads to a filename collision in `readwise-mirror`. If such a duplicate ('remote duplicate') is detected (because a file already exists with the "same" filename), the plugin will write a file which has a short hash of the Readwise `id` value added to the filename of all detected duplicates.
-
-The filename of two different Readwise items both titled `My Duplicate Book` would thus become `My Duplicate Book.md` and `My Duplicate Book <HASH>.md` where `<HASH>` would be a short hashed `id` value of the second item the plugin encounters when downloading. As this order can change between runs of the plugin (e.g., because of changes to one item which changes the order in the returned data), the filenames might change as well from run to run.
+[^1]: You might want to ensure that properties like `author` are omitted from the template as these have a tendency to break frontmatter. Alternatively, you can use the `authorStr` variable, or run a plugin like "Linter" to check and fix all your Readwise notes before upgrading.
