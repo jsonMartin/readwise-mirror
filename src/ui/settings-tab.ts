@@ -733,7 +733,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             .onChange(async (value) => {
               this.plugin.settings.trackFiles = value;
               await this.plugin.saveSettings();
-              this.frontmatterManager.updateFrontmatteTemplate(this.plugin.settings.frontMatterTemplate);
+              this.frontmatterManager.updateFrontmatterTemplate(this.plugin.settings.frontMatterTemplate);
               this.display();
             })
         );
@@ -752,7 +752,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               .onChange(async (value) => {
                 this.plugin.settings.trackingProperty = value || 'uri';
                 await this.plugin.saveSettings();
-                this.frontmatterManager.updateFrontmatteTemplate(this.plugin.settings.frontMatterTemplate);
+                this.frontmatterManager.updateFrontmatterTemplate(this.plugin.settings.frontMatterTemplate);
               })
           );
 
@@ -939,7 +939,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
           updatePreview(validationResult);
 
-          this.frontmatterManager.updateFrontmatteTemplate(value);
+          this.frontmatterManager.updateFrontmatterTemplate(value);
           await this.plugin.saveSettings();
         });
 

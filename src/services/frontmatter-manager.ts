@@ -262,7 +262,7 @@ export class FrontmatterManager {
   }
 
   // Update the frontmatter template with the sync properties (and remove the markers)
-  public updateFrontmatteTemplate(template: string) {
+  public updateFrontmatterTemplate(template: string) {
     this.frontMatterTemplate = new Template(this.addSyncPropertiesToTemplate(template), this.env, null, true);
   }
 

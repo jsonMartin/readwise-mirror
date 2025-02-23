@@ -493,7 +493,7 @@ export default class ReadwiseMirror extends Plugin {
     this.env.addFilter('qa', (str) => str.replace(/\.qa(.*)\?(.*)/g, '**Q:**$1?\r\n\r\n**A:**$2'));
 
     this.frontmatterManager = new FrontmatterManager(this.app, this.settings, this.env, this.logger);
-    this.frontmatterManager.updateFrontmatteTemplate(this.settings.frontMatterTemplate);
+    this.frontmatterManager.updateFrontmatterTemplate(this.settings.frontMatterTemplate);
 
     this.headerTemplate = this.settings.headerTemplate;
     this.highlightTemplate = this.settings.highlightTemplate;
