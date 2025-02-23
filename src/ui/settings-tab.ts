@@ -161,7 +161,18 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    // Add debug mode setting
+    this.renderDebugMode(containerEl);
+    this.renderAuthentication(containerEl);
+    this.renderLibrarySettings(containerEl);
+    this.renderSyncSettings(containerEl);
+    this.renderAuthorSettings(containerEl);
+    this.renderHighlightSettings(containerEl);
+    this.renderFilenameSettings(containerEl);
+    this.renderSyncLogging(containerEl);
+    this.renderTemplates(containerEl);
+  }
+
+  private renderDebugMode(containerEl: HTMLElement): void {
     new Setting(containerEl)
       .setName('Debug mode')
       .setDesc('Enable debug logging')
@@ -173,10 +184,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
+  }
 
-    // Rest of settings...
-
-    // Authentication section inspired by the official Readwise plugin
+  private renderAuthentication(containerEl: HTMLElement): void {
     new Setting(containerEl).setName('Authentication').setHeading();
 
     let hasValidToken: boolean | null = null;
@@ -303,7 +313,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           .setValue(maskedToken)
           .setDisabled(true);
       });
+  }
 
+  private renderLibrarySettings(containerEl: HTMLElement): void {
     new Setting(containerEl).setName('Library').setHeading();
 
     new Setting(containerEl)
@@ -319,7 +331,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+  }
 
+  private renderSyncSettings(containerEl: HTMLElement): void {
     new Setting(containerEl).setName('Sync').setHeading();
 
     new Setting(containerEl)
@@ -331,7 +345,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
+  }
 
+  private renderAuthorSettings(containerEl: HTMLElement): void {
     new Setting(containerEl)
       .setName('Author names')
       .setHeading()
@@ -380,7 +396,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
+  }
 
+  private renderHighlightSettings(containerEl: HTMLElement): void {
     new Setting(containerEl).setName('Highlight organization').setHeading();
 
     new Setting(containerEl)
@@ -428,7 +446,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
+  }
 
+  private renderFilenameSettings(containerEl: HTMLElement): void {
     new Setting(containerEl).setName('Filenames').setHeading();
 
     new Setting(containerEl)
@@ -512,7 +532,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           })
         );
     }
+  }
 
+  private renderSyncLogging(containerEl: HTMLElement): void {
     new Setting(containerEl).setName('Sync logging').setHeading();
 
     new Setting(containerEl)
@@ -522,6 +544,8 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         toggle.setValue(this.plugin.settings.logFile).onChange(async (value) => {
           this.plugin.settings.logFile = value;
           await this.plugin.saveSettings();
+          // Trigger re-render to show/hide log filename setting
+          this.display();
         })
       );
 
@@ -541,7 +565,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             })
         );
     }
+  }
 
+  private renderTemplates(containerEl: HTMLElement): void {
     new Setting(containerEl)
       .setName('Templates')
       .setHeading()
