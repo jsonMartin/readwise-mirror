@@ -79,7 +79,7 @@ export class DeduplicatingVaultWriter {
    * @returns A short hash
    */
   private generateShortHash(doc: ReadwiseDocument): string {
-    return md5('sha256').substring(0, 4); 
+    return md5(doc.id.toString()).substring(0, 4); 
   }
 
   /**
