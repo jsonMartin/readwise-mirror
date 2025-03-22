@@ -341,7 +341,12 @@ export default class ReadwiseMirror extends Plugin {
       const template = this.settings.filenameTemplate;
       const context = {
         title: book.title,
-        author: book.author,
+        author: this.settings.normalizeAuthorNames ? 
+          new AuthorParser({
+            normalizeCase: true,
+            removeTitles: this.settings.stripTitlesFromAuthors
+          }).parse(book.author).join(', ') : 
+          book.author,
         category: book.category,
         source: book.source_url,
         book_id: book.user_book_id,
