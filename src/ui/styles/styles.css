@@ -1,4 +1,5 @@
-.settings-template-input, .error-details {
+.settings-template-input,
+.error-details {
   font-family: var(--font-monospace);
   font-size: smaller;
   resize: vertical;
@@ -27,4 +28,52 @@
 
 .indent {
   margin-left: 20px;
+}
+
+.settings-tab-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.settings-tab-buttons {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid var(--background-modifier-border);
+  padding-bottom: 0.5rem;
+}
+
+.settings-tab-button {
+  background: transparent;
+  border: none;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  border-radius: 4px 4px 0 0;
+  position: relative;
+}
+
+.settings-tab-button:hover {
+  color: var(--text-normal);
+  background-color: var(--background-modifier-hover);
+}
+
+.settings-tab-button.active {
+  color: var(--text-normal);
+  background-color: var(--interactive-accent);
+  font-weight: bold;
+}
+
+.settings-tab-button.active::after {
+  content: "";
+  position: absolute;
+  bottom: -0.5rem;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: var(--interactive-accent);
+}
+
+.settings-tab-content {
+  padding-top: 1rem;
 }

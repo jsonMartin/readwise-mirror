@@ -14,6 +14,76 @@ import type { TemplateValidationResult } from 'types';
 import type Notify from 'ui/notify';
 import ReadwiseApi, { TokenValidationError } from 'services/readwise-api';
 
+interface SettingsTab {
+  id: string;
+  name: string;
+  icon?: string; // Optional icon for visual distinction
+  render: (containerEl: HTMLElement) => void;
+}
+
+class TabView {
+  private activeTab: string;
+  private tabs: SettingsTab[];
+  private containerEl: HTMLElement;
+  private tabContent: HTMLElement;
+
+  constructor(containerEl: HTMLElement, tabs: SettingsTab[]) {
+    this.containerEl = containerEl;
+    this.tabs = tabs;
+    this.activeTab = tabs[0].id;
+  }
+
+  render() {
+    // Create tab container
+    const tabContainer = this.containerEl.createDiv({
+      cls: 'settings-tab-container',
+    });
+
+    // Create tab buttons
+    const tabButtons = tabContainer.createDiv({
+      cls: 'settings-tab-buttons',
+    });
+
+    for (const tab of this.tabs) {
+      const btn = tabButtons.createEl('button', {
+        cls: ['settings-tab-button', this.activeTab === tab.id ? 'active' : ''],
+        text: tab.name,
+      });
+      btn.addEventListener('click', () => this.switchTab(tab.id));
+    }
+
+    // Create tab content area
+    this.tabContent = tabContainer.createDiv({
+      cls: 'settings-tab-content',
+    });
+
+    this.renderActiveTab();
+  }
+
+  private renderActiveTab() {
+    // Clear existing content
+    this.tabContent.empty();
+
+    // Render active tab
+    const activeTab = this.tabs.find((t) => t.id === this.activeTab);
+    if (activeTab) {
+      activeTab.render(this.tabContent);
+    }
+  }
+
+  private switchTab(tabId: string) {
+    this.activeTab = tabId;
+
+    // Update button states
+    const buttons = this.containerEl.querySelectorAll('.settings-tab-button');
+    for (const btn of Array.from(buttons)) {
+      btn.classList.toggle('active', btn.textContent === this.tabs.find((t) => t.id === tabId)?.name);
+    }
+
+    this.renderActiveTab();
+  }
+}
+
 export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
   private plugin: ReadwiseMirror;
   private notify: Notify;
@@ -150,10 +220,14 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         item.appendText(`: ${desc}`);
       }
 
-      container.createDiv({
-        cls: 'template-syntax-note',
-        text: 'Supports Nunjucks templating syntax',
+      const syntaxNote = container.createDiv({ cls: 'template-syntax-note' });
+      syntaxNote.appendText('Supports Nunjucks templating syntax. See ');
+      const link = syntaxNote.createEl('a', {
+        text: 'built-in filters documentation',
+        href: 'https://mozilla.github.io/nunjucks/templating.html#builtin-filters',
       });
+      link.setAttr('target', '_blank');
+      syntaxNote.appendText('.');
     });
   }
 
@@ -161,15 +235,37 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    this.renderDebugMode(containerEl);
-    this.renderAuthentication(containerEl);
-    this.renderLibrarySettings(containerEl);
-    this.renderSyncSettings(containerEl);
-    this.renderAuthorSettings(containerEl);
-    this.renderHighlightSettings(containerEl);
-    this.renderFilenameSettings(containerEl);
-    this.renderSyncLogging(containerEl);
-    this.renderTemplates(containerEl);
+    const tabs: SettingsTab[] = [
+      {
+        id: 'general',
+        name: 'General',
+        render: (container) => {
+          this.renderDebugMode(container);
+          this.renderAuthentication(container);
+          this.renderLibrarySettings(container);
+          this.renderSyncSettings(container);
+          this.renderSyncLogging(container);
+        },
+      },
+      {
+        id: 'organization',
+        name: 'Organization',
+        render: (container) => {
+          this.renderAuthorSettings(container);
+          this.renderHighlightSettings(container);
+          this.renderFilenameSettings(container);
+        },
+      },
+      {
+        id: 'templates',
+        name: 'Templates',
+        render: (container) => {
+          this.renderTemplates(container);
+        },
+      },
+    ];
+
+    new TabView(containerEl, tabs).render();
   }
 
   private renderDebugMode(containerEl: HTMLElement): void {
@@ -251,7 +347,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             try {
               const isValid = await this.plugin.readwiseApi.validateToken();
               hasValidToken = isValid;
-              
+
               if (isValid) this.notify.setStatusBarText('Readwise: Click to Sync');
               validationButton?.setDisabled(isValid);
               validationButton?.setButtonText(isValid ? 'Re-authenticate with Readwise' : 'Authenticate with Readwise');
@@ -728,7 +824,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               fragment.createEl('br');
               if (this.plugin.settings.trackFiles) {
                 fragment.appendText('The tracking field ');
-                fragment.createEl('strong', { text: this.plugin.settings.trackingProperty });
+                fragment.createEl('strong', {
+                  text: this.plugin.settings.trackingProperty,
+                });
                 fragment.appendText(' cannot be protected.');
               }
             })
@@ -860,7 +958,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
                 'When enabled, duplicate files will be removed. Otherwise, they will be marked with duplicate: true in frontmatter.'
               );
               fragment.createEl('br');
-              fragment.createEl('blockquote', { text: 'Default: Mark duplicates in frontmatter' });
+              fragment.createEl('blockquote', {
+                text: 'Default: Mark duplicates in frontmatter',
+              });
             })
           )
           .addToggle((toggle) =>
@@ -878,8 +978,12 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
                 buttonContainer.style.gap = '10px';
                 buttonContainer.style.marginTop = '20px';
 
-                const cancelButton = buttonContainer.createEl('button', { text: 'Cancel' });
-                const confirmButton = buttonContainer.createEl('button', { text: 'Confirm' });
+                const cancelButton = buttonContainer.createEl('button', {
+                  text: 'Cancel',
+                });
+                const confirmButton = buttonContainer.createEl('button', {
+                  text: 'Confirm',
+                });
                 confirmButton.style.backgroundColor = 'var(--background-modifier-error)';
 
                 cancelButton.onclick = () => {
