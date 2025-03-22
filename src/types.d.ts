@@ -48,22 +48,22 @@ export interface Library {
 
 /**
  * Represents a file that is pending to be written to the vault.
- * 
+ *
  * @property basename - The basename of the file to write (consistent with TFile class)
  * @property doc - The Readwise document metadata
  * @property contents - The contents of the file to write
  * @property path - The full path including category
  */
 export interface ReadwiseFile {
-  basename: string;   // The basename of the file to write (consistent with TFile class)
+  basename: string; // The basename of the file to write (consistent with TFile class)
   path?: string; // The full path including category
   doc: ReadwiseDocument;
   contents: string; // Rendered contents of the file
 }
 /**
- *  is the metadata of a book from the Readwise API, 
+ *  is the metadata of a book from the Readwise API,
  * formatted for use in the nunjucks templates.
- * 
+ *
  * @see https://readwise.io/api/docs/highlights
  */
 export interface ReadwiseDocument {
@@ -102,47 +102,48 @@ export interface AuthorParserOptions {
 }
 
 export interface PluginSettings {
-  baseFolderName: string;      // Base folder where synced notes will be stored
-  apiToken: string | null;     // Readwise API authentication token
-  lastUpdated: string | null;  // Timestamp of last successful sync
-  autoSync: boolean;           // Whether to automatically sync on startup
-  highlightSortOldestToNewest: boolean;  // Sort highlights chronologically from oldest to newest
-  highlightSortByLocation: boolean;       // Sort highlights by their location in the document
-  highlightDiscard: boolean;              // Filter out discarded highlights
-  syncNotesOnly: boolean;      // Only sync highlights that have notes attached
-  colonSubstitute: string;     // String to replace colons in filenames
-  logFile: boolean;            // Whether to save sync logs to a file
-  logFileName: string;         // Name of the sync log file
-  frontMatter: boolean;        // Whether to include YAML frontmatter in notes
+  baseFolderName: string; // Base folder where synced notes will be stored
+  apiToken: string | null; // Readwise API authentication token
+  lastUpdated: string | null; // Timestamp of last successful sync
+  autoSync: boolean; // Whether to automatically sync on startup
+  highlightSortOldestToNewest: boolean; // Sort highlights chronologically from oldest to newest
+  highlightSortByLocation: boolean; // Sort highlights by their location in the document
+  highlightDiscard: boolean; // Filter out discarded highlights
+  syncNotesOnly: boolean; // Only sync highlights that have notes attached
+  colonSubstitute: string; // String to replace colons in filenames
+  logFile: boolean; // Whether to save sync logs to a file
+  logFileName: string; // Name of the sync log file
+  frontMatter: boolean; // Whether to include YAML frontmatter in notes
   frontMatterTemplate: string; // Template for YAML frontmatter content
-  headerTemplate: string;      // Template for document header content
-  highlightTemplate: string;   // Template for individual highlights
-  useSlugify: boolean;         // Whether to slugify filenames
-  slugifySeparator: string;    // Character to use as separator in slugified names
-  slugifyLowercase: boolean;   // Convert slugified names to lowercase
-  trackFiles: boolean;         // Track files using unique Readwise URLs
-  trackingProperty: string;    // Frontmatter property for storing tracking URL
-  deleteDuplicates: boolean;   // Remove duplicate files instead of marking them
+  headerTemplate: string; // Template for document header content
+  highlightTemplate: string; // Template for individual highlights
+  useSlugify: boolean; // Whether to slugify filenames
+  slugifySeparator: string; // Character to use as separator in slugified names
+  slugifyLowercase: boolean; // Convert slugified names to lowercase
+  trackFiles: boolean; // Track files using unique Readwise URLs
+  trackingProperty: string; // Frontmatter property for storing tracking URL
+  deleteDuplicates: boolean; // Remove duplicate files instead of marking them
   protectFrontmatter: boolean; // Protect specified frontmatter fields from updates
-  protectedFields: string;     // List of frontmatter fields to protect
-  updateFrontmatter: boolean;  // Allow updating of non-protected frontmatter fields
-  syncPropertiesToReadwise: boolean;  // Sync title/author changes back to Readwise
-  titleProperty: string;       // Frontmatter property for syncing title
-  authorProperty: string;      // Frontmatter property for syncing author
+  protectedFields: string; // List of frontmatter fields to protect
+  updateFrontmatter: boolean; // Allow updating of non-protected frontmatter fields
+  syncPropertiesToReadwise: boolean; // Sync title/author changes back to Readwise
+  titleProperty: string; // Frontmatter property for syncing title
+  authorProperty: string; // Frontmatter property for syncing author
   normalizeAuthorNames: boolean; // Normalize author names
   stripTitlesFromAuthors: boolean; // Strip titles from author names
+  debugMode: boolean; // Enable debug mode for detailed logging
   useCustomFilename: boolean; // Use custom filename template
   filenameTemplate: string; // Template for generating filenames
 }
 
 export interface YamlStringState {
-	hasSingleQuotes: boolean;
-	hasDoubleQuotes: boolean;
-	isValueEscapedAlready: boolean;
+  hasSingleQuotes: boolean;
+  hasDoubleQuotes: boolean;
+  isValueEscapedAlready: boolean;
 }
 
 export interface TemplateValidationResult {
-	isValid: boolean;
-	error?: string;
-	preview?: string;
+  isValid: boolean;
+  error?: string;
+  preview?: string;
 }

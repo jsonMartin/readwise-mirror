@@ -95,4 +95,4 @@ export const FRONTMATTER_TO_ESCAPE = ['title', 'sanitized_title', 'author', 'aut
 
 // YAML options
 // Don't line-break (mainly for compatiblity with platers/obsidian-linter#1227)
-export const YAML_TOSTRING_OPTIONS : ToStringOptions = { 'lineWidth': -1 }
+export const YAML_TOSTRING_OPTIONS: ToStringOptions = { lineWidth: -1 };
