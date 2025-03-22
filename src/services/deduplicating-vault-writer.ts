@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import * as md5 from 'md5';
 import { type App, type TFile, type Vault, normalizePath } from 'obsidian';
 import type { FrontmatterManager } from 'services/frontmatter-manager';
 import type Logger from 'services/logger';
@@ -79,7 +79,7 @@ export class DeduplicatingVaultWriter {
    * @returns A short hash
    */
   private generateShortHash(doc: ReadwiseDocument): string {
-    return createHash('sha256').update(doc.id.toString()).digest('hex').substring(0, 4);
+    return md5('sha256').substring(0, 4); 
   }
 
   /**
