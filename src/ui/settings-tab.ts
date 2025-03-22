@@ -452,6 +452,70 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     new Setting(containerEl).setName('Filenames').setHeading();
 
     new Setting(containerEl)
+      .setName('Use custom filename template')
+      .setDesc(
+        createFragment((fragment) => {
+          fragment.appendText(
+            'Use a custom template to generate filenames. Slugify and colon replacement will be applied after the filename has been generated.'
+          );
+          fragment.createEl('br');
+          fragment.createEl('br');
+          fragment.appendText('Available variables:');
+          fragment.createEl('ul', undefined, (ul) => {
+            ul.createEl('li', { text: '{{title}} - Document title' });
+            ul.createEl('li', { text: '{{author}} - Author name(s)' });
+            ul.createEl('li', {
+              text: '{{category}} - Content type (books, articles, etc)',
+            });
+            ul.createEl('li', { text: '{{source}} - Original content URL' });
+            ul.createEl('li', { text: '{{book_id}} - Unique document ID' });
+          });
+          fragment.createEl('br');
+          fragment.appendText('Example: {{title}} - {{author|trim}}');
+          fragment.createEl('br');
+          fragment.createEl('br');
+          fragment.appendText('Built-in filters:');
+          fragment.createEl('br');
+          fragment.appendText('You can use Nunjucks built-in filters like ');
+          fragment.createEl('code', { text: 'trim' });
+          fragment.appendText(', ');
+          fragment.createEl('code', { text: 'upper' });
+          fragment.appendText(', ');
+          fragment.createEl('code', { text: 'lower' });
+          fragment.appendText(', etc. See the ');
+          const link = fragment.createEl('a', {
+            text: 'Nunjucks documentation',
+            href: 'https://mozilla.github.io/nunjucks/templating.html#builtin-filters',
+          });
+          link.setAttr('target', '_blank');
+          fragment.appendText(' for all available filters.');
+        })
+      )
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.useCustomFilename).onChange(async (value) => {
+          this.plugin.settings.useCustomFilename = value;
+          await this.plugin.saveSettings();
+          this.display();
+        })
+      );
+
+    if (this.plugin.settings.useCustomFilename) {
+      new Setting(containerEl)
+        .setClass('indent')
+        .setName('Filename template')
+        .setDesc('Template used to generate filenames. All special characters will be sanitized.')
+        .addText((text) =>
+          text
+            .setPlaceholder('{{title}}')
+            .setValue(this.plugin.settings.filenameTemplate)
+            .onChange(async (value) => {
+              this.plugin.settings.filenameTemplate = value || '{{title}}';
+              await this.plugin.saveSettings();
+            })
+        );
+    }
+
+    new Setting(containerEl)
       .setName('Colon replacement in filenames')
       .setDesc(
         "Set the string to be used for replacement of colon (:) in filenames derived from the title. The default value for this setting is '-'."

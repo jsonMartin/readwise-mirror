@@ -131,7 +131,8 @@ export interface PluginSettings {
   authorProperty: string;      // Frontmatter property for syncing author
   normalizeAuthorNames: boolean; // Normalize author names
   stripTitlesFromAuthors: boolean; // Strip titles from author names
-  debugMode: boolean;
+  useCustomFilename: boolean; // Use custom filename template
+  filenameTemplate: string; // Template for generating filenames
 }
 
 export interface YamlStringState {

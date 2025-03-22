@@ -181,7 +181,7 @@ export default class ReadwiseMirror extends Plugin {
       const { highlights } = book;
       const num_highlights = highlights.length;
       this.logger.warn(`Replacing colon with ${this.settings.colonSubstitute}`);
-      const sanitizedTitle = this.filenameFromTitle(book.title);
+      const sanitizedTitle = this.getFileNameFromDoc(book);
       const contents = `\n- [[${sanitizedTitle}]] *(${num_highlights} highlights)*`;
       logString += contents;
     }
@@ -255,7 +255,7 @@ export default class ReadwiseMirror extends Plugin {
         .reverse()[0];
 
       // Sanitize title, replace colon with substitute from settings
-      const basename = this.filenameFromTitle(title);
+      const basename = this.getFileNameFromDoc(book);
 
       // Filter highlights
       const filteredHighlights = this.filterHighlights(highlights);
@@ -332,15 +332,34 @@ export default class ReadwiseMirror extends Plugin {
     }
   }
 
-  // Sanitize title for use as filename
-  private filenameFromTitle(title: string) {
+  /**
+   * Get the filename from the Readwise document
+   * @param book
+   * @returns filename
+   */
+  private getFileNameFromDoc(book: Export) {
+    let filename: string;
+    if (this.settings.useCustomFilename) {
+      const template = this.settings.filenameTemplate;
+      const context = {
+        title: book.title,
+        author: book.author,
+        category: book.category,
+        source: book.source_url,
+        book_id: book.user_book_id,
+      };
+      filename = new Template(template, this.env, null, true).render(context);
+    } else {
+      filename = book.title;
+    }
+
     const normalizedTitle = this.settings.useSlugify
-      ? slugify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
+      ? slugify(filename.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
           separator: this.settings.slugifySeparator,
           lowercase: this.settings.slugifyLowercase,
         })
       : // ... else filenamify the title and limit to 255 characters
-        filenamify(title.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
+        filenamify(filename.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
           replacement: ' ',
           maxLength: 255,
         })
@@ -350,7 +369,6 @@ export default class ReadwiseMirror extends Plugin {
           .replace(/ +/g, ' ')
           .trim();
 
-    // Return normalized version of the title
     return normalizePath(normalizedTitle);
   }
 
@@ -461,7 +479,6 @@ export default class ReadwiseMirror extends Plugin {
       this._readwiseApi = new ReadwiseApi(this.settings.apiToken, this.notify, this._logger);
     }
   }
-
 
   async onload() {
     await this.loadSettings();
