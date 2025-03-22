@@ -22,6 +22,7 @@ interface SettingsTab {
 }
 
 class TabView {
+  private static lastActiveTab: string;
   private activeTab: string;
   private tabs: SettingsTab[];
   private containerEl: HTMLElement;
@@ -30,7 +31,11 @@ class TabView {
   constructor(containerEl: HTMLElement, tabs: SettingsTab[]) {
     this.containerEl = containerEl;
     this.tabs = tabs;
-    this.activeTab = tabs[0].id;
+    // Use the last active tab if it exists and is valid, otherwise use first tab
+    this.activeTab = TabView.lastActiveTab && 
+                     tabs.some(t => t.id === TabView.lastActiveTab) ? 
+                     TabView.lastActiveTab : 
+                     tabs[0].id;
   }
 
   render() {
@@ -73,6 +78,7 @@ class TabView {
 
   private switchTab(tabId: string) {
     this.activeTab = tabId;
+    TabView.lastActiveTab = tabId; // Store the last active tab
 
     // Update button states
     const buttons = this.containerEl.querySelectorAll('.settings-tab-button');
