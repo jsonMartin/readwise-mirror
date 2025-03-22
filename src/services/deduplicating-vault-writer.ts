@@ -1,4 +1,4 @@
-import md5 from 'md5';
+import md5 from 'md5'; // Fix imports
 import { type App, type TFile, type Vault, normalizePath } from 'obsidian';
 import type { FrontmatterManager } from 'services/frontmatter-manager';
 import type Logger from 'services/logger';
