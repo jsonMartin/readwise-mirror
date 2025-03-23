@@ -1,3 +1,4 @@
+import { YAML_TOSTRING_OPTIONS } from 'constants/index';
 import * as YAML from 'yaml';
 
 /**
@@ -17,10 +18,7 @@ export class FrontmatterError extends Error {
  * Type definitions for Frontmatter values and data
  */
 type PrimitiveValue = string | number | boolean | Date;
-type FrontmatterValue =
-  | PrimitiveValue
-  | Array<PrimitiveValue>
-  | Record<string, PrimitiveValue | Array<PrimitiveValue>>;
+type FrontmatterValue = PrimitiveValue | Array<PrimitiveValue> | Record<string, PrimitiveValue | Array<PrimitiveValue>>;
 export type FrontmatterData = Record<string, FrontmatterValue>;
 
 /**
@@ -44,7 +42,7 @@ export class Frontmatter {
    */
   private validateData(data: FrontmatterData): FrontmatterData {
     try {
-      const yamlString = YAML.stringify(data);
+      const yamlString = YAML.stringify(data, YAML_TOSTRING_OPTIONS);
       const parsed = YAML.parse(yamlString);
 
       if (typeof parsed !== 'object' || parsed === null) {
@@ -146,7 +144,9 @@ export class Frontmatter {
       return '';
     }
 
-    return [Frontmatter.DELIMITER, YAML.stringify(this.data).trim(), Frontmatter.DELIMITER].join('\n');
+    return [Frontmatter.DELIMITER, YAML.stringify(this.data, YAML_TOSTRING_OPTIONS).trim(), Frontmatter.DELIMITER].join(
+      '\n'
+    );
   }
 
   /**
