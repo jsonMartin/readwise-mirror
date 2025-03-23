@@ -128,7 +128,7 @@ export class DeduplicatingVaultWriter {
 
         if (newPath !== file.path) {
           this.logger.debug(`Renamed file from ${file.path} to ${newPath}`);
-          await this.vault.rename(file, newPath);
+          await this.app.fileManager.renameFile(file, newPath);
         }
       }
     } catch (err) {
