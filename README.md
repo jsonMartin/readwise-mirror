@@ -33,18 +33,75 @@ The first time this plugin is ran, it will do a full sync downloading all conten
   - Protected frontmatter fields to maintain your custom note properties
   - URL-friendly filename conversion (slugification)
 
-## Usage
-
-After installing, visit the plugin configuration page to enter the Readwise Access Token, which can be found here: [https://readwise.io/access_token](https://readwise.io/access_token)
-
-Then run any of the below commands or click the Readwise toolbar to sync for the first time.
-
 ## Commands
 
 - `Sync new highlights`: Download all new highlights since previous update
 - `Test Readwise API key`: Ensure the Access Token works
 - `Delete Readwise library`: Remove the Readwise library file folder from vault
 - `Download entire Readwise library (force)`: Forces a full download of all content from Readwise
+- `Adjust Filenames to current settings`: CLean up filenames of existing files in your Readwise library folder based on current filename settings (whitespace removal and slugify only for the time being)
+
+## Settings
+
+### General
+
+#### Authentication
+
+The plugin provides OAuth-based authentication with Readwise. After installing, visit the plugin settings and use the "Authenticate with Readwise" button to set up the connection.
+
+#### Library Settings
+
+- **Library folder name**: Where to store the Readwise library (defaults to `Readwise`)
+- **Auto sync when starting**: Automatically sync new highlights when Obsidian opens
+
+#### Sync Logging
+
+- **Sync log**: Enable writing sync results to a file
+- **Log filename**: Name of the log file (defaults to `Sync.md`)
+
+### Organization
+
+#### Author Names
+
+These settings control how author names are processed. If enabled, titles (Dr., Prof., Mr., Mrs., Ms., Miss, Sir, Lady) will be stripped from author names. This is useful for cases where you don't want to change the author names in Readwise (e.g. to avoid duplicate highlights).
+
+For example, given the author string: "Dr. John Doe, and JANE SMITH, Prof. Bob Johnson"
+
+The different settings will produce:
+
+- **Default**: "Dr. John Doe, JANE SMITH, Prof. Bob Johnson"
+- **Normalize case**: "Dr. John Doe, Jane Smith, Prof. Bob Johnson"
+- **Strip titles**: "John Doe, JANE SMITH, Bob Johnson"
+- **Both enabled**: "John Doe, Jane Smith, Bob Johnson"
+
+The plugin will split the authors returned by Readwise into an array which can be used in Frontmatter and other templates.
+
+#### Highlights Organization
+
+- **Sort highlights from oldest to newest**: Control highlight ordering
+- **Sort highlights by location**: Use document location for ordering
+- **Filter discarded highlights**: Hide discarded highlights
+- **Sync highlights with notes only**: Only sync highlights that have notes
+
+#### Filenames
+
+- **Custom filename template**: Generate filenames using variables like `{{title}}`, `{{author}}`
+- **Colon replacement**: Character to replace colons in filenames
+- **Slugify filenames**: Create clean, URL-friendly filenames
+
+### Templates
+
+The plugin uses three template types to format content:
+
+- **Frontmatter Template**: Controls YAML metadata
+- **Header Template**: Controls document structure
+- **Highlight Template**: Controls individual highlight formatting
+
+## Usage
+
+After installing, visit the plugin configuration page to enter the Readwise Access Token, which can be found here: [https://readwise.io/access_token](https://readwise.io/access_token)
+
+Then run any of the commands or click the Readwise toolbar to sync for the first time.
 
 ## How does this work?
 
@@ -128,7 +185,7 @@ The plugin provides an option to "slugify" filenames. This means converting the 
 
 To enable slugifying filenames, go to the plugin settings and toggle the "Slugify Filenames" option. Please note that this is a major change. You will end up with duplicate files unless you delete and sync the entire library.
 
-## Templates
+## Templating
 
 The plugin uses three template types to format content, all using Nunjucks templating syntax:
 
@@ -540,5 +597,7 @@ If you are upgrading from 1.x.x to 2.x.x, and want to preserve your existing lin
 4. Upgrade the plugin to 2.x.x and enable File Tracking
 
 Your subsequent syncs will then use the `uri` property to track unique files and ensure links to items in your Readwise library will be updated, even if the generated filenames change with the new version of the plugin.
+
+As an additional measure, you can also use the `Adjust Filenames to current settings` command. This will iteratively go through all files in your Readwise library only and will rename the files according to the general settings (incl. slugify), and will also remove things like multiple or trailing spaces in filenames. Links from other Notes to renamed files will be updated.
 
 [^1]: You might want to ensure that properties like `author` are omitted from the template as these have a tendency to break frontmatter. Alternatively, you can use the `authorStr` variable, or run a plugin like "Linter" to check and fix all your Readwise notes before upgrading.
