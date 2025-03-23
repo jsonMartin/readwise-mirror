@@ -1,7 +1,7 @@
 import slugify from '@sindresorhus/slugify';
 import filenamify from 'filenamify';
 import { type ConfigureOptions, Environment, Template } from 'nunjucks';
-import { type CachedMetadata, Plugin, type TFile, normalizePath } from 'obsidian';
+import { Plugin, TFile, TFolder, normalizePath } from 'obsidian';
 import { AuthorParser } from 'services/author-parser';
 import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
 import { FrontmatterManager } from 'services/frontmatter-manager';
@@ -341,12 +341,14 @@ export default class ReadwiseMirror extends Plugin {
       const template = this.settings.filenameTemplate;
       const context = {
         title: book.title,
-        author: this.settings.normalizeAuthorNames ? 
-          new AuthorParser({
-            normalizeCase: true,
-            removeTitles: this.settings.stripTitlesFromAuthors
-          }).parse(book.author).join(', ') : 
-          book.author,
+        author: this.settings.normalizeAuthorNames
+          ? new AuthorParser({
+              normalizeCase: true,
+              removeTitles: this.settings.stripTitlesFromAuthors,
+            })
+              .parse(book.author)
+              .join(', ')
+          : book.author,
         category: book.category,
         source: book.source_url,
         book_id: book.user_book_id,
@@ -356,7 +358,17 @@ export default class ReadwiseMirror extends Plugin {
       filename = book.title;
     }
 
-    const normalizedTitle = this.settings.useSlugify
+    return this.normalizeFilename(filename);
+  }
+
+  /**
+   *  Normalizes the filename by replacing critical characters
+   *  and ensuring it is a valid filename
+   * @param filename - The filename to normalize
+   * @returns The normalized filename
+   */
+  private normalizeFilename(filename: string) {
+    const normalizedFilename = this.settings.useSlugify
       ? slugify(filename.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
           separator: this.settings.slugifySeparator,
           lowercase: this.settings.slugifyLowercase,
@@ -372,7 +384,7 @@ export default class ReadwiseMirror extends Plugin {
           .replace(/ +/g, ' ')
           .trim();
 
-    return normalizePath(normalizedTitle);
+    return normalizePath(normalizedFilename);
   }
 
   async deleteLibraryFolder() {
@@ -466,6 +478,72 @@ export default class ReadwiseMirror extends Plugin {
 
   lastUpdatedHumanReadableFormat() {
     return spacetime.now().since(spacetime(this.settings.lastUpdated)).rounded;
+  }
+
+  /**
+   * Handles the adjustment of filenames in the Readwise folder.
+   */
+  async handleFilenameAdjustment() {
+    const vault = this.app.vault;
+    const path = `${this.settings.baseFolderName}`;
+    const readwiseFolder = vault.getAbstractFileByPath(path);
+    if (readwiseFolder && readwiseFolder instanceof TFolder) {
+      // Iterate all files in the Readwise folder and "fix" their names according to the current settings using
+      // this.normalizeFilename()
+      const renamedFiles = await this.iterativeReadwiseRenamer(readwiseFolder);
+      if (renamedFiles > 0) {
+        this.notify.notice(`Readwise: Renamed ${renamedFiles} files. Check console for renaming errors.`);
+      } else {
+        this.notify.notice('Readwise: No files renamed. Check console for renaming errors.');
+      }
+    }
+  }
+
+  /**
+   * Iteratively renames files in the Readwise folder.
+   * @param folder - The folder to iterate through
+   * @returns
+   */
+  private async iterativeReadwiseRenamer(folder: TFolder): Promise<number> {
+    const files = folder.children;
+    let countRenamed = 0;
+    for (const file of files) {
+      if (file instanceof TFolder) {
+        // Skip folders
+        countRenamed += await this.iterativeReadwiseRenamer(file);
+      }
+
+      if (file instanceof TFile && file.extension === 'md') {
+        const result = await this.renameReadwiseNote(file);
+        if (result) {
+          countRenamed++;
+        }
+      }
+    }
+    return countRenamed;
+  }
+
+  /**
+   * Formats the filename of a Readwise note based on the settings.
+   *
+   * @param file The file to format.
+   */
+  private async renameReadwiseNote(file: TFile): Promise<boolean> {
+    const newFilename = this.normalizeFilename(file.basename);
+
+    // Only rename if there's a difference
+    if (newFilename !== file.basename) {
+      const newPath = `${file.parent.path}/${newFilename}.md`;
+      try {
+        await this.app.fileManager.renameFile(file, newPath);
+        this.logger.info(`Renamed file '${file.name}' to '${newFilename}.md'`);
+        return true;
+      } catch (error) {
+        this.logger.error(`Error renaming file: '${file.name}' to '${newFilename}.md': ${error}`);
+        return false;
+      }
+    }
+    return false;
   }
 
   // Reload settings after external change (e.g. after sync)
@@ -564,6 +642,15 @@ export default class ReadwiseMirror extends Plugin {
       id: 'update',
       name: 'Sync new highlights',
       callback: this.sync.bind(this),
+    });
+
+    this.addCommand({
+      id: 'adjust-filenames',
+      name: 'Adjust Filenames to current settings',
+      callback: async () => {
+        this.notify.notice('Readwise: Filename adjustment started');
+        await this.handleFilenameAdjustment();
+      },
     });
 
     this.registerInterval(
