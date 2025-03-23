@@ -39,7 +39,7 @@ The first time this plugin is ran, it will do a full sync downloading all conten
 - `Test Readwise API key`: Ensure the Access Token works
 - `Delete Readwise library`: Remove the Readwise library file folder from vault
 - `Download entire Readwise library (force)`: Forces a full download of all content from Readwise
-- `Adjust Filenames to current settings`: CLean up filenames of existing files in your Readwise library folder based on current filename settings (whitespace removal and slugify only for the time being)
+- `Adjust Filenames to current settings`: Clean up filenames of existing files in your Readwise library folder based on current filename settings (whitespace removal and slugify only for the time being)
 
 ## Settings
 
