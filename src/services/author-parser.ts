@@ -61,16 +61,20 @@ export class AuthorParser {
     }
 
     if (this.options.normalizeCase) {
-      processed = this.normalizeCase(processed);
+      processed = this.normalizeName(processed);
     }
 
     return processed;
   }
 
-  private normalizeCase(name: string): string {
+  private normalizeName(name: string): string {
     return name
       .split(' ')
-      .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .map(part => 
+        part.split('-')
+          .map(subPart => subPart.charAt(0).toUpperCase() + subPart.slice(1).toLowerCase())
+          .join('-')
+      )
       .join(' ');
   }
 }
@@ -81,8 +85,8 @@ export class AuthorParser {
 //   normalizeCase: true
 // });
 //
-// const authors1 = parser.parse('Dr. John Doe, and JANE SMITH, Prof. Bob Johnson');
-// // Result: ['John Doe', 'Jane Smith', 'Bob Johnson']
+// const authors1 = parser.parse('Dr. John Doe, and JANE SMITH-DOE, Prof. Jean-Bob Johnson');
+// // Result: ['John Doe', 'Jane Smith-Doe', 'Jean-Bob Johnson']
 //
 // parser.setOptions({ removeTitles: false });
 // const authors2 = parser.parse('mr. john doe,and JANE SMITH');
