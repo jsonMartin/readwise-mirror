@@ -462,7 +462,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setDesc(
         createFragment((fragment) => {
           fragment.appendText(
-            'These settings control how author names are processed. If enabled, titles (Dr., Prof., Mr., Mrs., Ms., Miss, Sir, Lady) will be stripped from author names.'
+            'These settings control how author names are processed. If enabled, titles (Dr., Prof., PhD, Mr., Mrs., Ms., Miss, Sir, Lady) will be stripped from author names.'
           );
           fragment.createEl('br');
           fragment.createEl('br');
