@@ -4,7 +4,7 @@ export class AuthorParser {
   /** Matches common separators between author names: comma-and, and, or comma */
   private readonly AUTHOR_SEPARATORS = /(?:,\s*and\s*)|(?:\s+and\s+)|(?:,\s*)/;
   /** Matches common English titles at the start of a name */
-  private readonly TITLES = /^(dr|prof|mr|mrs|ms|miss|sir|lady)\.\s+/i;
+  private readonly TITLES = /^(dr|prof|phd|mr|mrs|ms|miss|sir|lady)\.\s+/i;
 
   constructor(private options: AuthorParserOptions = {}) {
     this.options = {
