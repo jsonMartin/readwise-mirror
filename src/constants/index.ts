@@ -19,7 +19,7 @@ id: {{ id }}
 created: {{ created }}
 updated: {{ updated }}
 title: {{ title }}
-author: {{ author }}
+author: [{{ author }}]
 ---
 `,
   headerTemplate: `
@@ -28,11 +28,14 @@ ID: {{ id }}
 Updated: {{ updated }}
 %%
 
+{%- set re = r/readwise-assets\.s3\.amazonaws\.com\/static\/images/g %}
+{%- if cover_image_url and not re.test(cover_image_url) %}
 ![]( {{ cover_image_url }})
 
+{%- endif %}
 # About
-Title: [[{{ sanitized_title }}]]
-Authors: {{ authorStr }}
+Title: [[{{ title }}]]
+Authors: [[{{ author | join(']], [[')}}]]
 Category: #{{ category }}
 {%- if tags %}
 Tags: {{ tags }}
