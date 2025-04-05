@@ -12,6 +12,14 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: latest
+      - name: Install dependencies
+        run: npm clean-install
+        env:
+          HUSKY: 0
       - name: Generate release notes
         id: release-notes-preview
         uses: guilhermetod/semantic-release-notes-preview@v1.0.0
