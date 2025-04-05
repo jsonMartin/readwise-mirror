@@ -1,0 +1,26 @@
+on:
+  pull_request:
+    types: [opened, edited]
+
+jobs:
+  release:
+    name: PR Release Notes Preview
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Generate release notes
+        id: release-notes-preview
+        uses: guilhermetod/semantic-release-notes-preview@v1.0.0
+      - name: Comment release notes preview
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          issue-number: ${{ github.event.number }}
+          body: |
+            Thank you for your contribution. Below is a preview of the release notes if your PR gets merged.
+
+            ---
+
+            ${{ steps.release-notes-preview.outputs.releaseNotes }}
