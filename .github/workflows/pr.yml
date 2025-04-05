@@ -1,3 +1,4 @@
+name: Provide PR Release Notes Preview
 on:
   pull_request:
     types: [opened, edited]
