@@ -34,5 +34,10 @@ export function updatedDate(highlights: Highlight[]) {
  * @returns
  */
 export function createdDate(highlights: Highlight[]) {
-  return highlights.map((highlight) => highlight.created_at).sort()[0];
+  if (!highlights || highlights.length === 0) return null;
+  return highlights
+    .map((highlight) => highlight.created_at)
+    .reduce((earliest, date) => {
+      return !earliest || new Date(date) < new Date(earliest) ? date : earliest;
+    }, null);
 }
