@@ -1,4 +1,5 @@
 import { type ConfigureOptions, Environment, type ILoaderAny } from 'nunjucks';
+import type { Moment } from 'moment';
 
 /**
  * Custom Nunjucks environment with Readwise-specific filters
@@ -30,6 +31,12 @@ export class ReadwiseEnvironment extends Environment {
     this.addFilter('qa', (str: string) => {
       if (typeof str !== 'string') return str;
       return str.replace(/\.qa(.*)\?(.*)/g, '**Q:**$1?\r\n\r\n**A:**$2');
+    });
+
+    // Add a date filter
+    this.addFilter('date', (date: Moment, format: string) => {
+      const moment = window.moment;
+      return moment(date).format(format);
     });
   }
 }

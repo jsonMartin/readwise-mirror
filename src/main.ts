@@ -347,6 +347,8 @@ export default class ReadwiseMirror extends Plugin {
         category: book.category,
         source: book.source_url,
         book_id: book.user_book_id,
+        created: createdDate(book.highlights),
+        updated: updatedDate(book.highlights),
       };
       filename = new Template(template, new ReadwiseEnvironment(), null, true).render(context);
     } else {

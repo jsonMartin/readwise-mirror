@@ -577,12 +577,14 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             });
             ul.createEl('li', { text: '{{source}} - Original content URL' });
             ul.createEl('li', { text: '{{book_id}} - Unique document ID' });
+            ul.createEl('li', { text: '{{created}} - Created date' });
+            ul.createEl('li', { text: '{{updated}} - Updated date' });
           });
           fragment.createEl('br');
-          fragment.appendText('Example: {{title}} - {{author|trim}}');
+          fragment.appendText('Example: {{ created | date("YYYYMMDDHHMMSS") }}⁝ {{title}} - {{author|trim}}');
           fragment.createEl('br');
           fragment.createEl('br');
-          fragment.appendText('Built-in filters:');
+          fragment.appendText('Built-in and custom filters:');
           fragment.createEl('br');
           fragment.appendText('You can use Nunjucks built-in filters like ');
           fragment.createEl('code', { text: 'trim' });
