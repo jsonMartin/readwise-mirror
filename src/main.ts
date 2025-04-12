@@ -13,6 +13,7 @@ import Logger from 'services/logger';
 import ReadwiseApi from 'services/readwise-api';
 import Notify from 'ui/notify';
 import ReadwiseMirrorSettingTab from 'ui/settings-tab';
+import { createdDate, updatedDate, lastHighlightedDate } from 'utils/highlight-date-utils';
 
 // Types
 import type { Export, Highlight, Library, PluginSettings, ReadwiseDocument, ReadwiseFile, Tag } from 'types';
@@ -241,16 +242,10 @@ export default class ReadwiseMirror extends Plugin {
 
       // Get highlight count
       const num_highlights = highlights.length;
-      const created = highlights.map((highlight) => highlight.created_at).sort()[0]; // No reverse sort: we want the oldest entry
-      const updated = highlights
-        .map((highlight) => highlight.updated_at)
-        .sort()
-        .reverse()[0];
+      const created = createdDate(highlights); // No reverse sort: we want the oldest entry
+      const updated = updatedDate(highlights);
 
-      const last_highlight_at = highlights
-        .map((highlight) => highlight.highlighted_at)
-        .sort()
-        .reverse()[0];
+      const last_highlight_at = lastHighlightedDate(highlights);
 
       // Sanitize title, replace colon with substitute from settings
       const basename = this.getFileNameFromDoc(book);
