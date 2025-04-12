@@ -9,10 +9,11 @@ import {
   Setting,
 } from 'obsidian';
 import type ReadwiseMirror from 'main';
-import { FrontmatterManager } from 'services/frontmatter-manager';
+import type { FrontmatterManager } from 'services/frontmatter-manager';
 import type { TemplateValidationResult } from 'types';
 import type Notify from 'ui/notify';
 import ReadwiseApi, { TokenValidationError } from 'services/readwise-api';
+import { validateFrontmatterTemplate } from 'utils/frontmatter-utils';
 
 interface SettingsTab {
   id: string;
@@ -882,9 +883,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.frontMatter).onChange(async (value) => {
           // Test template with sample data
-          const { isValid, error } = FrontmatterManager.validateFrontmatterTemplate(
-            this.plugin.settings.frontMatterTemplate
-          );
+          const { isValid, error } = validateFrontmatterTemplate(this.plugin.settings.frontMatterTemplate);
           if ((value && isValid) || !value) {
             // Save settings and update the template
             this.plugin.settings.frontMatter = value;
@@ -1125,12 +1124,12 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         };
 
         // Display rendered template on load
-        const validationResult: TemplateValidationResult = FrontmatterManager.validateFrontmatterTemplate(
+        const validationResult: TemplateValidationResult = validateFrontmatterTemplate(
           this.plugin.settings.frontMatterTemplate
         );
         updatePreview(validationResult);
         text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
-          const validationResult: TemplateValidationResult = FrontmatterManager.validateFrontmatterTemplate(value);
+          const validationResult: TemplateValidationResult = validateFrontmatterTemplate(value);
 
           // Update validation notice
           const noticeEl = containerEl.querySelector('.validation-notice');

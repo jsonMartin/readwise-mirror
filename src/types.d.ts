@@ -142,6 +142,10 @@ export interface YamlStringState {
   isValueEscapedAlready: boolean;
 }
 
+export interface YamlEscapeOptions {
+  multiline?: boolean;
+}
+
 export interface TemplateValidationResult {
   isValid: boolean;
   error?: string;

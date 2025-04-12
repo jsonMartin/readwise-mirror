@@ -1,130 +1,18 @@
+import { escapeMetadata } from 'utils/frontmatter-utils';
 import { EMPTY_FRONTMATTER, FRONTMATTER_TO_ESCAPE } from 'constants/index';
 import { Template } from 'nunjucks';
 import type { FrontMatterCache, TFile } from 'obsidian';
 import { Frontmatter, FrontmatterError } from 'services/frontmatter';
 import { ReadwiseEnvironment } from 'services/readwise-environment';
-import { sampleMetadata } from 'test/sample-data';
-import type { PluginSettings, ReadwiseDocument, YamlStringState } from 'types';
-import * as YAML from 'yaml';
+import type { PluginSettings, ReadwiseDocument } from 'types';
 import type Logger from 'services/logger';
-
-interface YamlEscapeOptions {
-  multiline?: boolean;
-}
+import * as YAML from 'yaml';
 
 export class FrontmatterManager {
   constructor(
     private readonly settings: PluginSettings,
     private readonly logger: Logger
   ) {}
-
-  /**
-   * Analyzes a string for YAML frontmatter characteristics
-   * @param value - String to analyze
-   * @returns Analysis of string characteristics
-   */
-  private static analyzeString(value: string): YamlStringState {
-    if (!value) {
-      return {
-        hasSingleQuotes: false,
-        hasDoubleQuotes: false,
-        isValueEscapedAlready: false,
-      };
-    }
-
-    return {
-      hasSingleQuotes: value.includes("'"),
-      hasDoubleQuotes: value.includes('"'),
-      isValueEscapedAlready: FrontmatterManager.isStringEscaped(value),
-    };
-  }
-
-  /**
-   * Checks if a string is already escaped
-   * @param value - String to check
-   */
-  private static isStringEscaped(value: string): boolean {
-    if (value.length <= 1) return false;
-    return (value.startsWith("'") && value.endsWith("'")) || (value.startsWith('"') && value.endsWith('"'));
-  }
-
-  /**
-   * Handles multiline string formatting
-   * @param value - String to format
-   * @returns Formatted multiline string
-   */
-  private static formatMultilineString(value: string): string {
-    const indent = '  ';
-    return `>-\n${indent}${value.replace(/\n/g, `\n${indent}`)}`;
-  }
-
-  /**
-   * Escapes a value for YAML frontmatter
-   * @param value - Value to escape
-   * @param options - Escape options
-   */
-  private static escapeValue(value: string, { multiline = false }: YamlEscapeOptions = {}): string {
-    if (!value) return '""';
-    if (FrontmatterManager.analyzeString(value).isValueEscapedAlready) return value;
-
-    if (value.includes('\n') && multiline) {
-      return FrontmatterManager.formatMultilineString(value);
-    }
-
-    const cleanValue = FrontmatterManager.normalizeString(value);
-    return FrontmatterManager.quoteString(cleanValue);
-  }
-
-  /**
-   * Normalizes a string by cleaning whitespace
-   */
-  private static normalizeString(value: string): string {
-    return value.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-  }
-
-  /**
-   * Applies appropriate quoting to a string
-   */
-  private static quoteString(value: string): string {
-    const state = FrontmatterManager.analyzeString(value);
-
-    if (!state.hasSingleQuotes && !state.hasDoubleQuotes) {
-      return `"${value}"`;
-    }
-
-    if (state.hasDoubleQuotes && !state.hasSingleQuotes) {
-      return `'${value}'`;
-    }
-
-    if (state.hasSingleQuotes && !state.hasDoubleQuotes) {
-      return `"${value}"`;
-    }
-
-    return `"${value.replace(/"/g, '\\"')}"`;
-  }
-
-  // Before metadata is used
-  private static escapeMetadata(metadata: ReadwiseDocument, fieldsToProcess: Array<string>): ReadwiseDocument {
-    // Copy the metadata object to avoid modifying the original
-    const processedMetadata = { ...metadata } as ReadwiseDocument;
-    for (const field of fieldsToProcess) {
-      if (field in processedMetadata && processedMetadata[field as keyof ReadwiseDocument]) {
-        const key = field as keyof ReadwiseDocument;
-        const value = processedMetadata[key];
-
-        const escapeStringValue = (str: string) => FrontmatterManager.escapeValue(str);
-
-        if (Array.isArray(value)) {
-          (processedMetadata[key] as unknown) = value.map((item) =>
-            typeof item === 'string' ? escapeStringValue(item) : item
-          );
-        } else if (typeof value === 'string') {
-          (processedMetadata[key] as unknown) = escapeStringValue(value);
-        }
-      }
-    }
-    return processedMetadata;
-  }
 
   /**
    * Get updated and merged frontmatter based on a document's existing frontmatter
@@ -147,34 +35,6 @@ export class FrontmatterManager {
       return currentFrontmatter;
     } catch (error) {
       throw new FrontmatterError('Failed to update frontmatter', error);
-    }
-  }
-
-  /**
-   * Validates the frontmatter template
-   * @param template - Frontmatter template to validate
-   * @returns Validation result
-   */
-  public static validateFrontmatterTemplate(template: string): { isValid: boolean; error?: string; preview?: string } {
-    const renderedTemplate = new Template(template, new ReadwiseEnvironment(), null, true).render(
-      FrontmatterManager.escapeMetadata(sampleMetadata, FRONTMATTER_TO_ESCAPE)
-    );
-    const yamlContent = renderedTemplate.replace(Frontmatter.REGEX, '$2');
-    try {
-      YAML.parse(yamlContent);
-      return { isValid: true };
-    } catch (error) {
-      if (error instanceof YAML.YAMLParseError) {
-        return {
-          isValid: false,
-          error: `Invalid YAML: ${error.message}`,
-          preview: yamlContent,
-        };
-      }
-      return {
-        isValid: false,
-        error: `Template error: ${error.message}`,
-      };
     }
   }
 
@@ -293,7 +153,7 @@ export class FrontmatterManager {
         true
       );
       const renderedTemplate = template
-        .render(FrontmatterManager.escapeMetadata(metadata, FRONTMATTER_TO_ESCAPE))
+        .render(escapeMetadata(metadata, FRONTMATTER_TO_ESCAPE))
         .replace(Frontmatter.REGEX, '$2');
 
       const yaml = YAML.parse(renderedTemplate);
