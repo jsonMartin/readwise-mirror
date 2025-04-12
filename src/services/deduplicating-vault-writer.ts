@@ -79,7 +79,7 @@ export class DeduplicatingVaultWriter {
    * @returns A short hash
    */
   private generateShortHash(doc: ReadwiseDocument): string {
-    return md5(doc.id.toString()).substring(0, 4); 
+    return md5(doc.id.toString()).substring(0, 4);
   }
 
   /**
@@ -99,20 +99,19 @@ export class DeduplicatingVaultWriter {
    * @param file - The file to update
    * @param readwiseFile - The readwise file containing doc and contents
    */
-  private async updateExistingFile(
-    file: TFile,
-    readwiseFile: ReadwiseFile,
-  ): Promise<void> {
-    
+  private async updateExistingFile(file: TFile, readwiseFile: ReadwiseFile): Promise<void> {
     this.notifyFileCount();
 
-    const frontmatter = this.frontmatterManager.renderFrontmatter(readwiseFile.doc);
     try {
       if (this.settings.updateFrontmatter) {
-        const updatedFrontmatter = await this.frontmatterManager.getUpdatedFrontmatter(file, frontmatter);
+        const updatedFrontmatter = this.frontmatterManager.getFrontmatter(
+          readwiseFile.doc,
+          this.app.metadataCache.getFileCache(file)?.frontmatter
+        );
         this.logger.debug(`Updating file ${file.path} with new frontmatter`, updatedFrontmatter);
         await this.vault.process(file, () => `${updatedFrontmatter.toString()}${readwiseFile.contents}`);
       } else {
+        const frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile.doc);
         this.logger.debug(`Not updating frontmatter for file ${file.path}`, frontmatter);
         await this.vault.process(file, () => `${frontmatter.toString()}${readwiseFile.contents}`);
       }
@@ -144,10 +143,9 @@ export class DeduplicatingVaultWriter {
    * @param readwiseFile - The readwise file containing doc metadata
    */
   private async handleDuplicate(file: TFile, readwiseFile: ReadwiseFile): Promise<void> {
-
     this.notifyFileCount();
 
-    const frontmatter = this.frontmatterManager.renderFrontmatter(readwiseFile.doc);
+    const frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile.doc);
     try {
       if (this.settings.deleteDuplicates) {
         this.logger.debug(`Trashing duplicate ${file.path}`);
@@ -164,11 +162,10 @@ export class DeduplicatingVaultWriter {
   }
 
   public async process(readwiseFiles: ReadwiseFile[]): Promise<void> {
-    
     // Reset the file count
     this.totalFileCount = readwiseFiles.length;
     this.fileCount = 0;
-    
+
     this.notify.setStatusBarText(`Readwise: ${this.totalFileCount} files to process`);
 
     // First, compute paths for all files
@@ -210,10 +207,10 @@ export class DeduplicatingVaultWriter {
     if (this.settings.trackFiles && this.settings.trackingProperty) {
       // Update or create primary file based on highlights_url
       for (const file of readwiseFiles) {
-        await this.processTrackedFile(file);        
+        await this.processTrackedFile(file);
       }
     } else {
-      // All files are untracked - append hash to all but the first, 
+      // All files are untracked - append hash to all but the first,
       this.logger.debug('Files are untracked - appending hash to all but the first', { files: readwiseFiles });
       const [primary, ...duplicates] = readwiseFiles;
       await this.writeFile(primary, true);
@@ -240,7 +237,6 @@ export class DeduplicatingVaultWriter {
         this.logger.warn('Existing duplicate file found', { duplicate });
         await this.handleDuplicate(duplicate, trackedPrimary);
       }
-
     } else {
       // If the file already exists, create a new file with a hash
       if (await this.app.vault.adapter.exists(trackedPrimary.path, false)) {
@@ -257,10 +253,7 @@ export class DeduplicatingVaultWriter {
    * @param overwrite - Whether to overwrite an existing file or create with hash
    * @returns The created or updated file
    */
-  private async writeFile(
-    readwiseFile: ReadwiseFile,
-    overwrite?: boolean
-  ): Promise<TFile> {
+  private async writeFile(readwiseFile: ReadwiseFile, overwrite?: boolean): Promise<TFile> {
     /**
      * This method looks quite convoluted and complex, which is due to the fact that
      * the vault methods to get files are case-sensitive, but the filesystem is probably not.
@@ -274,7 +267,7 @@ export class DeduplicatingVaultWriter {
     this.notifyFileCount();
 
     try {
-      const frontmatter = this.frontmatterManager.renderFrontmatter(readwiseFile.doc);
+      const frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile.doc);
       const fileContents = `${frontmatter.toString()}${readwiseFile.contents}`;
       const fileOptions = {
         ctime: new Date(readwiseFile.doc.created).getTime(),
@@ -291,7 +284,10 @@ export class DeduplicatingVaultWriter {
         }
         // Create new path with hash
         const hash = this.generateShortHash(readwiseFile.doc);
-        const newPath = this.getNormalizedPath(this.getCategoryPath(readwiseFile.doc.category), `${readwiseFile.basename} ${hash}.md`);
+        const newPath = this.getNormalizedPath(
+          this.getCategoryPath(readwiseFile.doc.category),
+          `${readwiseFile.basename} ${hash}.md`
+        );
         const newFileExists = await this.app.vault.adapter.exists(newPath, false);
         if (newFileExists) {
           const existingNewFile = await this.vault.getFileByPath(newPath);

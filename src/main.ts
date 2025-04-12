@@ -1,20 +1,21 @@
 import slugify from '@sindresorhus/slugify';
 import filenamify from 'filenamify';
-import { type ConfigureOptions, Environment, Template } from 'nunjucks';
+import { Template } from 'nunjucks';
 import { Plugin, TFile, TFolder, normalizePath } from 'obsidian';
 import { AuthorParser } from 'services/author-parser';
 import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
 import { FrontmatterManager } from 'services/frontmatter-manager';
+import { ReadwiseEnvironment } from 'services/readwise-environment';
 import spacetime from 'spacetime';
 
 // Plugin classes
-import ReadwiseApi from 'services/readwise-api';
-import ReadwiseMirrorSettingTab from 'ui/settings-tab';
-import Notify from 'ui/notify';
 import Logger from 'services/logger';
+import ReadwiseApi from 'services/readwise-api';
+import Notify from 'ui/notify';
+import ReadwiseMirrorSettingTab from 'ui/settings-tab';
 
 // Types
-import type { Export, Highlight, Library, PluginSettings, ReadwiseDocument, Tag, ReadwiseFile } from 'types';
+import type { Export, Highlight, Library, PluginSettings, ReadwiseDocument, ReadwiseFile, Tag } from 'types';
 
 // Constants
 import { DEFAULT_SETTINGS } from 'constants/index';
@@ -26,7 +27,6 @@ export default class ReadwiseMirror extends Plugin {
   private _highlightTemplate: Template;
   private _logger: Logger;
   private notify: Notify;
-  private env: Environment;
   private isSyncing = false;
   private frontmatterManager: FrontmatterManager;
   private deduplicatingVaultWriter: DeduplicatingVaultWriter;
@@ -54,11 +54,11 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   set headerTemplate(template: string) {
-    this._headerTemplate = new Template(template, this.env, null, true);
+    this._headerTemplate = new Template(template, new ReadwiseEnvironment(), null, true);
   }
 
   set highlightTemplate(template: string) {
-    this._highlightTemplate = new Template(template, this.env, null, true);
+    this._highlightTemplate = new Template(template, new ReadwiseEnvironment(), null, true);
   }
 
   /**
@@ -353,7 +353,7 @@ export default class ReadwiseMirror extends Plugin {
         source: book.source_url,
         book_id: book.user_book_id,
       };
-      filename = new Template(template, this.env, null, true).render(context);
+      filename = new Template(template, new ReadwiseEnvironment(), null, true).render(context);
     } else {
       filename = book.title;
     }
@@ -578,20 +578,7 @@ export default class ReadwiseMirror extends Plugin {
 
     this.notify = new Notify(statusBarItem);
 
-    // Setup templating
-    this.env = new Environment(null, { autoescape: false } as ConfigureOptions);
-
-    // Add a nunjucks filter to convert newlines to "newlines + >" for quotes
-    this.env.addFilter('bq', (str) => str.replace(/\r|\n|\r\n/g, '\r\n> '));
-
-    // Add a nunjukcs filter to test whether we are a ".qa" note
-    this.env.addFilter('is_qa', (str) => str.includes('.qa'));
-
-    // Add a nunjucks filter to convert ".qa" notes to Q& A
-    this.env.addFilter('qa', (str) => str.replace(/\.qa(.*)\?(.*)/g, '**Q:**$1?\r\n\r\n**A:**$2'));
-
-    this.frontmatterManager = new FrontmatterManager(this.app, this.settings, this.env, this.logger);
-    this.frontmatterManager.updateFrontmatterTemplate(this.settings.frontMatterTemplate);
+    this.frontmatterManager = new FrontmatterManager(this.settings, this.logger);
 
     this.headerTemplate = this.settings.headerTemplate;
     this.highlightTemplate = this.settings.highlightTemplate;

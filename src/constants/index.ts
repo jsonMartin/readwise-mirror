@@ -92,6 +92,7 @@ Tags: {{ tags }}
 };
 
 export const FRONTMATTER_TO_ESCAPE = ['title', 'sanitized_title', 'author', 'authorStr'];
+export const EMPTY_FRONTMATTER: string = '---\n---\n';
 
 // YAML options
 // Don't line-break (mainly for compatiblity with platers/obsidian-linter#1227)

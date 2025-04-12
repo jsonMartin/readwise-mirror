@@ -9,7 +9,7 @@ import {
   Setting,
 } from 'obsidian';
 import type ReadwiseMirror from 'main';
-import type { FrontmatterManager } from 'services/frontmatter-manager';
+import { FrontmatterManager } from 'services/frontmatter-manager';
 import type { TemplateValidationResult } from 'types';
 import type Notify from 'ui/notify';
 import ReadwiseApi, { TokenValidationError } from 'services/readwise-api';
@@ -32,10 +32,8 @@ class TabView {
     this.containerEl = containerEl;
     this.tabs = tabs;
     // Use the last active tab if it exists and is valid, otherwise use first tab
-    this.activeTab = TabView.lastActiveTab && 
-                     tabs.some(t => t.id === TabView.lastActiveTab) ? 
-                     TabView.lastActiveTab : 
-                     tabs[0].id;
+    this.activeTab =
+      TabView.lastActiveTab && tabs.some((t) => t.id === TabView.lastActiveTab) ? TabView.lastActiveTab : tabs[0].id;
   }
 
   render() {
@@ -254,12 +252,19 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         },
       },
       {
-        id: 'organization',
-        name: 'Organization',
+        id: 'files',
+        name: 'File Tracking & Handling',
+        render: (container) => {
+          this.renderFileTracking(container);
+          this.renderFilenameSettings(container);
+        },
+      },
+      {
+        id: 'structure-display',
+        name: 'Structure & Display',
         render: (container) => {
           this.renderAuthorSettings(container);
           this.renderHighlightSettings(container);
-          this.renderFilenameSettings(container);
         },
       },
       {
@@ -700,6 +705,107 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     }
   }
 
+  private renderFileTracking(containerEl: HTMLElement): void {
+    new Setting(containerEl).setName('File tracking').setHeading();
+
+    new Setting(containerEl)
+      .setName('Enable file tracking')
+      .setDesc(
+        createFragment((fragment) => {
+          fragment.appendText(
+            'Track files using their unique Readwise URL to maintain consistency when titles or properties change.'
+          );
+          fragment.createEl('br');
+          fragment.appendText(
+            'This prevents duplicate files and maintains links when articles are updated in Readwise.'
+          );
+          fragment.createEl('br');
+          fragment.createEl('br');
+          fragment.appendText(
+            'Note: The tracking field will automatically be added to the Frontmatter, independent of the "Frontmatter" setting.'
+          );
+        })
+      )
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.trackFiles).onChange(async (value) => {
+          this.plugin.settings.trackFiles = value;
+          await this.plugin.saveSettings();
+          this.display();
+        })
+      );
+
+    if (this.plugin.settings.trackFiles) {
+      new Setting(containerEl)
+        .setClass('indent')
+        .setName('Tracking property')
+        .setDesc(
+          'Frontmatter property to store the unique Readwise URL (default: uri). This field will be automatically managed in the frontmatter.'
+        )
+        .addText((text) =>
+          text.setValue(this.plugin.settings.trackingProperty).onChange(async (value) => {
+            this.plugin.settings.trackingProperty = value || 'uri';
+            await this.plugin.saveSettings();
+          })
+        );
+
+      new Setting(containerEl)
+        .setClass('indent')
+        .setName('Remove duplicate files')
+        .setDesc(
+          createFragment((fragment) => {
+            fragment.appendText(
+              'When enabled, duplicate files will be removed. Otherwise, they will be marked with duplicate: true in frontmatter.'
+            );
+            fragment.createEl('br');
+            fragment.createEl('blockquote', {
+              text: 'Default: Mark duplicates in frontmatter',
+            });
+          })
+        )
+        .addToggle((toggle) =>
+          toggle.setValue(this.plugin.settings.deleteDuplicates).onChange(async (value) => {
+            if (value) {
+              const modal = new Modal(this.app);
+              modal.titleEl.setText('Warning');
+              modal.contentEl.createEl('p', {
+                text: 'This will permanently delete duplicate files instead of marking them. If enabled, files in your Vault will be deleted when duplicates are found. Are you sure you want to continue?',
+              });
+
+              const buttonContainer = modal.contentEl.createDiv();
+              buttonContainer.style.display = 'flex';
+              buttonContainer.style.justifyContent = 'flex-end';
+              buttonContainer.style.gap = '10px';
+              buttonContainer.style.marginTop = '20px';
+
+              const cancelButton = buttonContainer.createEl('button', {
+                text: 'Cancel',
+              });
+              const confirmButton = buttonContainer.createEl('button', {
+                text: 'Confirm',
+              });
+              confirmButton.style.backgroundColor = 'var(--background-modifier-error)';
+
+              cancelButton.onclick = () => {
+                toggle.setValue(false);
+                modal.close();
+              };
+
+              confirmButton.onclick = async () => {
+                this.plugin.settings.deleteDuplicates = true;
+                await this.plugin.saveSettings();
+                modal.close();
+              };
+
+              modal.open();
+            } else {
+              this.plugin.settings.deleteDuplicates = false;
+              await this.plugin.saveSettings();
+            }
+          })
+        );
+    }
+  }
+
   private renderSyncLogging(containerEl: HTMLElement): void {
     new Setting(containerEl).setName('Sync logging').setHeading();
 
@@ -776,10 +882,11 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.frontMatter).onChange(async (value) => {
           // Test template with sample data
-          const { isValid, error } = this.frontmatterManager.validateFrontmatterTemplate(
+          const { isValid, error } = FrontmatterManager.validateFrontmatterTemplate(
             this.plugin.settings.frontMatterTemplate
           );
           if ((value && isValid) || !value) {
+            // Save settings and update the template
             this.plugin.settings.frontMatter = value;
             await this.plugin.saveSettings();
             // Trigger re-render to show/hide frontmatter settings
@@ -906,111 +1013,6 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             });
         }
       }
-
-      new Setting(containerEl).setName('File tracking').setHeading();
-
-      new Setting(containerEl)
-        .setName('Enable file tracking')
-        .setDesc(
-          createFragment((fragment) => {
-            fragment.appendText(
-              'Track files using their unique Readwise URL to maintain consistency when titles or properties change.'
-            );
-            fragment.createEl('br');
-            fragment.appendText(
-              'This prevents duplicate files and maintains links when articles are updated in Readwise.'
-            );
-            fragment.createEl('br');
-            fragment.createEl('br');
-            fragment.appendText('Note: Requires frontmatter to be enabled');
-          })
-        )
-        .addToggle((toggle) =>
-          toggle
-            .setValue(this.plugin.settings.trackFiles && this.plugin.settings.frontMatter)
-            .setDisabled(!this.plugin.settings.frontMatter)
-            .onChange(async (value) => {
-              this.plugin.settings.trackFiles = value;
-              await this.plugin.saveSettings();
-              this.frontmatterManager.updateFrontmatterTemplate(this.plugin.settings.frontMatterTemplate);
-              this.display();
-            })
-        );
-
-      if (this.plugin.settings.trackFiles && this.plugin.settings.frontMatter) {
-        new Setting(containerEl)
-          .setClass('indent')
-          .setName('Tracking property')
-          .setDesc(
-            'Frontmatter property to store the unique Readwise URL (default: uri). This field will be automatically managed in the frontmatter.'
-          )
-          .addText((text) =>
-            text
-              .setValue(this.plugin.settings.trackingProperty)
-              .setDisabled(!this.plugin.settings.frontMatter)
-              .onChange(async (value) => {
-                this.plugin.settings.trackingProperty = value || 'uri';
-                await this.plugin.saveSettings();
-                this.frontmatterManager.updateFrontmatterTemplate(this.plugin.settings.frontMatterTemplate);
-              })
-          );
-
-        new Setting(containerEl)
-          .setClass('indent')
-          .setName('Remove duplicate files')
-          .setDesc(
-            createFragment((fragment) => {
-              fragment.appendText(
-                'When enabled, duplicate files will be removed. Otherwise, they will be marked with duplicate: true in frontmatter.'
-              );
-              fragment.createEl('br');
-              fragment.createEl('blockquote', {
-                text: 'Default: Mark duplicates in frontmatter',
-              });
-            })
-          )
-          .addToggle((toggle) =>
-            toggle.setValue(this.plugin.settings.deleteDuplicates).onChange(async (value) => {
-              if (value) {
-                const modal = new Modal(this.app);
-                modal.titleEl.setText('Warning');
-                modal.contentEl.createEl('p', {
-                  text: 'This will permanently delete duplicate files instead of marking them. If enabled, files in your Vault will be deleted when duplicates are found. Are you sure you want to continue?',
-                });
-
-                const buttonContainer = modal.contentEl.createDiv();
-                buttonContainer.style.display = 'flex';
-                buttonContainer.style.justifyContent = 'flex-end';
-                buttonContainer.style.gap = '10px';
-                buttonContainer.style.marginTop = '20px';
-
-                const cancelButton = buttonContainer.createEl('button', {
-                  text: 'Cancel',
-                });
-                const confirmButton = buttonContainer.createEl('button', {
-                  text: 'Confirm',
-                });
-                confirmButton.style.backgroundColor = 'var(--background-modifier-error)';
-
-                cancelButton.onclick = () => {
-                  toggle.setValue(false);
-                  modal.close();
-                };
-
-                confirmButton.onclick = async () => {
-                  this.plugin.settings.deleteDuplicates = true;
-                  await this.plugin.saveSettings();
-                  modal.close();
-                };
-
-                modal.open();
-              } else {
-                this.plugin.settings.deleteDuplicates = false;
-                await this.plugin.saveSettings();
-              }
-            })
-          );
-      }
     }
 
     new Setting(containerEl)
@@ -1123,12 +1125,12 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         };
 
         // Display rendered template on load
-        const validationResult: TemplateValidationResult = this.frontmatterManager.validateFrontmatterTemplate(
+        const validationResult: TemplateValidationResult = FrontmatterManager.validateFrontmatterTemplate(
           this.plugin.settings.frontMatterTemplate
         );
         updatePreview(validationResult);
         text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
-          const validationResult: TemplateValidationResult = this.frontmatterManager.validateFrontmatterTemplate(value);
+          const validationResult: TemplateValidationResult = FrontmatterManager.validateFrontmatterTemplate(value);
 
           // Update validation notice
           const noticeEl = containerEl.querySelector('.validation-notice');
@@ -1136,6 +1138,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             noticeEl.setText(validationResult.isValid ? '' : validationResult.error);
           }
 
+          // Set the frontmatter in settings
           if (!value) {
             this.plugin.settings.frontMatterTemplate = DEFAULT_SETTINGS.frontMatterTemplate;
           } else {
@@ -1143,8 +1146,6 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           }
 
           updatePreview(validationResult);
-
-          this.frontmatterManager.updateFrontmatterTemplate(value);
           await this.plugin.saveSettings();
         });
 
