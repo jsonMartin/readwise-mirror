@@ -10,10 +10,7 @@
     "moduleResolution": "node",
     "importHelpers": true,
     "allowSyntheticDefaultImports": true,
-    "lib": ["dom", "es5", "scripthost", "es2015"],
-    "paths": {
-      "types": ["src/types/index.d.ts"]
-    }
+    "lib": ["dom", "es5", "scripthost", "es2015"]
   },
   "include": ["src/**/*.ts"]
 }
