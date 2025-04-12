@@ -493,7 +493,7 @@ The plugin implements a deduplication strategy to handle both tracked and untrac
 
 ### File Tracking
 
-When File Tracking is enabled (via `trackFiles` and `trackingProperty` settings), the plugin uses the `highlights_url` property to track unique documents from Readwise.
+When File Tracking is enabled (via the File Tracking settings on the "File tracking & Handling" settings tab). As a deliberate design choice, the plugin uses the unique `highlights_url` property to track unique documents from Readwise which also contains the `id` value of the document but allows the user to jump directly to Readwise.
 
 ## Deduplication Strategy
 
