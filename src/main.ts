@@ -370,10 +370,10 @@ export default class ReadwiseMirror extends Plugin {
           separator: this.settings.slugifySeparator,
           lowercase: this.settings.slugifyLowercase,
         })
-      : // ... else filenamify the title and limit to 255 characters
+      : // ... else filenamify the title and limit to 252 characters (to account for the `.md` which will be added)
         filenamify(filename.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
           replacement: ' ',
-          maxLength: 255,
+          maxLength: 252,
         })
           // Ensure we remove additional critical characters, replace multiple spaces with one, and trim
           // Replace # as this inrerferes with WikiLinks (other characters are taken care of in "filenamify")
