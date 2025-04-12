@@ -103,7 +103,8 @@ export class DeduplicatingVaultWriter {
     this.notifyFileCount();
 
     try {
-      if (this.settings.updateFrontmatter) {
+      // Only update frontmatter if frontmatter is enabled
+      if (this.settings.frontMatter && this.settings.updateFrontmatter) {
         const updatedFrontmatter = this.frontmatterManager.getFrontmatter(
           readwiseFile.doc,
           this.app.metadataCache.getFileCache(file)?.frontmatter
