@@ -20,10 +20,12 @@ export function lastHighlightedDate(highlights: Highlight[]) {
  * @returns
  */
 export function updatedDate(highlights: Highlight[]) {
+  if (!highlights || highlights.length === 0) return null;
   return highlights
     .map((highlight) => highlight.updated_at)
-    .sort()
-    .reverse()[0];
+    .reduce((latest, date) => {
+      return !latest || new Date(date) > new Date(latest) ? date : latest;
+    }, null);
 }
 
 /**
