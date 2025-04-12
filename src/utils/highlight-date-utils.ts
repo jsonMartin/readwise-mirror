@@ -6,10 +6,12 @@ import type { Highlight } from 'types';
  * @returns
  */
 export function lastHighlightedDate(highlights: Highlight[]) {
+  if (!highlights || highlights.length === 0) return null;
   return highlights
     .map((highlight) => highlight.highlighted_at)
-    .sort()
-    .reverse()[0];
+    .reduce((latest, date) => {
+      return !latest || new Date(date) > new Date(latest) ? date : latest;
+    }, null);
 }
 
 /**
