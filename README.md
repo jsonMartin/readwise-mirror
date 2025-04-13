@@ -1,109 +1,84 @@
 # Readwise Mirror Plugin
 
-> [!WARNING]  
-> Readwise Mirror 2.x is a major rewrite of the plugin which might break things due to changes how filenames are generated and validated. The documentation contains a step-by-step guide how you can prepare an existing Readwise library by adding the `uri` tracking property to your items before upgrading to ensure links to items in your Readwise library will be updated. You can find the guide [here](#upgrading-from-1xx-to-2xx).
+>[!WARNING]  
+>Readwise Mirror 2.x is a major rewrite of the plugin which will break internal links if you update right away. This is due to changes how the filenames for notes created by this plugin are generated and handled. 
+>The documentation contains a step-by-step guide how you can prepare an existing Readwise library for an upgrade to 2.x.x by adding the `uri` tracking property to the frontmatter of your notes before upgrading. This will ensure links to notes synced from your Readwise library can be updated by Obsidian after the upgrade. You can find the guide [here](#upgrading-from-1xx-to-2xx).
 
-**Readwise Mirror** is an unoffical open source plugin for the powerful note-taking and knowledge-base application [Obsidian](http://obsidian.md/). This plugin allows a user to "mirror" their entire Readwise library by automatically downloading all highlights/notes and syncing changes directly into an Obsidian vault.
+**Readwise Mirror** is an unoffical open source plugin for the powerful note-taking and knowledge-base application [Obsidian](http://obsidian.md/). This plugin allows a user to "mirror" their entire Readwise library by automatically downloading all highlights/notes and syncing changes directly into an Obsidian vault. 
+
+Its advanced features allow you to keep internal links to your Readwise notes intact across syncs, protect or update frontmatter properties in your notes, and define custom filenames based on each Readwise item's properties.
 
 ![example.gif](https://raw.githubusercontent.com/jsonMartin/readwise-mirror/master/example.gif)
 
-The format of the output is similar to the Markdown export available directly from Readwise (which groups all highlights together in one file per book/article/etc), except that it is integrated directly into Obsidian and provides beneficial Obsidian formatting enhancements, such as automatically creating `[[Links]]` for Book Titles and Author Names *(supports multiple authors)* and block level link references *(using highlight ID)*.
+The format of the output is similar to the Markdown export available directly from Readwise (which groups all highlights together in one file per book/article/etc), except that it is integrated directly into Obsidian and provides beneficial Obsidian formatting enhancements, such as automatically creating `[[Links]]` for Book Titles and Author Names *(supports multiple authors)* and block level link references *(using highlight ID)*, as well as custom filenames and advanced frontmatter management.
 
-The first time this plugin is ran, it will do a full sync downloading all content from Readwise. Every subsequent sync will only check for sources with new changes made after the last sync attempt; if any are found, it will automatically regenerate the note with the most current data.
-
-## Features
-
-- **Flexible Organization**
-  - Customizable library folder location (defaults to `Readwise`)
-  - Automatic content categorization into subfolders (Books, Articles, etc.)
-
-- **Seamless Syncing**
-  - Complete one-way synchronization that keeps your highlights current
-  - Downloads your entire Readwise library in clean Markdown format
-
-- **Enhanced Obsidian Integration**
-  - Automatic `[[Links]]` creation for book titles and authors
-  - Block references using highlight IDs for easy linking and transclusion
-  - Full support for tags on both highlights and sources
-  - Integration with Readwise Reader features like summaries and document notes
-
-- **Smart File Management**
-  - Uses Readwise's unique URLs to track notes across title changes
-  - Automatically updates filenames and content while preserving links
-  - Protected frontmatter fields to maintain your custom note properties
-  - URL-friendly filename conversion (slugification)
+The first time this plugin is ran, it will do a full sync, downloading all content from Readwise. Every subsequent sync will only check for sources with new changes made after the last sync attempt; if any are found, it will automatically regenerate the note with the most current data.
 
 ## Commands
 
 - `Sync new highlights`: Download all new highlights since previous update
 - `Test Readwise API key`: Ensure the Access Token works
-- `Delete Readwise library`: Remove the Readwise library file folder from vault
+- `Delete Readwise library`: Remove the Readwise library file folder from the Obsidian vault
 - `Download entire Readwise library (force)`: Forces a full download of all content from Readwise
-- `Adjust Filenames to current settings`: Clean up filenames of existing files in your Readwise library folder based on current filename settings (whitespace removal and slugify only for the time being)
+- `Adjust Filenames to current settings`: Clean up filenames of existing notes in your Readwise library folder based on current filename settings (whitespace removal and slugify only for the time being)
 
 ## Settings
 
-### General
+The plugin can be configured via numerous settings and has different, advanced features that will allow for better integration of your Readwise highlights into your Obsidian vault. Please make sure you read the section on [advanced features](#advanced-features) below.
 
-#### Authentication
+### General Settings
 
-The plugin provides OAuth-based authentication with Readwise. After installing, visit the plugin settings and use the "Authenticate with Readwise" button to set up the connection.
+General settings of the plugin:
 
-#### Library Settings
+- **Debug mode**: Will generate lots of debug messages, usually not needed.
+- **Authentication**: The plugin provides OAuth-based authentication with Readwise. After installing, visit the plugin settings and use the "Authenticate with Readwise" button to set up the connection.
+- **Library folder name**: Specify the folder where the Readwise library will be stored (defaults to `Readwise`).
+- **Auto sync on startup**: Automatically sync new highlights when Obsidian starts.
+- **Sync log**: Enable writing sync results to a file.
+- **Log filename**: Specify the name of the log file (defaults to `Sync.md`).
 
-- **Library folder name**: Where to store the Readwise library (defaults to `Readwise`)
-- **Auto sync when starting**: Automatically sync new highlights when Obsidian opens
+### File tracking and naming
 
-#### Sync Logging
+Settings related to tracking notes across syncs, renames, and settings related to the way it generates the filenames used during sync:
 
-- **Sync log**: Enable writing sync results to a file
-- **Log filename**: Name of the log file (defaults to `Sync.md`)
+- **File tracking**: Track the notes created from your readwise items using their unique readwise URL. This allows the plugin to maintain consistency across syncs, including for cases where the metadata of a Readwise item is changed in Readwise itself.[^2]
+- **Filenames**: Define settings related to how the plugin generates filenames of the notes it creates.
+  - **Custom filename template**: Define filenames using variables like `{{title}}`, `{{author}}`, `{{book_id}}` and others.
+  - **Colon replacement**: Specify a character to replace colons in filenames.
+- **Slugify filenames**: Convert filenames into a URL-friendly format by replacing spaces and special characters.
 
-### Organization
+### Highlights
 
-#### Author Names
+Settings related to the processing of certain metadata and the way highlights with and without notes are synced into your Obsidian library:
 
-These settings control how author names are processed. If enabled, titles (Dr., Prof., Mr., Mrs., Ms., Miss, Sir, Lady) will be stripped from author names. This is useful for cases where you don't want to change the author names in Readwise (e.g. to avoid duplicate highlights).
+- **Author name processing**: Control how author names are handled, good for keeping names consistent with respect to case and titles. 
+- **Sort highlights**: Controls how highlights are sorted within the generated Obsidian file.
+- **Filter discarded highlights**: Exclude discarded highlights from syncing.
+- **Sync highlights with notes only**: Only sync highlights that include notes.
 
-For example, given the author string: "Dr. John Doe, and JANE SMITH, Prof. Bob Johnson"
+### Template Settings
 
-The different settings will produce:
+The plugin supports three types of templates for formatting content which can be defined individually.
 
-- **Default**: "Dr. John Doe, JANE SMITH, Prof. Bob Johnson"
-- **Normalize case**: "Dr. John Doe, Jane Smith, Prof. Bob Johnson"
-- **Strip titles**: "John Doe, JANE SMITH, Bob Johnson"
-- **Both enabled**: "John Doe, Jane Smith, Bob Johnson"
-
-The plugin will split the authors returned by Readwise into an array which can be used in Frontmatter and other templates.
-
-#### Highlights Organization
-
-- **Sort highlights from oldest to newest**: Control highlight ordering
-- **Sort highlights by location**: Use document location for ordering
-- **Filter discarded highlights**: Hide discarded highlights
-- **Sync highlights with notes only**: Only sync highlights that have notes
-
-#### Filenames
-
-- **Custom filename template**: Generate filenames using variables like `{{title}}`, `{{author}}`
-- **Colon replacement**: Character to replace colons in filenames
-- **Slugify filenames**: Create clean, URL-friendly filenames
-
-### Templates
-
-The plugin uses three template types to format content:
-
-- **Frontmatter Template**: Controls YAML metadata
-- **Header Template**: Controls document structure
-- **Highlight Template**: Controls individual highlight formatting
+- **Frontmatter Template**: Defines the template for frontmatter (also called "properties") and how frontmatter is updated and protected across syncs.
+- **Header Template**: Defines the structure and metadata display of the heade of the documents .
+- **Highlight Template**: Defines the format of the individual highlights.
 
 ## Usage
 
-After installing, visit the plugin configuration page to enter the Readwise Access Token, which can be found here: [https://readwise.io/access_token](https://readwise.io/access_token)
+After installing, visit the plugin configuration page (General) to authenticate with Readwise, and adjust the settings as you see fit.
 
 Then run any of the commands or click the Readwise toolbar to sync for the first time.
 
+>[!IMPORTANT]
+>It is highly recommended that you enable at least File tracking. This will ensure future changes, including to the file names, colon replacements, or changes made on Readwise will not create duplicates in your Obsidian library.  
+
 ## How does this work?
+
+### **TL;DR**
+
+- Download [obsidian-readwise](https://github.com/renehernandez/obsidian-readwise) to import new highlights to your library with full control over the ability to modify and format your notes
+- Download this plugin if you want to mirror your entire Readwise Library into Obsidian and sync modifications to previous highlights
 
 ### One-way mirror sync vs append-based sync
 
@@ -115,12 +90,9 @@ Any changes made to content in Readwise will be automatically updated during the
 
 In addition to this plugin, there is also another Readwise community plugin for Obsidian named [obsidian-readwise](https://github.com/renehernandez/obsidian-readwise), which can be found at: [https://github.com/renehernandez/obsidian-readwise](https://github.com/renehernandez/obsidian-readwise). Both plugins exist for different use cases, so please read below to determine which best suits your needs.
 
+### Which one to use?
+
 **Because of the way the mirror sync works in this plugin, users lose the ability to modify their notes as the plugin is responsible for managing all note files in the Readwise library.** If a user needs full control over their library or the ability to modify notes and highlights directly in Obsidian, [obsidian-readwise](https://github.com/renehernandez/obsidian-readwise) would be the better choice.
-
-#### **TL;DR**
-
-- Download [obsidian-readwise](https://github.com/renehernandez/obsidian-readwise) to import new highlights to your library with full control over the ability to modify and format your notes
-- Download this plugin if you want to mirror your entire Readwise Library into Obsidian and sync modifications to previous highlights
 
 ## Performance
 
@@ -135,33 +107,122 @@ As a reference for performance, syncing my library of 5,067 Highlights across 92
 The current recommended way to test beta features is through frozen beta versions using BRAT:
 
 1. Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin in Obsidian
-2. Go to the [releases page](https://github.com/jsonMartin/readwise-mirror/releases) and note the latest beta version number (e.g. `1.5.1-beta.1`), labeled as pre-release
-3. Open BRAT settings and add the beta repository:
+2. Open BRAT settings and add the beta repository:
    - Click "Add Beta Plugin with frozen version"
    - Enter `jsonMartin/readwise-mirror`
-   - Enter the version number you noted from releases (e.g. `1.5.1-beta.1`)
+   - Select the preferred (pre-)release or `latest` in the version dropdown (available from BRAT `1.1.0`) 
    - Click "Add Plugin"
-
-Note: Beta versions are currently distributed as frozen releases that must be installed through BRAT's version selector. In the future, BRAT might support a feature that allows automatic updates to the latest pre-release version on GitHub.
 
 ### Manual Download
 
 - Browse to [releases](https://github.com/jsonMartin/readwise-mirror/releases)
 - Download `main.js` and `manifest.json` of the latest release
-- Create a `readwise-mirror` subdirectory in your Obsidian plug-in directory (in `.obsidian/plugins` in your vault)
+- Create a `readwise-mirror` subdirectory in your Obsidian plug-in directory (in `.obsidian/plugins` in your Obsidian vault)
 - Move the two downloaded files there
 - In Obsidian, go to Settings, scroll down to Community Plug-ins, and activate it.
   - If it refuses to activate with an error message, open the developer console (with Ctrl-Shift-I) and check for error messages.
 
-## Sync highlights with notes only
+## Advanced features 
+### File tracking
+
+When File Tracking is enabled (via the File tracking settings on the "File tracking and naming" settings tab), the plugin uses the unique `highlights_url` field of a Readwise item to track unique documents from Readwise.[^4] 
+
+File tracking enables to key features in Readwise mirror:
+
+- Updated internal links to your Readwise notes, and 
+- Robust handling of note filenames in case of duplicate filenames
+
+#### Updated internal links
+Linking between notes is an essential feature of Obsidian and file tracking enables that links to your Readwise notes are updated and working even if the filename of a note changes between sync runs. 
+
+If a user renames an Obsidian note or if a plugin programatically renames it, and if "Automatically update internal links" is enabled, Obsidian will esnure that all links to that note will be changed accordingly. 
+
+#### Duplicate notes
+
+If for some reason, syncing would create two note files with the same filename in your Readwise folder, the plugin will ensure these are handled based on the plugin settings. It will either: 
+
+- ensure a unique filename for the duplicate note file, or 
+- delete a duplicate note file
+
+The plugin will ensure you get one note file for each Readwise item, even in cases of two or more notes created from different Readwise items (i.e. items with a different `id`) end up having the same filename (e.g. because you use the default filename template which is baed on the `title` field and you have two Readwise items with the same title in your library).[^3] 
+
+Note files are grouped by their path (category (e.g. "Article", "Book", etc.)). Handling of duplicate filenames will be done at category level. Different items with the same filename in different categories are left untouched (say if you have highlights in "De iure belli ac pacis" both in Books and Supplemental Books). 
+
+This may still lead to situations where two notes in your Obsidian vault have the same filename, but with a different path. This is standard and expected behavior in Obsidian.
+
+### Processing logic
+
+#### For tracked files (file tracking enabled)
+
+1. **Existing files with matching `highlights_url`**
+
+   ```shell
+   📄 "My Article.md" (primary, matching highlights_url)
+   └── Updates content and frontmatter
+   📄 "Same Article.md" (duplicate, matching highlights_url)
+   └── Either deleted or marked as duplicate: true
+   ```
+
+2. **Filename collision (different `highlights_url` but same filename)**
+
+   ```shell
+   📄 "My Article.md" (existing file)
+   📄 "My Article <hash>.md" (new file)
+   └── Creates new file with hash suffix
+   ```
+
+#### For untracked files (file tracking Disabled)
+
+When multiple files share the same path:
+
+```shell
+📄 "My Article.md" (first file)
+📄 "My Article <hash1>.md" (second file)
+📄 "My Article <hash2>.md" (third file)
+└── First file keeps original name, others get unique hashes added to it.
+```
+
+### Custom filenames
+
+You can define a template for custom filenames that can include various fields (e.g. `title`, `author`) which is used by the plugin to build a custom filename. You can also use filters to format certain fields. 
+
+For example, the following template will create a filename with an "ID" based on the date and time the Readwise document was created:
+
+```nunjucks
+{{ created | date("YYYYMMDDHHMMSS") }}: {{ title }}
+```
+
+Assuming the colon (`:`) is replaced with `⁝`, this would results in a filename like:
+
+```shell
+20201001071004⁝ Outliers
+```
+
+Using custom filenames can be viable strategy to create unique filenames, e.g. by using the `created` date as a unique element in the filenames.
+
+>[!IMPORTANT]
+>We recommend you enable file tracking and run a full sync of the Readwise library if you want to use custom filenames and/or want to change the format of the filename. Without that, you will likely end up with many duplicate notes in your Obsidian library.
+
+### Slugify Filenames
+
+The plugin provides an option to "slugify" filenames. This means converting the filenames into a URL-friendly format by replacing spaces and special characters with hyphens or other safe characters.
+
+If enabled, the plugin converts the filenames to a slugified format after it has applied the settings for custom filenames and the colon replacement character. 
+
+For example, `My Book Title` becomes `my-book-title`. You can select a separator and whether the filename will be all lowercase.
+
+>[!IMPORTANT]
+>We recommend you enable file tracking first and run a full sync of the REadwise library if you want to enable the "slugify" option, even if you don't want to use custom filenames. Without that, you will likely end up with many duplicate notes in your Obsidian library.
+
+### Sync highlights with notes only
 
 A lot of the value of Readwise highlights lies in the notes associated with them. E.g. if you are building a Zettelkasten and want to work with literature notes, you typically only want highlights with notes in your Zettelkasten -- and not every highlight.
 
 The option "Only sync highlights with notes" will do exactly that: it will only sync highlights with notes. If an item in your library has only highlights without notes, it will not be synced.
 
-## Author Name Settings
+### Author Name Settings
 
-These settings control how author names are processed. If enabled, titles (Dr., Prof., Mr., Mrs., Ms., Miss, Sir, Lady) will be stripped from author names. This is useful for cases where you don't want to change the author names in Readwise (e.g. to avoid duplicate highlights).
+These settings control how author names are processed. If enabled, titles (Dr., Prof., PhD, Mr., Mrs., Ms., Miss, Sir, Lady) will be stripped from author names. This is useful for cases where you don't want to change the author names in Readwise (e.g. to avoid duplicate highlights).
 
 For example, given the author string: "Dr. John Doe, and JANE SMITH, Prof. Bob Johnson"
 
@@ -174,143 +235,17 @@ The different settings will produce:
 
 The plugin will split the authors returned by Readwise into an array which can be used in Frontmatter and other templates.
 
-## Slugify Filenames
-
-The plugin provides an option to "slugify" filenames. This means converting the filenames into a URL-friendly format by replacing spaces and special characters with hyphens or other safe characters. This is useful for ensuring compatibility across different filesystems and avoiding issues with special characters.
-
-### Options
-
-- **Default**: The default behavior does not modify filenames.
-- **Slugify**: Converts filenames to a slugified format. For example, `My Book Title` becomes `my-book-title`. You can select a separator and whether the filename will be all lowercase
-
-To enable slugifying filenames, go to the plugin settings and toggle the "Slugify Filenames" option. Please note that this is a major change. You will end up with duplicate files unless you delete and sync the entire library.
-
-## Templating
+## Templates
 
 The plugin uses three template types to format content, all using Nunjucks templating syntax:
 
 ### Template Types
 
-- **Header Template**: Controls document structure and metadata display
+- **Frontmatter Template**: Controls note metadata (also called "properties") (optional)
+- - **Header Template**: Controls document structure and metadata display
 - **Highlight Template**: Controls individual highlight formatting
-- **Frontmatter Template**: Controls YAML metadata (optional)
 
-### Frontmatter Validation
-
-Real-time template validation for the frontmatter ensures:
-
-- Valid YAML syntax
-- Proper field escaping
-- Correct template variables
-- Preview with sample data
-
-## Frontmatter Management
-
-### Updating Frontmatter
-
-The plugin provides granular control over how frontmatter is handled in existing files:
-
-- **Update Frontmatter**: When enabled, updates frontmatter in existing files during sync, overwriting values defined in the frontmatter template and keeping additional fields you might have added since the last sync.
-- When disabled, existing frontmatter will always completely be overwritten
-- Works best with File Tracking enabled to ensure consistent file handling
-
-### Frontmatter Protection
-
-Protect specific frontmatter fields from being overwritten during sync:
-
-1. Enable "Protect Frontmatter Fields"
-2. Enter field names to protect (one per line), for example:
-
-   ```yaml
-   status
-   tags
-   categories
-   ```
-
-3. Protected fields will retain their values during sync **only if they already exist** in the file
-4. Fields listed for protection but not present in the file will be:
-   - Added normally on first sync
-   - Protected in subsequent updates once they exist
-5. Note: If File Tracking is enabled, the tracking field (e.g., `uri`) cannot be protected
-
-#### Example
-
-If you have an existing note:
-
-```yaml
----
-title: My Article
-status: in-progress  # Will be protected
-tags: [research]     # Will be protected
-uri: https://readwise.io/article/123
----
-```
-
-And protect `status`, `tags`, and `category`:
-
-- `status` and `tags` will keep their values
-- `category` would:
-  - Be added if present in the first sync
-  - Be protected in future syncs once it exists
-
->**Note**:
->
-> - Frontmatter protection only works when "Update Frontmatter" is enabled.
-> - Fields must exist in the file to be protected
-> - Non-existent protected fields will be written once, then protected
-
-### Available Variables
-
-#### Document Metadata
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `id` | Document ID | `12345` |
-| `title` | Original title | `"My Book"` |
-| `sanitized_title` | Filesystem-safe title | `"My-Book"` |
-| `author` | Author name(s) | `"John Smith"` |
-| `authorStr` | Author with wiki links | `"[[John Smith]]"` |
-| `category` | Content type | `"books"` |
-
-#### Header / Frontmatter Content
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `document_note` | Reader document note | `"My reading notes..."` |
-| `summary` | Reader summary | `"Book summary..."` |
-| `num_highlights` | Number of highlights | `42` |
-| `cover_image_url` | Cover image URL | `"https://..."` |
-
-#### URLs
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `highlights_url` | Readwise URL | `"https://readwise.io/..."` |
-| `source_url` | Original content URL | `"https://..."` |
-| `unique_url` | Reader URL (if available) | `"https://reader.readwise.io/..."` |
-
-#### Tags
-
-| Variable | Description | Example |
-|----------|-------------|--------|
-| `tags` | Document tags with # | `"#tag1, #tag2"` |
-| `tags_nohash` | Tags for frontmatter | `"'tag1', 'tag2'"` |
-| `highlight_tags` | Highlight tags with # | `"#note, #important"` |
-| `hl_tags_nohash` | Highlight tags for frontmatter | `"'note', 'important'"` |
-
-#### Timestamps
-
-| Variable | Description |
-|----------|-------------|
-| `created` | Creation date |
-| `updated` | Last update |
-| `last_highlight_at` | Last highlight date |
-
-### Template Filters
-
-- `bq`: Add blockquote markers.
-- `is_qa`: Check for Q&A format.
-- `qa`: Convert to Q&A format.
+### Templates
 
 #### Default frontmatter template
 
@@ -323,7 +258,7 @@ author: {{ author }}
 ---
 ```
 
-#### Example of a more complex frontmatter template
+#### A more complex frontmatter template
 
 The following would print both document and all highlight tags, rolled-up:
 
@@ -381,7 +316,67 @@ Summary: {{ summary }}
 
 ```
 
+#### Default highlight template
+
+```markdown+nunjucks
+{{ text }}{%- if category == 'books' %} ([{{ location }}]({{ location_url }})){%- endif %}{%- if color %} %% Color: {{ color }} %%{%- endif %} ^{{id}}{%- if note %}
+
+Note: {{ note }}
+{%- endif %}{%- if tags %}
+
+Tags: {{ tags }}
+{%- endif %}
+
+---
+```
+
+### Document variables
+
+These variables exist at Readwise item level and can be used for the frontmatter and header template, but also for the highlights.
+
+#### Metadata
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `id` | Document ID | `12345` |
+| `title` | Original title | `"My Book"` |
+| `sanitized_title` | Filesystem-safe title | `"My-Book"` |
+| `author` | Author name(s) | `"John Smith"` |
+| `authorStr` | Author with wiki links | `"[[John Smith]]"` |
+| `category` | Content type | `"books"` |
+| `document_note` | Reader document note | `"My reading notes..."` |
+| `summary` | Reader summary | `"Book summary..."` |
+| `num_highlights` | Number of highlights | `42` |
+
+#### Readwise item URLs
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `highlights_url` | Readwise URL | `"https://readwise.io/..."` |
+| `source_url` | Original content URL | `"https://..."` |
+| `unique_url` | Reader URL (if available) | `"https://reader.readwise.io/..."` |
+| `cover_image_url` | Cover image URL | `"https://..."` |
+
+#### Tags
+
+| Variable | Description | Example |
+|----------|-------------|--------|
+| `tags` | Document tags with # | `"#tag1, #tag2"` |
+| `tags_nohash` | Document tags without # (e.g. to be used in the frontmatter template) | `"'tag1', 'tag2'"` |
+| `highlight_tags` | Tags from all highlight, with # | `"#note, #important"` |
+| `hl_tags_nohash` | Tags from all highlights, without # (e.g. to be used in the frontmatter template) | `"'note', 'important'"` |
+
+#### Timestamps
+
+| Variable | Description |
+|----------|-------------|
+| `created` | Creation date |
+| `updated` | Last update |
+| `last_highlight_at` | Last highlight date |
+
 ### Highlight Template Variables
+
+These variables are different for each highlight and are only available in the highlight template.
 
 #### Highlight Content
 
@@ -410,31 +405,21 @@ Summary: {{ summary }}
 | `created_at` | Creation timestamp | `"2024-01-20T10:00:00Z"` |
 | `updated_at` | Last update timestamp | `"2024-01-21T15:30:00Z"` |
 
-#### Available Filters
+### Template filters
+
+The plugin provides filters that can be used in all templates (including in the filename template). These filters add functionality which is useful for working with Readwise highlights and notes, e.g. related to [action tags](https://docs.readwise.io/reader/docs/faqs/action-tags). They complement and are used like the existing [filters in nunjucks](https://mozilla.github.io/nunjucks/templating.html#builtin-filters).
 
 | Filter | Description | Example |
 |--------|-------------|---------|
 | `bq` | Add blockquote markers | `{{ text \| bq }}` |
 | `is_qa` | Check for Q&A format | `{% if note \| is_qa %}` |
 | `qa` | Convert to Q&A format | `{{ note \| qa }}` |
+| `date` | Format dates | `{{ created \| date("YYYMMDDHHMMSS") }}` |
 
-#### Default highlight template
+#### Blockquote filter
+If your highlight or note in Readwise spans multiple paragraphs, it can be difficult to get it as a proper blockquote in Obsidian as each paragraph, and the empty lines between, must begin with the quote character (`>`). 
 
-```markdown+nunjucks
-{{ text }}{%- if category == 'books' %} ([{{ location }}]({{ location_url }})){%- endif %}{%- if color %} %% Color: {{ color }} %%{%- endif %} ^{{id}}{%- if note %}
-
-Note: {{ note }}
-{%- endif %}{%- if tags %}
-
-Tags: {{ tags }}
-{%- endif %}
-
----
-```
-
-### Blockquote filter
-
-If you want to use blockquotes for text fields in your template, there's a handy `bq` filter that will put the quote character (`>`) in front of every new line. This is useful for both multi-line highlights as well as multi-line notes.
+The blockquote filter (`bq`) can will ensure that every new line in the filtered text starts with the quote character.
 
 With this filter, templates like the following become possible, without breaking the blockquote.
 
@@ -448,12 +433,19 @@ Tags: {{ tags }}
 ---
 ```
 
-### Q & A Filter
+This will result in something like the following for a highlight wit htwo lines:
 
-If you want to render [notes with the `.qa` action tag](https://docs.readwise.io/reader/docs/faqs/action-tags#how-can-i-create-a-q-and-a-mastery-card-while-reading) properly, the plugin makes several nunjucks filters available for that:  
+>[!QUOTE]
+>This is the first line of my quote.
+>
+>This is the second line of my quote.
+
+#### Q & A filter
+
+You can use the Q&A filter to render [notes with the `.qa` action tag](https://docs.readwise.io/reader/docs/faqs/action-tags#how-can-i-create-a-q-and-a-mastery-card-while-reading) properly:  
 
 - `is_qa`: this filter returns `true` if the string it is applied to contains the `.qa` action tag
-- `qa`: this filter extracts the question and answer and returns them as a rendered string
+- `qa`: this filter extracts the question and answer and returns them as a string rendered as a Q&A pair.
 
 Using both filters, you could for example format Q&A notes differently from regular notes.
 
@@ -471,7 +463,7 @@ Using both filters, you could for example format Q&A notes differently from regu
 {% endif %}
 ```
 
-### Example Q&A Output
+#### Example Q&A Output
 
 Input note with `.qa` tag:
 
@@ -482,80 +474,81 @@ Rendered output:
 >
 > **A:** Paris is the capital of France.
 
+#### Date format
+
+The plugin provides a `date` filter which builds on [`moment.js`](https://momentjs.com/). It  allow you to format any date with a template (e.g. `{{ created | date("YYYYMMDDD")}}` would result in `13 Apr 10125` to be formatted as `20250413`). 
+
 ### Limitations
 
-- The templating is based on the [`nunjucks`](https://mozilla.github.io/nunjucks/templating.html) templating library and thus shares its limitations;
-- Certain strings (e.g. date, tags, authors) are currently preformatted
+The templating is based on the [`nunjucks`](https://mozilla.github.io/nunjucks/templating.html) templating library and thus shares its limitations.
 
-## Deduplication
+## Frontmatter management
 
-The plugin implements a deduplication strategy to handle both tracked and untracked files, ensuring consistency in your vault while preserving existing content and links.
+The plugin provides powerful frontmatter management, including an update mode which keeps additional frontmatter properties that are not part of the plugin's frontmatter template untouched and optionally protected from accidential overwrites. 
 
-### File Tracking
+This is particularly useful as it allows for example to protect a property field where you put links to other notes. A rerun of the sync for a specific note will always overwrite the body of the note. All links to other notes you might have added in the body manually will be lost during the next syny. But a protected frontmatter property with links to other notes will keep thes across the sync runs.
 
-When File Tracking is enabled (via the File Tracking settings on the "File tracking & Handling" settings tab). As a deliberate design choice, the plugin uses the unique `highlights_url` property to track unique documents from Readwise which also contains the `id` value of the document but allows the user to jump directly to Readwise.
+### Frontmatter template validation
 
-## Deduplication Strategy
+Frontmatter in Obsidian is based on "YAML" syntax. This requires that property values are properly stored, for example to ensure newlines in a vlaue do not lead to invalid frontmatter. We therefore validate the frontmatter template using sample date, to ensure valid frontmatter is generated. 
 
-### Path-Based Grouping
+### Update frontmatter
 
-Files are first grouped by their normalized path (category + filename), handling potential case-sensitivity issues across different filesystems. This ensures consistent behavior regardless of your operating system but leaves different items with the same filename in different categories untouched (e.g. Books and Supplemental Books).
+The plugin provides granular control over how frontmatter is handled in existing files with the **Update frontmatter** setting:
 
-### Processing Logic
+When enabled, the plugin updates frontmatter in already existing files during sync, overwriting values defined in the frontmatter template and keeping additional fields you might have added since the last sync untouched. This means that properties added by other plugins, or by you manually will be kept in the note.
 
-#### For Tracked Files (File Tracking Enabled)
+When disabled, existing frontmatter will always completely be overwritten, and any additional properties added between sync runs will be lost.
+  
+>[!IMPORTANT]
+>Frontmatter update works best with file tracking enabled to ensure consistent file and duplicates handling, even if the filenames change between sync runs. 
+>
+>If file tracking is disabled, the plugin will overwrite whenever a file with the same name exists already, but will update its frontmatter. In very rare circumstances, this might lead to a case where duplicates in your Readwise library will be overwritten by each other in subsequent sync runs.[^3]
 
-1. **Existing Files with Matching `highlights_url`**
+### Frontmatter protection
 
-   ```shell
-   📄 "My Article.md" (primary, matching highlights_url)
-   └── Updates content and frontmatter
-   📄 "Same Article.md" (duplicate, matching highlights_url)
-   └── Either deleted or marked as duplicate: true
+By protecting specific frontmatter properties, you can on one hand ensure that a change to the frontmatter template will not accidentially overwrite a property that was previously added manually or by another pluging.
+
+Protection will also allow you to write a property on the first sync run and then protect the value even if changed manually. This can especially be useful if you know that certain properties might need manual updates, e.g. for author names, or aliases, or any other field where a manual touch might be needed because of errors in the original metadata.[^5]
+
+You can protect specific frontmatter fields from being overwritten during sync:
+
+1. Enable "Protect frontmatter fields"
+2. Enter field names to protect (one per line), for example:
+
+   ```yaml
+   status
+   tags
+   categories
    ```
 
-2. **Path Collision (Different `highlights_url`)**
+3. Protected fields will retain their values during sync **only if they already exist** in the file
+4. Fields listed for protection but not present in the file will be:
+   - Added normally on first sync
+   - Protected in subsequent updates once they exist
+5. Note: If File tracking is enabled, the tracking field (e.g., `uri`) cannot be protected
 
-   ```shell
-   📄 "My Article.md" (existing file)
-   📄 "My Article <hash>.md" (new file)
-   └── Creates new file with hash suffix
-   ```
+#### Example
 
-#### For Untracked Files (File Tracking Disabled)
+If you have an existing note:
 
-When multiple files share the same path:
-
-```shell
-📄 "My Article.md" (first file)
-📄 "My Article <hash1>.md" (second file)
-📄 "My Article <hash2>.md" (third file)
-└── First file keeps original name, others get unique hashes
+```yaml
+---
+title: My Article
+status: in-progress  # Will be protected
+tags: [research]     # Will be protected
+uri: https://readwise.io/article/123
+---
 ```
 
-### File Operations
+And protect `status`, `tags`, and `category`:
 
-The plugin carefully manages file operations to maintain vault consistency:
-
-1. **Content Updates**
-   - Preserves original file creation and modification timestamps
-   - Selectively updates frontmatter based on `updateFrontmatter` setting
-   - Handles filename changes while maintaining internal links and metadata
-
-2. **Duplicate Management**
-   Based on your settings, duplicates are handled in one of two ways:
-   - When `deleteDuplicates: true`, duplicate files are moved to trash
-   - When `deleteDuplicates: false`, duplicates are marked with `duplicate: true` in frontmatter
+- `status` and `tags` will keep their values
+- `category` would:
+  - Be added if not present during the first sync
+  - Be protected in future syncs
 
 ## Special Considerations
-
-### Filename Changes
-
-The plugin implements a robust strategy for handling filename changes:
-
-1. First attempts a direct rename to the new filename
-2. If a file already exists at the target path, creates a new file with a hash suffix
-3. Throughout the process, preserves all metadata and internal links to Readwise items (please note that Markdown / Wikilinks in your notes can not be preserved, as the plugin can not sync changes to the original Readwise content)
 
 ### Remote Duplicates
 
@@ -564,40 +557,35 @@ Readwise can contain multiple items sharing the same title but with different ID
 1. Using the plain filename (e.g. `My Duplicate Book.md`) for the first encountered item
 2. Adding a short hash of the Readwise ID to subsequent files (e.g. `My Duplicate Book <HASH>.md`)
 
-## Deduplication Limitations
-
-The current implementation has several important considerations:
-
-- File ordering affects clean filename assignment, though we mitigate this by sorting by Readwise ID (ascending)
-- Initial setup requires a full sync to establish proper tracking properties
-- During the initial full sync, local modifications may be overwritten
-- Platform differences in case-sensitivity are handled through normalized path comparison
-
-## Best Practices
-
-To get the most out of the deduplication system:
-
-1. Enable File Tracking for the most reliable deduplication experience
-2. Run a full sync when first enabling tracking
-3. Consider maintaining unique titles in Readwise to minimize hash suffix usage
-
 ## Upgrading from 1.x.x to 2.x.x
 
-If you are upgrading from 1.x.x to 2.x.x, and want to preserve your existing links to items in your Readwise library, you need to follow these steps before upgrading the plugin:
+>[!WARNING]
+>If you update to 2.x.x without following these steps, you will likely end up with duplicate notes for the same Readwise item or, if you delete the whole Readwise folder in your Obsidian vault first, will likely lose any internal links to notes created by the plugin.
 
-1. Make sure you have a backup of your vault (or at least your Readwise Mirror folder)
-2. In the plugin settings, add the `uri` tracking property to the Frontmatter template. Just add the following at the end of the template and enable Frontmatter[^1]:
+If you plan to upgrade the plugin from v1.x.x to v2.x.x, and want to make sure any internal links in your Obsidian vault to notes created by the plugin remain intact, then you should ensure all your notes have the file tracking property in their frontmatter before the upgrade.
+
+1. Make sure you have a backup of your Obsidian vault (or at least your Readwise mirror folder with the notes created by this plugin).
+2. In the plugin settings in v1.x.x, add the `uri` tracking property (or whatever property key you plan to use for file tracking) to the Frontmatter template. You can replace (recommended) the frontmatter template with the following, and enable Frontmatter[^1]:
 
    ```yaml
+   ---
    uri: {{ highlights_url }}
+   ---
    ```
 
-3. Run **a full sync** to establish proper tracking properties (this will overwrite your local changes, but will preserve the filenames of your existing files according to the way version 1.4.11 of the plugin creates them)
+3. Run **a full sync** to establish proper tracking properties (this will overwrite your local changes based on the current settings for the colon, but it will preserve the filenames of your existing files according to the way v1.4.11 of the plugin creates these. In consequence, all internal links will remain valid).
 
-4. Upgrade the plugin to 2.x.x and enable File Tracking
+4. Upgrade the plugin to `2.x.x` and enable file tracking (this will ensure the tracking property will always be added to newly created or updated notes).
+5. Rebuild the frontmatter templates and adjust the filename settings to your liking (you can also reset the templates to their default: simply delete the whole template value).
+6. Run **a full sync** to rebuild all the notes according to the new settings and enjoy the new features of Readwise mirror 2.x.x. 
 
-Your subsequent syncs will then use the `uri` property to track unique files and ensure links to items in your Readwise library will be updated, even if the generated filenames change with the new version of the plugin.
+Your subsequent syncs will then use the `uri` property to track unique files and ensure links to items in your Readwise library will be updated, even if the note filenames change with the new version of the plugin.
 
-As an additional measure, you can also use the `Adjust Filenames to current settings` command. This will iteratively go through all files in your Readwise library only and will rename the files according to the general settings (incl. slugify), and will also remove things like multiple or trailing spaces in filenames. Links from other Notes to renamed files will be updated.
+>[!TIP]
+>If you are unsure what the plugin will do to your Obsidian Obsidian vault after the upgrade, we would recommend that you create a copy of the Obsidian vault and run a test upgrade according to the steps described above.
 
-[^1]: You might want to ensure that properties like `author` are omitted from the template as these have a tendency to break frontmatter. Alternatively, you can use the `authorStr` variable, or run a plugin like "Linter" to check and fix all your Readwise notes before upgrading.
+[^1]: You might want to ensure that properties like `author` are omitted from the template as these have a tendency to break frontmatter. Alternatively, you can run a plugin like "Linter" to check and fix all your Readwise notes before upgrading, or you simply remove all properties except `uri` from your template and rebuild it after a successful upgrade. 
+[^2]: There are different cases where this can happen. For example, you can manually change Metadata of Reader and Readwise items. Without tracking, this would create a new file during the next sync. With tracking, we can rename the file based on the new metadata, and also based on whatever you chose as custom filename template.
+[^3]: Readwise has a quite elaborate deduplication strategy itself where a number of factors outside of our control define if a new item is created for a highlight or if it ends up being appended to an existing item. It is therefore entirely possible, although usually unlikely, that a Readwise library contains different items of the same type with the same title. 
+[^4]: The use of `highlights_url` is a deliberate choice over the `id` value alone, both because, as an URL, it contains a namespace (allowing differention from other ID values) and because it allows the user to jump directly to the Readwise item in question.
+[^5]: If at all possible, it is always better to change mistakes at the source, that is in Readwise itself. If, for example, Readwise has not correctly parsed an author's name, you might want to change this in the metadata in Readwise instead of manually updating (and protecting) the `author` property in Readwise. Nevertheless, there might be use cases where a *sync once, protect afterwards* approach might be useful. 
