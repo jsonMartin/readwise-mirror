@@ -254,15 +254,15 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       },
       {
         id: 'files',
-        name: 'File Tracking & Naming',
+        name: 'File tracking and naming',
         render: (container) => {
           this.renderFileTracking(container);
           this.renderFilenameSettings(container);
         },
       },
       {
-        id: 'structure-display',
-        name: 'Structure & Display',
+        id: 'highlights',
+        name: 'Highlights',
         render: (container) => {
           this.renderAuthorSettings(container);
           this.renderHighlightSettings(container);
