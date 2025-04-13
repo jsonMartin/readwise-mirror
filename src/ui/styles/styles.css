@@ -77,3 +77,7 @@
 .settings-tab-content {
   padding-top: 1rem;
 }
+
+#frontmatter-template.invalid-template {
+  color: var(--text-danger);
+}

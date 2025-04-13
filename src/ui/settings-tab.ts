@@ -1060,14 +1060,11 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .addTextArea((text) => {
         const initialRows = 12;
         text.inputEl.addClass('settings-template-input');
+        text.inputEl.id = 'frontmatter-template';
         text.inputEl.rows = initialRows;
         text.inputEl.cols = 50;
 
         const container = containerEl.createDiv();
-
-        text.inputEl.addClass('settings-template-input');
-        text.inputEl.rows = 12;
-        text.inputEl.cols = 50;
 
         // Create preview elements below textarea
         const previewContainer = container.createDiv('template-preview');
@@ -1110,19 +1107,18 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           if (!result.isValid) {
             errorNotice.setText('Your Frontmatter contains invalid YAML');
             errorDetails.setText(result.error);
-            errorDetails.show();
 
             if (result.preview) {
               previewContent.setText(result.preview);
-              previewContainer.show();
             }
-            return;
+          } else {
+            errorNotice.setText('');
+            errorDetails.setText('');
           }
 
-          errorNotice.setText('');
-          errorDetails.setText('');
-          errorDetails.hide();
-          previewContainer.hide();
+          text.inputEl.toggleClass('invalid-template', !result.isValid);
+          errorDetails.toggle(!result.isValid);
+          previewContainer.toggle(!result.isValid && result.preview !== '');
         };
 
         // Display rendered template on load
