@@ -38,6 +38,7 @@
 
 .settings-tab-buttons {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   border-bottom: 2px solid var(--background-modifier-border);
   padding-bottom: 0.5rem;
@@ -51,6 +52,10 @@
   color: var(--text-muted);
   border-radius: 4px 4px 0 0;
   position: relative;
+  /* Ensure buttons don't grow unnecessarily wide */
+  flex: 0 1 auto;
+  /* Prevent text from wrapping inside buttons */
+  white-space: nowrap;
 }
 
 .settings-tab-button:hover {
@@ -62,16 +67,6 @@
   color: var(--text-normal);
   background-color: var(--interactive-accent);
   font-weight: bold;
-}
-
-.settings-tab-button.active::after {
-  content: "";
-  position: absolute;
-  bottom: -0.5rem;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background-color: var(--interactive-accent);
 }
 
 .settings-tab-content {
