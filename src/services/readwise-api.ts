@@ -43,6 +43,9 @@ export default class ReadwiseApi {
     this.apiToken = apiToken;
     this.validateToken().then((isValid) => {
       this.validToken = isValid;
+    }).catch((e) => {
+      this.logger.error(`Failed to set token: ${e.message}`);
+      this.validToken = false;
     });
   }
 
@@ -60,12 +63,12 @@ export default class ReadwiseApi {
   }
 
   /**
-   * Validates and updates the validation status of the token in the Readwise API instance
-   * @returns {Promise<boolean>} - Returns a promise that resolves to a boolean indicating if the token is valid
+   * Returns the validation status of the API token
+   * @returns {boolean} - Returns a boolean indicating if the token is valid
    */
-  async hasValidToken(): Promise<boolean> {
+  public hasValidToken(): boolean {
     if (this.validToken === undefined) {
-      this.validToken = await this.validateToken();
+      return false;
     }
     return this.validToken;
   }
@@ -78,7 +81,8 @@ export default class ReadwiseApi {
     try {
       const response = await requestUrl({ url: `${API_ENDPOINT}/auth`, ...this.options });
 
-      return response.status === 204;
+      this.validToken = (response.status === 204);
+      return this.validToken;
     } catch (error) {
       throw new TokenValidationError(
         `Token validation failed: ${error instanceof Error ? error.message : String(error)}`

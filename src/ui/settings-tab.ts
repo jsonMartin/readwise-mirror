@@ -357,14 +357,13 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           // Validate the token on load
           if (this.plugin.readwiseApi) {
             try {
-              const isValid = await this.plugin.readwiseApi.validateToken();
-              hasValidToken = isValid;
+              hasValidToken = this.plugin.readwiseApi.hasValidToken() ?? await this.plugin.readwiseApi.validateToken();
 
-              if (isValid) this.notify.setStatusBarText('Readwise: Click to Sync');
-              validationButton?.setDisabled(isValid);
-              validationButton?.setButtonText(isValid ? 'Re-authenticate with Readwise' : 'Authenticate with Readwise');
-              tokenValidationSuccess.toggle(isValid);
-              tokenValidationInvalid.toggle(!isValid);
+              if (hasValidToken) this.notify.setStatusBarText('Readwise: Click to Sync');
+              validationButton?.setDisabled(hasValidToken);
+              validationButton?.setButtonText(hasValidToken ? 'Re-authenticate with Readwise' : 'Authenticate with Readwise');
+              tokenValidationSuccess.toggle(hasValidToken);
+              tokenValidationInvalid.toggle(!hasValidToken);
             } catch (error) {
               validationButton?.setDisabled(true);
               if (error instanceof TokenValidationError) {
