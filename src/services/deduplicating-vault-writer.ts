@@ -195,7 +195,8 @@ export class DeduplicatingVaultWriter {
   }
 
   /**
-   * Processes a path group of files, deduplicates and writes them to the vault
+   * Processes a path group of files, identified duplicates and writes 
+   * the files to the vault according to the tracking settings
    * @param readwiseFiles - The files to process
    */
   private async writePathGroup(readwiseFiles: ReadwiseFile[]): Promise<void> {
