@@ -741,7 +741,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         .setClass('indent')
         .setName('Tracking property')
         .setDesc(
-          'Frontmatter property to store the unique Readwise URL (default: uri). This field will be automatically managed in the frontmatter.'
+          'Frontmatter property used to track the unique Readwise URL across syncs (default: uri). This field will be automatically managed in the frontmatter.'
         )
         .addText((text) =>
           text.setValue(this.plugin.settings.trackingProperty).onChange(async (value) => {
@@ -756,7 +756,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         .setDesc(
           createFragment((fragment) => {
             fragment.appendText(
-              'When enabled, duplicate files will be removed. Otherwise, they will be marked with duplicate: true in frontmatter.'
+              'When enabled, duplicate files with the same Readwise URL in the tracking property will be removed. Otherwise, they will be marked with duplicate: true in frontmatter.'
             );
             fragment.createEl('br');
             fragment.createEl('blockquote', {
@@ -873,7 +873,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setName('Frontmatter settings')
       .setDesc(
         createFragment((fragment) => {
-          fragment.appendText('Controls the YAML metadata at the top of each note.');
+          fragment.appendText('Controls the YAML metadata at the top of each note');
         })
       )
       .setHeading();
@@ -908,8 +908,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           createFragment((fragment) => {
             fragment.appendText('Update frontmatter when syncing existing files');
             fragment.createEl('br');
+            fragment.createEl('br');
             fragment.appendText(
-              'When enabled, frontmatter of existing files will be updated, keeping additional fields that are not present in the template. Works best with Deduplication enabled.'
+              'When enabled, frontmatter of existing files will be updated, keeping additional fields that are not present in the template. Works best with file tracking enabled.'
             );
           })
         )
@@ -1047,10 +1048,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               ['tags_nohash', 'Tags without # prefix (compatible with frontmatter)'],
               ['highlight_tags', 'Tags from highlights with # prefix'],
               ['hl_tags_nohash', 'Tags from highlights without # prefix (compatible with frontmatter)'],
-              ['highlights_url', 'Readwise URL (auto-injected if deduplication enabled)'],
+              ['highlights_url', 'Readwise URL (auto-injected if file tracking enabled)'],
               [
                 'Note:',
-                'If deduplication is enabled, the specified property will be automatically added or updated in the frontmatter template.',
+                'If file tracking is enabled, the specified tracking property will be automatically added or updated in the frontmatter template, independent of the frontmatter settings.',
               ],
             ])
           );
@@ -1186,6 +1187,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         ])
       )
       .addTextArea((text) => {
+        // TODO: Add header template validation resp. preview
         const initialRows = 15;
         text.inputEl.addClass('settings-template-input');
         text.inputEl.rows = initialRows;
@@ -1238,6 +1240,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         ])
       )
       .addTextArea((text) => {
+        // TODO: Add settings template validation resp. preview
         const initialRows = 12;
         text.inputEl.addClass('settings-template-input');
         text.inputEl.rows = initialRows;

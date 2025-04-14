@@ -560,7 +560,7 @@ Readwise can contain multiple items sharing the same title but with different ID
 ## Upgrading from 1.x.x to 2.x.x
 
 >[!WARNING]
->If you update to 2.x.x without following these steps, you will likely end up with duplicate notes for the same Readwise item or, if you delete the whole Readwise folder in your Obsidian vault first, will likely lose any internal links to notes created by the plugin.
+>If you update to 2.x.x without following these steps, you will likely end up with duplicate notes for the same Readwise item or, if you delete the whole Readwise folder in your Obsidian vault first, will likely lose any existing internal links to notes created by the plugin.
 
 If you plan to upgrade the plugin from v1.x.x to v2.x.x, and want to make sure any internal links in your Obsidian vault to notes created by the plugin remain intact, then you should ensure all your notes have the file tracking property in their frontmatter before the upgrade.
 
