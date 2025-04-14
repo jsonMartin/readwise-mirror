@@ -730,9 +730,45 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       )
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.trackFiles).onChange(async (value) => {
-          this.plugin.settings.trackFiles = value;
-          await this.plugin.saveSettings();
-          this.display();
+          if (!value) {
+            const modal = new Modal(this.app);
+            modal.titleEl.setText('Warning');
+            modal.contentEl.createEl('p', {
+              text: 'Disabling and re-enabling file tracking might lead to loss of consistency in your vault if you sync Readwise notes without tracking properties and then re-enable file tracking again. Are you sure you want to continue?',
+            });
+
+            const buttonContainer = modal.contentEl.createDiv();
+            buttonContainer.style.display = 'flex';
+            buttonContainer.style.justifyContent = 'flex-end';
+            buttonContainer.style.gap = '10px';
+            buttonContainer.style.marginTop = '20px';
+
+            const cancelButton = buttonContainer.createEl('button', {
+              text: 'Cancel',
+            });
+            const confirmButton = buttonContainer.createEl('button', {
+              text: 'Confirm',
+            });
+            confirmButton.style.backgroundColor = 'var(--background-modifier-error)';
+
+            cancelButton.onclick = () => {
+              toggle.setValue(true);
+              modal.close();
+            };
+
+            confirmButton.onclick = async () => {
+              this.plugin.settings.trackFiles = value;
+              await this.plugin.saveSettings();
+              this.display();
+              modal.close();
+            };
+
+            modal.open();
+          } else {
+            this.plugin.settings.trackFiles = value;
+            await this.plugin.saveSettings();
+            this.display();
+          }
         })
       );
 
