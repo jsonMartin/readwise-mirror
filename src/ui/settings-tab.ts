@@ -693,7 +693,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             const modal = new Modal(this.app);
             modal.titleEl.setText('Warning');
             modal.contentEl.createEl('p', {
-              text: 'Disabling and re-enabling file tracking might lead to loss of consistency in your vault if you sync Readwise notes without tracking properties and then re-enable file tracking again. Are you sure you want to continue?',
+              text: 'Disabling and re-enabling file tracking might lead to loss of consistency in your Obsidian vault if you sync Readwise notes without tracking properties and then re-enable file tracking again. Are you sure you want to continue?',
             });
 
             const buttonContainer = modal.contentEl.createDiv();
