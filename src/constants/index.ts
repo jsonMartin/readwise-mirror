@@ -19,7 +19,7 @@ id: {{ id }}
 created: {{ created }}
 updated: {{ updated }}
 title: {{ title }}
-author: [ {{ author | parse_authors | join(', ') }} ]
+author: [ {{ author | join(', ') }} ]
 ---
 `,
   headerTemplate: `
@@ -35,7 +35,7 @@ Updated: {{ updated }}
 {%- endif %}
 # About
 Title: [[{{ title }}]]
-Authors: [[{{ author | parse_authors | join(']], [[') }}]]
+Authors: [[{{ author | join(']], [[') }}]]
 Category: #{{ category }}
 {%- if tags %}
 Tags: {{ tags }}

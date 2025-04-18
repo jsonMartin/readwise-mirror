@@ -235,7 +235,7 @@ The plugin uses three template types to format content, all using Nunjucks templ
 id: {{ id }}
 updated: {{ updated }}
 title: {{ title }}
-author: [{{ author | parse_authors | join(', ') }}]
+author: [{{ author | join(', ') }}]
 ---
 ```
 
@@ -249,7 +249,7 @@ id: {{ id }}
 updated: {{ updated }}
 title: {{ title }}
 alias: {{ sanitized_title }}
-author: [{{ author | parse_authors | join(', ') }}]
+author: [{{ author | join(', ') }}]
 highlights: {{ num_highlights }}
 last_highlight_at: {{ last_highlight_at }}
 source: {{ source_url }}
@@ -269,7 +269,7 @@ Updated: {{ updated }}
 
 # About
 Title: [[{{ title }}]]
-Authors: [[{{ author | parse_authors | join(']], [[') }}]]
+Authors: [[{{ author | join(']], [[') }}]]
 Category: #{{ category }}
 {%- if tags %}
 Tags: {{ tags }}
@@ -396,7 +396,6 @@ The plugin provides filters that can be used in all templates (including in the 
 | `is_qa` | Check for Q&A format | `{% if note \| is_qa %}` |
 | `qa` | Convert to Q&A format | `{{ note \| qa }}` |
 | `date` | Format dates | `{{ created \| date("YYYMMDDHHMMSS") }}` |
-| `parse_authors` | Get array of authors from an author field | `{{ author \| parse_authors }}` |  
 
 #### Blockquote filter
 
@@ -463,20 +462,20 @@ The plugin provides a `date` filter which builds on [`moment.js`](https://moment
 
 #### Author parser
 
-For certain use cases, like linking to authors or putting multiple authors into frontmatter, you might want to get individual authors instead of one variable. The plugin provides a `parse_authors` filter which will separate a string into individual authors, following a simple approach, using commas or *and* as separators:
+The plugin will split the authors from Readwise into an array of individual author names which can then be used in your templates as you wish.
 
-The `author` field with the following value `John Doe, Jane Smith, and Homer Simpson` woud be split into an array consiting of `[ 'John Doe', 'Jane Smith', 'Home Simpson']`. You can then use other `nunjucks` filters, including `join()`, to rebuild a string in your template.
+The `author` field with the following value `John Doe, Jane Smith, and Homer Simpson` would be split into an array consiting of `[ 'John Doe', 'Jane Smith', 'Homer Simpson']`. You can then use other `nunjucks` filters, including `join()`, to rebuild a string in your template.
 
 For example the following frontmatter and heading template  
 
 ```markdown+nunjucks
 ---
-author: [ {{ author | parse_authors | join(', ') }} ]
+author: [ {{ author | join(', ') }} ]
 ---
 
 ...
 
-Author: [[{{ author | parse_authors | join(']], [[') }}]]
+Author: [[{{ author | join(']], [[') }}]]
 ```
 
 Would render as
@@ -493,9 +492,8 @@ Author: [[John Doe]], [[Jane Smith]], [[Homer Simpson]]
 
 >[!NOTE]
 >This will not work for authors that are stored in Readwise in the scientific notation (Last, First). If you end up having such cases stored in your Readwise library, it is best to manually correct them at the source or in Readwise and sync again to Obsidian.
->The use of a nunjucks filter instead of a hardcoded parsing or setting was a deliberate choice as this is about *content* of your Readwise library and not functionality of the synchronization.
 
-### Limitations
+### Template limitations
 
 The templating is based on the [`nunjucks`](https://mozilla.github.io/nunjucks/templating.html) templating library and thus shares its limitations.
 

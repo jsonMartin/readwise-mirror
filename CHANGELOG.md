@@ -44,7 +44,6 @@ Your subsequent syncs will then use the `uri` property to track unique files and
 
 - Added Q&A parsing with new `is_qa` and `qa` nunjucks filters for `.qa` action tags in Readwise
 - Added `date` filter to format dates (e.g. for filenames)
-- Added `parse_authors` filter to split author strings into an array of author names
 - Added `bq` filter to ensure notes or highlights with multiple paragraphs are properly escaped as *one* blockquote
 - Improved title, author, and frontmatter template handling and error reporting to persistently create valid frontmatter
 - Added slugify option for filenames (implements #27)
