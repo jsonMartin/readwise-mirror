@@ -73,6 +73,6 @@
   padding-top: 1rem;
 }
 
-.invalid-template {
+#frontmatter-template.invalid-template {
   border-color: var(--color-red) !important;
 }

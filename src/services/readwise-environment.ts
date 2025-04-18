@@ -38,5 +38,12 @@ export class ReadwiseEnvironment extends Environment {
       const moment = window.moment;
       return moment(date).format(format);
     });
+
+    // Add an author parser filter
+    this.addFilter('parse_authors', (author: string) => {
+      if (typeof author !== 'string') return author;
+      const authors = author.split(',').map((a) => a.trim());
+      return authors.length > 1 ? authors : authors[0];
+    });
   }
 }
