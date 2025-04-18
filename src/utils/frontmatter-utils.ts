@@ -15,24 +15,24 @@ import { sampleMetadata } from 'test/sample-data';
  * @param template - Frontmatter template to validate
  * @returns Validation result
  */
-export function validateFrontmatterTemplate(template: string): { isValid: boolean; error?: string; preview?: string } {
+export function validateFrontmatterTemplate(template: string): { isValidYaml: boolean; error?: string; preview?: string } {
   const renderedTemplate = new Template(template, new ReadwiseEnvironment(), null, true).render(
     escapeMetadata(sampleMetadata, FRONTMATTER_TO_ESCAPE)
   );
   const yamlContent = renderedTemplate.replace(Frontmatter.REGEX, '$2');
   try {
     YAML.parse(yamlContent);
-    return { isValid: true };
+    return { isValidYaml: true };
   } catch (error) {
     if (error instanceof YAML.YAMLParseError) {
       return {
-        isValid: false,
+        isValidYaml: false,
         error: `Invalid YAML: ${error.message}`,
         preview: yamlContent,
       };
     }
     return {
-      isValid: false,
+      isValidYaml: false,
       error: `Template error: ${error.message}`,
     };
   }

@@ -364,11 +364,14 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           // Validate the token on load
           if (this.plugin.readwiseApi) {
             try {
-              hasValidToken = this.plugin.readwiseApi.hasValidToken() ?? await this.plugin.readwiseApi.validateToken();
+              hasValidToken =
+                this.plugin.readwiseApi.hasValidToken() ?? (await this.plugin.readwiseApi.validateToken());
 
               if (hasValidToken) this.notify.setStatusBarText('Readwise: Click to Sync');
               validationButton?.setDisabled(hasValidToken);
-              validationButton?.setButtonText(hasValidToken ? 'Re-authenticate with Readwise' : 'Authenticate with Readwise');
+              validationButton?.setButtonText(
+                hasValidToken ? 'Re-authenticate with Readwise' : 'Authenticate with Readwise'
+              );
               tokenValidationSuccess.toggle(hasValidToken);
               tokenValidationInvalid.toggle(!hasValidToken);
             } catch (error) {
@@ -460,7 +463,6 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         })
       );
   }
-
 
   private renderHighlightSettings(containerEl: HTMLElement): void {
     new Setting(containerEl).setName('Highlight organization').setHeading();
@@ -877,18 +879,23 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.frontMatter).onChange(async (value) => {
           // Test template with sample data
-          const { isValid, error } = validateFrontmatterTemplate(this.plugin.settings.frontMatterTemplate);
-          if ((value && isValid) || !value) {
-            // Save settings and update the template
-            this.plugin.settings.frontMatter = value;
-            await this.plugin.saveSettings();
-            // Trigger re-render to show/hide frontmatter settings
-            this.display();
-          } else if (value && !isValid) {
-            this.notify.notice(`Invalid frontmatter template: ${error}`);
-            toggle.setValue(false);
-            // Trigger re-render to show/hide property selector
-            this.display();
+          try {
+            const { isValidYaml, error } = validateFrontmatterTemplate(this.plugin.settings.frontMatterTemplate);
+            if ((value && isValidYaml) || !value) {
+              // Save settings and update the template
+              this.plugin.settings.frontMatter = value;
+              await this.plugin.saveSettings();
+              // Trigger re-render to show/hide frontmatter settings
+              this.display();
+            } else if (value && !isValidYaml) {
+              this.notify.notice(`Invalid frontmatter template: ${error}`);
+              toggle.setValue(false);
+              // Trigger re-render to show/hide property selector
+              this.display();
+            }
+          } catch (error) {
+            this.logger.error('Error validating frontmatter template:', error);
+            return;
           }
         })
       );
@@ -1077,6 +1084,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             style: 'color: var(--text-error); margin-top: 1em;',
           },
         });
+        errorNotice.id = 'validation-notice';
 
         const previewContent = previewContainer.createEl('pre', {
           cls: ['template-preview-content', 'settings-template-input'],
@@ -1084,6 +1092,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             style: 'background-color: var(--background-secondary); padding: 1em; border-radius: 4px; overflow-x: auto;',
           },
         });
+        previewContent.id = 'template-preview-content';
 
         const errorDetails = previewContainer.createEl('pre', {
           cls: ['error-details'],
@@ -1092,51 +1101,85 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               'color: var(--text-error); background-color: var(--background-primary-alt); padding: 0.5em; border-radius: 4px; margin-top: 0.5em; font-family: monospace; white-space: pre-wrap;',
           },
         });
+        errorDetails.id = 'error-details';
 
         errorDetails.hide();
 
         // Update preview on template changes
         const updatePreview = (result: TemplateValidationResult) => {
-          if (!result.isValid) {
-            errorNotice.setText('Your Frontmatter contains invalid YAML');
-            errorDetails.setText(result.error);
+          const isInvalidTemplate = result.isValidtemplate === false;
+          const isInvalidYaml = result.isValidYaml === false;
+          const hasError = isInvalidTemplate || isInvalidYaml;
 
-            if (result.preview) {
-              previewContent.setText(result.preview);
-            }
+          if (isInvalidTemplate) {
+            errorNotice.setText('Your Frontmatter template contains invalid Nunjucks syntax.');
+            errorDetails.setText(result.error);
+          } else if (isInvalidYaml) {
+            errorNotice.setText('Your Frontmatter template creates invalid YAML.');
+            errorDetails.setText(result.error);
           } else {
             errorNotice.setText('');
             errorDetails.setText('');
           }
 
-          text.inputEl.toggleClass('invalid-template', !result.isValid);
-          errorDetails.toggle(!result.isValid);
-          previewContainer.toggle(!result.isValid && result.preview !== '');
+          if (result.preview) {
+            previewContent.setText(result.preview);
+          }
+
+          text.inputEl.toggleClass('invalid-template', hasError);
+          errorDetails.toggle(hasError);
+          previewContainer.toggle(hasError && result.preview !== '');
         };
 
         // Display rendered template on load
-        const validationResult: TemplateValidationResult = validateFrontmatterTemplate(
-          this.plugin.settings.frontMatterTemplate
-        );
-        updatePreview(validationResult);
-        text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
-          const validationResult: TemplateValidationResult = validateFrontmatterTemplate(value);
-
-          // Update validation notice
-          const noticeEl = containerEl.querySelector('.validation-notice');
-          if (noticeEl) {
-            noticeEl.setText(validationResult.isValid ? '' : validationResult.error);
-          }
-
-          // Set the frontmatter in settings
-          if (!value) {
-            this.plugin.settings.frontMatterTemplate = DEFAULT_SETTINGS.frontMatterTemplate;
-          } else {
-            this.plugin.settings.frontMatterTemplate = value.replace(/\n*$/, '\n');
-          }
-
+        try {
+          const validationResult: TemplateValidationResult = validateFrontmatterTemplate(
+            this.plugin.settings.frontMatterTemplate
+          );
           updatePreview(validationResult);
-          await this.plugin.saveSettings();
+        } catch (error) {
+          // Catch Nunjucks template errors
+          this.logger.error('Error validating frontmatter template:', error);
+          updatePreview({
+            isValidYaml: true,
+            isValidtemplate: false,
+            error: error.message,
+            preview: this.plugin.settings.frontMatterTemplate,
+          });
+        }
+        text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
+          const noticeEl = containerEl.querySelector('#validation-notice');
+          try {
+            const validationResult: TemplateValidationResult = validateFrontmatterTemplate(value);
+
+            // Update validation notice
+            if (noticeEl) {
+              noticeEl.setText(validationResult.isValidYaml ? '' : validationResult.error);
+            }
+
+            // Set the frontmatter in settings
+            if (!value) {
+              this.plugin.settings.frontMatterTemplate = DEFAULT_SETTINGS.frontMatterTemplate;
+            } else {
+              this.plugin.settings.frontMatterTemplate = value.replace(/\n*$/, '\n');
+            }
+
+            updatePreview(validationResult);
+            await this.plugin.saveSettings();
+          } catch (error) {
+            // Catch Nunjucks template errors
+            this.logger.error('Error validating frontmatter template:', error);
+
+            if (noticeEl) {
+              noticeEl.setText(`Error validating frontmatter template: ${error.message}`);
+              updatePreview({
+                isValidYaml: true,
+                isValidtemplate: false,
+                error: error.message,
+                preview: value,
+              });
+            }
+          }
         });
 
         // Initial row adjustment

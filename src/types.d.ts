@@ -140,7 +140,8 @@ export interface YamlEscapeOptions {
 }
 
 export interface TemplateValidationResult {
-  isValid: boolean;
+  isValidYaml?: boolean;
+  isValidtemplate?: boolean;
   error?: string;
   preview?: string;
 }
