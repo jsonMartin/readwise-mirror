@@ -62,7 +62,7 @@ After installing, visit the plugin configuration page (General) to authenticate 
 Then run any of the commands or click the Readwise toolbar to sync for the first time.
 
 >[!IMPORTANT]
->It is highly recommended that you enable at least File tracking. This will ensure future changes, including to the file names, colon replacements, or changes made on Readwise will not create duplicates in your Obsidian library.  
+>It is highly recommended that you enable at least File tracking. This will ensure future configuration changes, including to the file name template, colon replacement character, or metadata changes made on Readwise (title, author) will not create duplicates in your Obsidian library.  
 
 ## How does this work?
 
@@ -126,7 +126,10 @@ File tracking enables to key features in Readwise mirror:
 #### Updated internal links
 Linking between notes is an essential feature of Obsidian and file tracking enables that links to your Readwise notes are updated and working even if the filename of a note changes between sync runs. 
 
-If a user renames an Obsidian note or if a plugin programatically renames it, and if "Automatically update internal links" is enabled, Obsidian will esnure that all links to that note will be changed accordingly. 
+If a user renames an Obsidian note or if a plugin programatically renames it, and if "Automatically update internal links" is enabled, Obsidian will ensure that all links to that note will be changed accordingly. 
+
+>[!IMPORTANT]
+>File tracking searches existing Readwise notes with the tracking property **across your whole Obsidian vault**. If you have file tracking enabled and you move a note with the tracking property  created by the plugin to another folder outside of the Readwise library folder, it will still be found and updated (overwritten) by the plugin if the original item has changes that trigger a sync. You have to remove the tracking property (`uri` or whatever you chose) from the note to sever the tracking. Future versions might offer an option to limit tracking to the Readwise library folder.
 
 #### Duplicate notes
 

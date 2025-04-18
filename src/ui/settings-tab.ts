@@ -681,7 +681,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           fragment.createEl('br');
           fragment.createEl('br');
           fragment.appendText(
-            'Note: The tracking field will automatically be added to the Frontmatter, independent of the "Frontmatter" setting.'
+            'Note: The tracking field will automatically be added to the Frontmatter, independent of the "Frontmatter" setting. File tracking works across the whole Obsidian vault. If you move a tracked note outside of the Readwise library, it will still be found by the plugin. Remove the tracking property manually in these notes to sever the tracking.'
           );
         })
       )
