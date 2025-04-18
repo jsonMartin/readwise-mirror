@@ -47,22 +47,13 @@ Settings related to tracking notes across syncs, renames, and settings related t
   - **Colon replacement**: Specify a character to replace colons in filenames.
 - **Slugify filenames**: Convert filenames into a URL-friendly format by replacing spaces and special characters.
 
-### Highlights
-
-Settings related to the processing of certain metadata and the way highlights with and without notes are synced into your Obsidian library:
-
-- **Author name processing**: Control how author names are handled, good for keeping names consistent with respect to case and titles. 
-- **Sort highlights**: Controls how highlights are sorted within the generated Obsidian file.
-- **Filter discarded highlights**: Exclude discarded highlights from syncing.
-- **Sync highlights with notes only**: Only sync highlights that include notes.
-
 ### Template Settings
 
 The plugin supports three types of templates for formatting content which can be defined individually.
 
 - **Frontmatter Template**: Defines the template for frontmatter (also called "properties") and how frontmatter is updated and protected across syncs.
 - **Header Template**: Defines the structure and metadata display of the heade of the documents .
-- **Highlight Template**: Defines the format of the individual highlights.
+- **Highlight Template**: Defines the format of the individual highlights and the way highlights with and without notes are synced into your Obsidian library.
 
 ## Usage
 
@@ -219,21 +210,6 @@ For example, `My Book Title` becomes `my-book-title`. You can select a separator
 A lot of the value of Readwise highlights lies in the notes associated with them. E.g. if you are building a Zettelkasten and want to work with literature notes, you typically only want highlights with notes in your Zettelkasten -- and not every highlight.
 
 The option "Only sync highlights with notes" will do exactly that: it will only sync highlights with notes. If an item in your library has only highlights without notes, it will not be synced.
-
-### Author Name Settings
-
-These settings control how author names are processed. If enabled, titles (Dr., Prof., PhD, Mr., Mrs., Ms., Miss, Sir, Lady) will be stripped from author names. This is useful for cases where you don't want to change the author names in Readwise (e.g. to avoid duplicate highlights).
-
-For example, given the author string: "Dr. John Doe, and JANE SMITH, Prof. Bob Johnson"
-
-The different settings will produce:
-
-- **Default**: "Dr. John Doe, JANE SMITH, Prof. Bob Johnson"
-- **Normalize case**: "Dr. John Doe, Jane Smith, Prof. Bob Johnson"
-- **Strip titles**: "John Doe, JANE SMITH, Bob Johnson"
-- **Both enabled**: "John Doe, Jane Smith, Bob Johnson"
-
-The plugin will split the authors returned by Readwise into an array which can be used in Frontmatter and other templates.
 
 ## Templates
 
@@ -415,6 +391,7 @@ The plugin provides filters that can be used in all templates (including in the 
 | `is_qa` | Check for Q&A format | `{% if note \| is_qa %}` |
 | `qa` | Convert to Q&A format | `{{ note \| qa }}` |
 | `date` | Format dates | `{{ created \| date("YYYMMDDHHMMSS") }}` |
+| `parse_authors` | Get array of authors from an author field | `{{ author \| parse_authors }}` |  
 
 #### Blockquote filter
 If your highlight or note in Readwise spans multiple paragraphs, it can be difficult to get it as a proper blockquote in Obsidian as each paragraph, and the empty lines between, must begin with the quote character (`>`). 
@@ -477,6 +454,38 @@ Rendered output:
 #### Date format
 
 The plugin provides a `date` filter which builds on [`moment.js`](https://momentjs.com/). It  allow you to format any date with a template (e.g. `{{ created | date("YYYYMMDDD")}}` would result in `13 Apr 10125` to be formatted as `20250413`). 
+
+#### Author parser
+
+For certain use cases, like linking to authors or putting multiple authors into frontmatter, you might want to get individual authors instead of one variable. The plugin provides a `parse_authors` filter which will separate a string into individual authors, following a simple approach, using commas or *and* as separators:
+
+The `author` field with the following value `John Doe, Jane Smith, and Homer Simpson` woud be split into an array consiting of `[ 'John Doe', 'Jane Smith', 'Home Simpson']`. You can then use other `nunjucks` filters, including `join()`, to rebuild a string in your template.
+
+For example the following frontmatter and heading template  
+
+```markdown+nunjucks
+---
+author: [ {{ author | join(', ') }} ]
+---
+
+...
+
+Author: [[{{ author | join(']], [[') }}]]
+```
+
+Would render as 
+```markdown
+---
+author: [ 'John Doe', 'Jane Smith', 'Homer Simpson' ]
+---
+
+...
+
+Author: [[John Doe]], [[Jane Smith]], [[Homer Simpson]]
+```
+
+>[!NOTE]
+>This will not work for authors that are stored in Readwise in the scientific notation (Last, First). If you end up having such cases stored in your Readwise library, it is best to manually correct them at the source or in Readwise and sync again to Obsidian.
 
 ### Limitations
 

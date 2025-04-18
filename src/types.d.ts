@@ -96,11 +96,6 @@ export interface MetadataInput {
   source_url: string;
 }
 
-export interface AuthorParserOptions {
-  removeTitles?: boolean;
-  normalizeCase?: boolean;
-}
-
 export interface PluginSettings {
   baseFolderName: string; // Base folder where synced notes will be stored
   apiToken: string | null; // Readwise API authentication token
@@ -129,8 +124,6 @@ export interface PluginSettings {
   syncPropertiesToReadwise: boolean; // Sync title/author changes back to Readwise
   titleProperty: string; // Frontmatter property for syncing title
   authorProperty: string; // Frontmatter property for syncing author
-  normalizeAuthorNames: boolean; // Normalize author names
-  stripTitlesFromAuthors: boolean; // Strip titles from author names
   debugMode: boolean; // Enable debug mode for detailed logging
   useCustomFilename: boolean; // Use custom filename template
   filenameTemplate: string; // Template for generating filenames

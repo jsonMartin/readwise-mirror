@@ -2,7 +2,6 @@ import slugify from '@sindresorhus/slugify';
 import filenamify from 'filenamify';
 import { Template } from 'nunjucks';
 import { Plugin, TFile, TFolder, normalizePath } from 'obsidian';
-import { AuthorParser } from 'services/author-parser';
 import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
 import { FrontmatterManager } from 'services/frontmatter-manager';
 import { ReadwiseEnvironment } from 'services/readwise-environment';
@@ -19,7 +18,7 @@ import { createdDate, updatedDate, lastHighlightedDate } from 'utils/highlight-d
 import type { Export, Highlight, Library, PluginSettings, ReadwiseDocument, ReadwiseFile, Tag } from 'types';
 
 // Constants
-import { DEFAULT_SETTINGS } from 'constants/index';
+import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS } from 'constants/index';
 
 export default class ReadwiseMirror extends Plugin {
   private _settings: PluginSettings;
@@ -133,6 +132,27 @@ export default class ReadwiseMirror extends Plugin {
       return true;
     });
   }
+
+    /**
+   * Parses a string of authors into an array of individual authors
+   * @param authorString The input string containing one or more authors
+   * @returns Array of individual author names
+   */
+    private parseAuthor(authorString?: string): string[] {
+      if (!authorString?.trim()) {
+        return [];
+      }
+  
+      return authorString
+        .split(AUTHOR_SEPARATORS)
+        .map(author => author.trim())
+        .filter(author => {
+          if (!author) {
+            return false;
+          }
+          return true;
+        });
+    }
 
   private formatDate(dateStr: string) {
     return dateStr.split('T')[0];
@@ -261,12 +281,7 @@ export default class ReadwiseMirror extends Plugin {
       // get an array with all tags from highlights
       const highlightTags = this.getTagsFromHighlights(filteredHighlights);
 
-      // Parse Authors, normalize their names and remove titles (configurable in settings)
-      const authorParser = new AuthorParser({
-        normalizeCase: this.settings.normalizeAuthorNames,
-        removeTitles: this.settings.stripTitlesFromAuthors,
-      });
-      const authors = authorParser.parse(author);
+      const authors = this.parseAuthor(author);
 
       const authorStr =
         authors[0] && authors?.length > 1
@@ -336,14 +351,7 @@ export default class ReadwiseMirror extends Plugin {
       const template = this.settings.filenameTemplate;
       const context = {
         title: book.title,
-        author: this.settings.normalizeAuthorNames
-          ? new AuthorParser({
-              normalizeCase: true,
-              removeTitles: this.settings.stripTitlesFromAuthors,
-            })
-              .parse(book.author)
-              .join(', ')
-          : book.author,
+        author: this.parseAuthor(book.author).join(', '),
         category: book.category,
         source: book.source_url,
         book_id: book.user_book_id,

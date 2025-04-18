@@ -87,8 +87,6 @@ Tags: {{ tags }}
   syncPropertiesToReadwise: false,
   titleProperty: 'title',
   authorProperty: 'author',
-  normalizeAuthorNames: false,
-  stripTitlesFromAuthors: false,
   debugMode: false,
   useCustomFilename: false,
   filenameTemplate: '{{title}}',
@@ -100,3 +98,5 @@ export const EMPTY_FRONTMATTER: string = '---\n---\n';
 // YAML options
 // Don't line-break (mainly for compatiblity with platers/obsidian-linter#1227)
 export const YAML_TOSTRING_OPTIONS: ToStringOptions = { lineWidth: -1 };
+
+export const AUTHOR_SEPARATORS = /(?:,\s*and\s*)|(?:\s+and\s+)|(?:,\s*)/;
