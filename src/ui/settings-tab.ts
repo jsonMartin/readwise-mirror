@@ -261,18 +261,25 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         },
       },
       {
-        id: 'highlights',
-        name: 'Highlights',
+        id: 'frontmatter-template',
+        name: 'Frontmatter',
         render: (container) => {
-          this.renderAuthorSettings(container);
-          this.renderHighlightSettings(container);
+          this.renderFrontmatterTemplateSettings(container);
         },
       },
       {
-        id: 'templates',
-        name: 'Templates',
+        id: 'header-template',
+        name: 'Header',
         render: (container) => {
-          this.renderTemplates(container);
+          this.renderHeaderTemplateSettings(container);
+        },
+      },
+      {
+        id: 'highlight-template',
+        name: 'Highlights',
+        render: (container) => {
+          this.renderHighlightSettings(container);
+          this.renderHighlightTemplateSettings(container);
         },
       },
     ];
@@ -454,56 +461,6 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       );
   }
 
-  private renderAuthorSettings(containerEl: HTMLElement): void {
-    new Setting(containerEl)
-      .setName('Author names')
-      .setHeading()
-      .setDesc(
-        createFragment((fragment) => {
-          fragment.appendText(
-            'These settings control how author names are processed. If enabled, titles (Dr., Prof., PhD, Mr., Mrs., Ms., Miss, Sir, Lady) will be stripped from author names.'
-          );
-          fragment.createEl('br');
-          fragment.createEl('br');
-          fragment.appendText('Example author string: "Dr. John Doe, and JANE SMITH, Prof. Bob Johnson"');
-          fragment.createEl('br');
-          fragment.createEl('blockquote', {
-            text: 'Default: "Dr. John Doe, JANE SMITH, Prof. Bob Johnson"',
-          });
-          fragment.createEl('blockquote', {
-            text: 'Normalize case: "Dr. John Doe, Jane Smith, Prof. Bob Johnson"',
-          });
-          fragment.createEl('blockquote', {
-            text: 'Strip titles: "John Doe, JANE SMITH, Bob Johnson"',
-          });
-          fragment.createEl('blockquote', {
-            text: 'Both enabled: "John Doe, Jane Smith, Bob Johnson"',
-          });
-        })
-      );
-
-    new Setting(containerEl)
-      .setName('Normalize author names')
-      .setClass('indent')
-      .setDesc('If enabled, author names will be normalized to a consistent case.')
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.normalizeAuthorNames).onChange(async (value) => {
-          this.plugin.settings.normalizeAuthorNames = value;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName('Strip titles from author names')
-      .setClass('indent')
-      .setDesc('If enabled, titles (e.g., Dr., Mr., Prof., etc.) will be stripped from author names.')
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.stripTitlesFromAuthors).onChange(async (value) => {
-          this.plugin.settings.stripTitlesFromAuthors = value;
-          await this.plugin.saveSettings();
-        })
-      );
-  }
 
   private renderHighlightSettings(containerEl: HTMLElement): void {
     new Setting(containerEl).setName('Highlight organization').setHeading();
@@ -877,7 +834,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     }
   }
 
-  private renderTemplates(containerEl: HTMLElement): void {
+  private renderFrontmatterTemplateSettings(containerEl: HTMLElement): void {
     new Setting(containerEl)
       .setName('Templates')
       .setHeading()
@@ -1192,7 +1149,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
         return text;
       });
+  }
 
+  private renderHeaderTemplateSettings(containerEl: HTMLElement): void {
     new Setting(containerEl)
       .setName('Header template')
       .setDesc(
@@ -1248,7 +1207,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
         return text;
       });
+  }
 
+  private renderHighlightTemplateSettings(containerEl: HTMLElement): void {
     new Setting(containerEl)
       .setName('Highlight template')
       .setDesc(
