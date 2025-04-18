@@ -233,7 +233,7 @@ The plugin uses three template types to format content, all using Nunjucks templ
 id: {{ id }}
 updated: {{ updated }}
 title: {{ title }}
-author: {{ author }}
+author: [{{ author | parse_authors | join(', ') }}]
 ---
 ```
 
@@ -247,7 +247,7 @@ id: {{ id }}
 updated: {{ updated }}
 title: {{ title }}
 alias: {{ sanitized_title }}
-author: {{ author }}
+author: [{{ author | parse_authors | join(', ') }}]
 highlights: {{ num_highlights }}
 last_highlight_at: {{ last_highlight_at }}
 source: {{ source_url }}
@@ -267,7 +267,7 @@ Updated: {{ updated }}
 
 # About
 Title: [[{{ title }}]]
-Authors: {{ authorStr }}
+Authors: [[{{ author | parse_authors | join(']], [[') }}]]
 Category: #{{ category }}
 {%- if tags %}
 Tags: {{ tags }}
@@ -468,12 +468,12 @@ For example the following frontmatter and heading template
 
 ```markdown+nunjucks
 ---
-author: [ {{ author | join(', ') }} ]
+author: [ {{ author | parse_authors | join(', ') }} ]
 ---
 
 ...
 
-Author: [[{{ author | join(']], [[') }}]]
+Author: [[{{ author | parse_authors | join(']], [[') }}]]
 ```
 
 Would render as 
@@ -489,6 +489,7 @@ Author: [[John Doe]], [[Jane Smith]], [[Homer Simpson]]
 
 >[!NOTE]
 >This will not work for authors that are stored in Readwise in the scientific notation (Last, First). If you end up having such cases stored in your Readwise library, it is best to manually correct them at the source or in Readwise and sync again to Obsidian.
+>The use of a nunjucks filter instead of a hardcoded parsing or setting was a deliberate choice as this is about *content* of your Readwise library and not functionality of the synchronization.
 
 ### Limitations
 
