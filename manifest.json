@@ -2,6 +2,7 @@
     "id": "readwise-mirror",
     "name": "Readwise mirror",
     "version": "2.0.0-beta.3",
+    "version": "2.0.0",
     "minAppVersion": "1.1.1",
     "description": "Mirror your Readwise library directly to an Obsidian vault",
     "author": "jsonmartin, johannrichard",
