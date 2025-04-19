@@ -54,11 +54,21 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   set headerTemplate(template: string) {
-    this._headerTemplate = new Template(template, new ReadwiseEnvironment(), null, true);
+    try {
+      this._headerTemplate = new Template(template, new ReadwiseEnvironment(), null, true);
+    } catch (error) {
+      this.logger.error('Error setting header template:', error);
+      this.notify.notice('Readwise: Error setting header template. Check console for details.');
+    }
   }
 
   set highlightTemplate(template: string) {
-    this._highlightTemplate = new Template(template, new ReadwiseEnvironment(), null, true);
+    try {
+      this._highlightTemplate = new Template(template, new ReadwiseEnvironment(), null, true);
+    } catch (error) {
+      this.logger.error('Error setting highlight template:', error);
+      this.notify.notice('Readwise: Error setting highlight template. Check console for details.');
+    }
   }
 
   /**
@@ -133,26 +143,26 @@ export default class ReadwiseMirror extends Plugin {
     });
   }
 
-    /**
+  /**
    * Parses a string of authors into an array of individual authors
    * @param authorString The input string containing one or more authors
    * @returns Array of individual author names
    */
-    private parseAuthor(authorString?: string): string[] {
-      if (!authorString?.trim()) {
-        return [];
-      }
-  
-      return authorString
-        .split(AUTHOR_SEPARATORS)
-        .map(author => author.trim())
-        .filter(author => {
-          if (!author) {
-            return false;
-          }
-          return true;
-        });
+  private parseAuthor(authorString?: string): string[] {
+    if (!authorString?.trim()) {
+      return [];
     }
+
+    return authorString
+      .split(AUTHOR_SEPARATORS)
+      .map((author) => author.trim())
+      .filter((author) => {
+        if (!author) {
+          return false;
+        }
+        return true;
+      });
+  }
 
   private formatDate(dateStr: string) {
     return dateStr.split('T')[0];
