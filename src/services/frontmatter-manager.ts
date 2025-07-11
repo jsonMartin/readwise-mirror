@@ -23,10 +23,10 @@ export class FrontmatterManager {
   public getFrontmatter(doc: ReadwiseDocument, frontmatterCache?: FrontMatterCache): Frontmatter {
     try {
       const currentFrontmatter = new Frontmatter(frontmatterCache);
-      const updates = this.processFrontmatterTemplate(doc);
+      const updates = this.getRawFrontmatter(doc);
 
       if (currentFrontmatter.keys().length > 0) {
-        const filteredUpdates = this.settings.protectFrontmatter ? this.filterProtectedFields(updates) : updates;
+        const filteredUpdates = this.settings.protectFrontmatter ? this.filterProtectedFrontmatter(updates) : updates;
         currentFrontmatter.merge(filteredUpdates);
       } else {
         currentFrontmatter.merge(updates);
@@ -38,7 +38,57 @@ export class FrontmatterManager {
     }
   }
 
-  private filterProtectedFields(updates: Frontmatter): Frontmatter {
+  /**
+   * Processes the frontmatter template according to the relevant settings and returns the raw frontmatter record
+   * @param metadata - The metadata to process
+   * @returns The frontmatter record
+   */
+  public getRawFrontmatter(metadata: ReadwiseDocument): Frontmatter {
+    // Render a template if frontmatter is managed or file tracking is set
+    if (!this.settings.frontMatter && !this.settings.trackFiles) {
+      return new Frontmatter();
+    }
+    try {
+      // Get frontmatter template string
+      const frontMatterTemplate = this.settings.frontMatter ? this.settings.frontMatterTemplate : EMPTY_FRONTMATTER;
+      // Add Sync properties
+      const mergedTemplate = this.addSyncPropertiesToTemplate(frontMatterTemplate);
+      this.logger.debug(`Processing merged frontmatter template\n${mergedTemplate}`);
+
+      // Render and parse the template into YAML
+      const template = new Template(
+        this.addSyncPropertiesToTemplate(mergedTemplate),
+        new ReadwiseEnvironment(),
+        null,
+        true
+      );
+      const renderedTemplate = template
+        .render(escapeMetadata(metadata, FRONTMATTER_TO_ESCAPE))
+        .replace(Frontmatter.REGEX, '$2');
+
+      const yaml = YAML.parse(renderedTemplate);
+      return new Frontmatter(yaml);
+    } catch (error) {
+      if (error instanceof YAML.YAMLParseError) {
+        this.logger.error('Failed to parse YAML frontmatter:', error.message);
+        throw new Error(`Invalid YAML frontmatter: ${error.message}`);
+      }
+
+      if (error instanceof Error) {
+        this.logger.error('Error processing frontmatter template:', error.message);
+        throw new Error(`Failed to process frontmatter: ${error.message}`);
+      }
+
+      this.logger.error('Unknown error processing frontmatter:', error);
+      throw new Error('Failed to process frontmatter due to unknown error');
+    }
+  }
+  /**
+   * Filters out protected fields from the frontmatter updates
+   * @param updates - The frontmatter updates to filter
+   * @returns Filtered frontmatter without protected fields
+   */
+  public filterProtectedFrontmatter(updates: Frontmatter): Frontmatter {
     const protectedFields = this.settings.protectedFields
       .split('\n')
       .map((f) => f.trim())
@@ -126,51 +176,5 @@ export class FrontmatterManager {
     const d = lines.length - filteredLines.length;
     filteredLines.splice(endIndex - d, 0, property);
     return filteredLines.join('\n');
-  }
-
-  /**
-   * Processes the frontmatter template according to the relevant settings and returns the frontmatter record
-   * @param metadata - The metadata to process
-   * @returns The frontmatter record
-   */
-  private processFrontmatterTemplate(metadata: ReadwiseDocument): Frontmatter {
-    // Render a template if frontmatter is managed or file tracking is set
-    if (!this.settings.frontMatter && !this.settings.trackFiles) {
-      return new Frontmatter();
-    }
-    try {
-      // Get frontmatter template string
-      const frontMatterTemplate = this.settings.frontMatter ? this.settings.frontMatterTemplate : EMPTY_FRONTMATTER;
-      // Add Sync properties
-      const mergedTemplate = this.addSyncPropertiesToTemplate(frontMatterTemplate);
-      this.logger.debug(`Processing merged frontmatter template\n${mergedTemplate}`);
-
-      // Render and parse the template into YAML
-      const template = new Template(
-        this.addSyncPropertiesToTemplate(mergedTemplate),
-        new ReadwiseEnvironment(),
-        null,
-        true
-      );
-      const renderedTemplate = template
-        .render(escapeMetadata(metadata, FRONTMATTER_TO_ESCAPE))
-        .replace(Frontmatter.REGEX, '$2');
-
-      const yaml = YAML.parse(renderedTemplate);
-      return new Frontmatter(yaml);
-    } catch (error) {
-      if (error instanceof YAML.YAMLParseError) {
-        this.logger.error('Failed to parse YAML frontmatter:', error.message);
-        throw new Error(`Invalid YAML frontmatter: ${error.message}`);
-      }
-
-      if (error instanceof Error) {
-        this.logger.error('Error processing frontmatter template:', error.message);
-        throw new Error(`Failed to process frontmatter: ${error.message}`);
-      }
-
-      this.logger.error('Unknown error processing frontmatter:', error);
-      throw new Error('Failed to process frontmatter due to unknown error');
-    }
   }
 }
