@@ -21,6 +21,7 @@ The first time this plugin is ran, it will do a full sync, downloading all conte
 - `Delete Readwise library`: Remove the Readwise library file folder from the Obsidian vault
 - `Download entire Readwise library (force)`: Forces a full download of all content from Readwise
 - `Adjust Filenames to current settings`: Clean up filenames of existing notes in your Readwise library folder based on current filename settings (whitespace removal and slugify only for the time being)
+- `Update all readwise note frontmatter`: Scan all notes in your Readwise library folder and update their frontmatter according to your current frontmatter template and protection settings, without changing the note content or filename. This is useful after changing your frontmatter template or protection settings.
 
 ## Settings
 
@@ -562,6 +563,12 @@ And protect `status`, `tags`, and `category`:
 - `category` would:
   - Be added if not present during the first sync
   - Be protected in future syncs
+
+### Standalone frontmatter Update
+
+The command "`Update all readwise note frontmatter`" Updates the frontmatter of existing Readwise notes in the workspace. The command downloads the current list of notes and iterates through each existing note, modifying the frontmatter as needed, and saves the changes. This is useful for batch updating metadata across all Readwise-imported notes when you only want to change the Frontmatter template.
+
+New Readwise documents will not be created or synced, those will be created during the next regular sync (Running this command will not update the last sync date).
 
 ## Special Considerations
 
