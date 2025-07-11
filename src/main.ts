@@ -676,6 +676,15 @@ export default class ReadwiseMirror extends Plugin {
       },
     });
 
+    this.addCommand({
+      id: 'update-all-frontmatter',
+      name: 'Update all Readwise note frontmatter',
+      callback: async () => {
+        this.notify.notice('Readwise: Updating all note frontmatter...');
+        await this.updateAllFrontmatter();
+      },
+    });
+
     this.registerInterval(
       window.setInterval(() => {
         if (/Synced/.test(this.notify.getStatusBarText())) {
@@ -695,5 +704,39 @@ export default class ReadwiseMirror extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+
+  /**
+   * Updates the frontmatter for all markdown files within the configured base folder.
+   *
+   * @async
+   * @returns {Promise<void>} Resolves when all eligible files have been processed.
+   */
+  async updateAllFrontmatter() {
+    if (this.isSyncing) {
+      this.notify.notice('Readwise: update already in progress');
+      return;
+    }
+
+    if (!this.settings.frontMatter && !this.settings.trackFiles) {
+      this.notify.notice('Frontmatter can only be updated for tracked files and with frontmatter enabled.');
+      return;
+    }
+
+    try {
+      this.isSyncing = true;
+
+      this.notify.notice('Readwise: downloading full library to update frontmatter...');
+      const library = await this._readwiseApi.downloadFullLibrary();
+
+      const readwiseFiles: ReadwiseFile[] = this.getReadwiseFilesFromLibrary(library);
+      this.deduplicatingVaultWriter.processFrontmatter(readwiseFiles);
+    } catch (error) {
+      this.logger.error('Error during frontmatter sync:', error);
+      this.notify.notice(`Readwise: Sync failed. ${error}`);
+    } finally {
+      // Make sure we reset the sync status in case of error
+      this.isSyncing = false;
+    }
   }
 }

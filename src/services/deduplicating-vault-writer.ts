@@ -4,6 +4,7 @@ import type { FrontmatterManager } from 'services/frontmatter-manager';
 import type Logger from 'services/logger';
 import type { ReadwiseFile, PluginSettings, ReadwiseDocument } from 'types';
 import type Notify from 'ui/notify';
+import type { Frontmatter } from './frontmatter';
 
 export class DeduplicatingVaultWriter {
   readonly vault: Vault;
@@ -162,6 +163,14 @@ export class DeduplicatingVaultWriter {
     }
   }
 
+  /**
+   * Processes an array of ReadwiseFile objects by normalizing their paths,
+   * grouping them by their computed path (including category and filename),
+   * and then processing each group to handle potential duplicates.
+   *
+   * @param readwiseFiles - An array of ReadwiseFile objects to be processed.
+   * @returns A Promise that resolves when all file groups have been processed.
+   */
   public async process(readwiseFiles: ReadwiseFile[]): Promise<void> {
     // Reset the file count
     this.totalFileCount = readwiseFiles.length;
@@ -194,8 +203,33 @@ export class DeduplicatingVaultWriter {
     }
   }
 
+  public async processFrontmatter(readwiseFiles: ReadwiseFile[]): Promise<void> {
+    this.logger.debug('Processing frontmatter for Readwise files', { readwiseFiles });
+
+    // Reset the file count
+    this.totalFileCount = readwiseFiles.length;
+    this.fileCount = 0;
+
+    this.notify.setStatusBarText(`Readwise: ${this.totalFileCount} files to process`);
+
+    // Process each file
+    for (const readwiseFile of readwiseFiles) {
+      const files: TFile[] = await this.findExistingByHighlightsUrl(readwiseFile.doc);
+      for (const file of files) {
+        // Since we are only updating frontmatter, for existing files, we can use the Obsidian file manager for atomic frontmatter updates
+        this.app.fileManager.processFrontMatter(file, (existingFrontmatter) => {
+          const updates: Frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile.doc);
+          const filteredFrontMatter = this.settings.protectFrontmatter
+            ? this.frontmatterManager.filterProtectedFrontmatter(updates)
+            : updates;
+          Object.assign(existingFrontmatter, filteredFrontMatter.toObject());
+        });
+        this.notifyFileCount();
+      }
+    }
+  }
   /**
-   * Processes a path group of files, identified duplicates and writes 
+   * Processes a path group of files, identified duplicates and writes
    * the files to the vault according to the tracking settings
    * @param readwiseFiles - The files to process
    */
