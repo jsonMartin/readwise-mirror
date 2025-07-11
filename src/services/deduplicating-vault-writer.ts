@@ -110,11 +110,11 @@ export class DeduplicatingVaultWriter {
           this.app.metadataCache.getFileCache(file)?.frontmatter
         );
         this.logger.debug(`Updating file ${file.path} with new frontmatter`, updatedFrontmatter);
-        await this.vault.process(file, () => `${updatedFrontmatter.toString()}${readwiseFile.contents}`);
+        await this.vault.process(file, () => `${updatedFrontmatter.toString()}\n${readwiseFile.contents}`);
       } else {
         const frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile.doc);
         this.logger.debug(`Not updating frontmatter for file ${file.path}`, frontmatter);
-        await this.vault.process(file, () => `${frontmatter.toString()}${readwiseFile.contents}`);
+        await this.vault.process(file, () => `${frontmatter.toString()}\n${readwiseFile.contents}`);
       }
 
       if (readwiseFile.basename !== file.basename) {
@@ -270,7 +270,7 @@ export class DeduplicatingVaultWriter {
 
     try {
       const frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile.doc);
-      const fileContents = `${frontmatter.toString()}${readwiseFile.contents}`;
+      const fileContents = `${frontmatter.toString()}\n${readwiseFile.contents}`;
       const fileOptions = {
         ctime: new Date(readwiseFile.doc.created).getTime(),
         mtime: new Date(readwiseFile.doc.updated).getTime(),
