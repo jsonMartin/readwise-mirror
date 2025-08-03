@@ -619,6 +619,14 @@ export default class ReadwiseMirror extends Plugin {
     this.headerTemplate = this.settings.headerTemplate;
     this.highlightTemplate = this.settings.highlightTemplate;
 
+    this.deduplicatingVaultWriter = new DeduplicatingVaultWriter(
+      this.app,
+      this.settings,
+      this.frontmatterManager,
+      this.logger,
+      this.notify
+    );
+
     if (!this.settings.apiToken) {
       this.notify.notice('Readwise: API Token not detected\nPlease enter in configuration page');
       this.notify.setStatusBarText('Readwise: API Token Required');
@@ -629,14 +637,6 @@ export default class ReadwiseMirror extends Plugin {
         this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`);
       else this.notify.setStatusBarText('Readwise: Click to Sync');
     }
-
-    this.deduplicatingVaultWriter = new DeduplicatingVaultWriter(
-      this.app,
-      this.settings,
-      this.frontmatterManager,
-      this.logger,
-      this.notify
-    );
 
     this.registerDomEvent(statusBarItem, 'click', this.sync.bind(this));
 
