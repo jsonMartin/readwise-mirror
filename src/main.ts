@@ -633,6 +633,14 @@ export default class ReadwiseMirror extends Plugin {
     } else {
       this._readwiseApi = new ReadwiseApi(this.settings.apiToken, this.notify, this._logger);
 
+      this.logger.info('Validating Readwise token ...');
+      this._readwiseApi.validateToken().then((isValid) => {
+        if (isValid && this.settings.autoSync) {
+          this.notify.notice('Readwise: Run auto sync on startup');
+          this.sync();
+        }
+      });
+
       if (this.settings.lastUpdated)
         this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`);
       else this.notify.setStatusBarText('Readwise: Click to Sync');
@@ -694,8 +702,6 @@ export default class ReadwiseMirror extends Plugin {
     );
 
     this.addSettingTab(new ReadwiseMirrorSettingTab(this.app, this, this.notify, this.frontmatterManager));
-
-    if (this.settings.autoSync) this.sync();
   }
 
   async loadSettings() {
