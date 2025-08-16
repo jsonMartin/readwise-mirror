@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "rollup --config rollup.config.mjs -w",
     "build": "rollup --config rollup.config.mjs --environment BUILD:production",
+    "build:dev": "rollup --config rollup.config.mjs --environment BUILD:development",
     "deploy:local": "npm run build && cross-env PACKAGE_NAME=$npm_package_name node deploy-local.mjs",
     "release:local": "npm ci && npm run build && semantic-release --dry-run false",
     "release:dry-run": "npm ci && npm run build && semantic-release --dry-run"
