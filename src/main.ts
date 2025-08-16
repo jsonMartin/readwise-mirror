@@ -634,12 +634,18 @@ export default class ReadwiseMirror extends Plugin {
       this._readwiseApi = new ReadwiseApi(this.settings.apiToken, this.notify, this._logger);
 
       this.logger.info('Validating Readwise token ...');
-      this._readwiseApi.validateToken().then((isValid) => {
-        if (isValid && this.settings.autoSync) {
-          this.notify.notice('Readwise: Run auto sync on startup');
-          this.sync();
-        }
-      });
+      // Run sync if we have a valid token and auto sync is enabled
+      this._readwiseApi
+        .validateToken()
+        .then((isValid) => {
+          if (isValid && this.settings.autoSync) {
+            this.notify.notice('Readwise: Run auto sync on startup');
+            this.sync();
+          }
+        })
+        .catch((error) => {
+          this.notify.notice(`Readwise: Error validating token, please check your API token: ${error}`);
+        });
 
       if (this.settings.lastUpdated)
         this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`);
