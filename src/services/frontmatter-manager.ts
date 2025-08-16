@@ -66,16 +66,14 @@ export class FrontmatterManager {
     } catch (error) {
       if (error instanceof YAML.YAMLParseError) {
         this.logger.error('Failed to parse YAML frontmatter:', error.message);
-        throw new Error(`Invalid YAML frontmatter: ${error.message}`);
+        throw new FrontmatterError(`Invalid YAML frontmatter: ${error.message}`, error);
       }
-
       if (error instanceof Error) {
         this.logger.error('Error processing frontmatter template:', error.message);
-        throw new Error(`Failed to process frontmatter: ${error.message}`);
+        throw new FrontmatterError(`Failed to process frontmatter: ${error.message}`, error);
       }
-
       this.logger.error('Unknown error processing frontmatter:', error);
-      throw new Error('Failed to process frontmatter due to unknown error');
+      throw new FrontmatterError('Failed to process frontmatter due to unknown error', error);
     }
   }
   /**
