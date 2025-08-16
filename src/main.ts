@@ -241,6 +241,11 @@ export default class ReadwiseMirror extends Plugin {
     // Prepare all files first
     const readwiseFiles: ReadwiseFile[] = this.getReadwiseFilesFromLibrary(library);
 
+    if (readwiseFiles.length === 0) {
+      this.logger.info('No eligible Readwise files to process (all highlights filtered out). Skipping write.');
+      return;
+    }
+
     // Process all files in batch
     try {
       this.logger.time('process');
