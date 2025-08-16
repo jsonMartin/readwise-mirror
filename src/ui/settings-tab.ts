@@ -309,11 +309,11 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         if (this.tokenValue) this.tokenValue.inputEl.type = 'text';
         break;
       case 'verifying':
-        this.validationButton?.setDisabled(true).setButtonText('Verifying...');
+        this.validationButton?.setDisabled(true).setCta();
         this.retrievalButton?.setDisabled(true);
         break;
       default:
-        this.validationButton?.setDisabled(false).setButtonText('Apply');
+        this.validationButton?.setDisabled(false).setCta().setButtonText('Apply');
         this.retrievalButton?.setDisabled(false).setButtonText('Authenticate with Readwise');
         break;
     }
@@ -457,15 +457,16 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         this.tokenValue = text;
         const token = this.plugin.settings.apiToken;
 
+        this.tokenValue.inputEl.type = 'password';
+
         this.tokenValue.setPlaceholder('API Token').setValue(token);
         this.tokenValue.onChange(() => {
           const value = this.tokenValue.inputEl.value;
           if (value !== this.plugin.settings.apiToken) {
+            this.setTokenValidationStatus('empty');
             this.updateAuthButtons('invalid');
-            this.tokenValue.inputEl.type = 'text';
           }
         });
-        this.tokenValue.inputEl.type = 'password';
       })
       .addButton((button) => {
         this.validationButton = button;
@@ -494,7 +495,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               } else {
                 this.plugin.readwiseApi = new ReadwiseApi(value, this.notify, this.logger);
               }
-              this.plugin.readwiseApi
+              await this.plugin.readwiseApi
                 .validateToken()
                 .then((isValid) => {
                   this.updateAuthButtons(isValid ? 'valid' : 'invalid');
