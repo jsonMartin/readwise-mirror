@@ -478,10 +478,12 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           .onClick(async () => {
             const value = this.tokenValue.inputEl.value;
             if (value === '') {
-              //
+              // Invalidate API and cached auth state when token is cleared
+              this.plugin.readwiseApi = null;
+              this.plugin.settings.apiToken = value;
+              // If you have a cached "hasValidToken" flag, set it to false here
               this.updateAuthButtons('empty');
               this.setTokenValidationStatus('empty');
-              this.plugin.settings.apiToken = value;
               await this.plugin.saveSettings();
               this.notify.notice('Cleared token. Add or retrieve token to sync.');
             } else if (value !== this.plugin.settings.apiToken) {
