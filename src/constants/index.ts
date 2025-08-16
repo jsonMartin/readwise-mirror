@@ -1,20 +1,20 @@
-import type { PluginSettings } from "types";
-import type { ToStringOptions } from "yaml";
+import type { PluginSettings } from 'types';
+import type { ToStringOptions } from 'yaml';
 
 export const DEFAULT_SETTINGS: PluginSettings = {
-	baseFolderName: "Readwise",
-	apiToken: null,
-	lastUpdated: null,
-	autoSync: true,
-	highlightSortOldestToNewest: true,
-	highlightSortByLocation: true,
-	highlightDiscard: false,
-	syncNotesOnly: false,
-	colonSubstitute: "-",
-	logFile: true,
-	logFileName: "Sync.md",
-	frontMatter: false,
-	frontMatterTemplate: `---
+  baseFolderName: 'Readwise',
+  apiToken: null,
+  lastUpdated: null,
+  autoSync: true,
+  highlightSortOldestToNewest: true,
+  highlightSortByLocation: true,
+  highlightDiscard: false,
+  syncNotesOnly: false,
+  colonSubstitute: '-',
+  logFile: true,
+  logFileName: 'Sync.md',
+  frontMatter: false,
+  frontMatterTemplate: `---
 id: {{ id }}
 created: {{ created }}
 updated: {{ updated }}
@@ -22,7 +22,7 @@ title: {{ title }}
 author: [ {{ author | join(', ') }} ]
 ---
 `,
-	headerTemplate: `
+  headerTemplate: `
 %%
 ID: {{ id }}
 Updated: {{ updated }}
@@ -59,7 +59,7 @@ Summary: {{ summary }}
 # Highlights
 
 `,
-	highlightTemplate: `{{ text }}{%- if category == 'books' %} ([{{ location }}]({{ location_url }})){%- endif %}{%- if color %} %% Color: {{ color }} %%{%- endif %} ^{{id}}{%- if note %}
+  highlightTemplate: `{{ text }}{%- if category == 'books' %} ([{{ location }}]({{ location_url }})){%- endif %}{%- if color %} %% Color: {{ color }} %%{%- endif %} ^{{id}}{%- if note %}
 
 Note: {{ note }}
 {%- endif %}{%- if tags %}
@@ -72,25 +72,25 @@ Tags: {{ tags }}
 
 ---
 `,
-	useSlugify: false,
-	slugifySeparator: "-",
-	slugifyLowercase: true,
-	trackFiles: false,
-	trackingProperty: "uri",
-	deleteDuplicates: false, // Avoid deleting duplicates by default (as this is destructive behavior)
-	protectFrontmatter: false,
-	protectedFields: "connections\nstatus\ntags",
-	updateFrontmatter: true,
-	syncPropertiesToReadwise: false,
-	titleProperty: "title",
-	authorProperty: "author",
-	debugMode: false,
-	useCustomFilename: false,
-	filenameTemplate: "{{title}}",
+  useSlugify: false,
+  slugifySeparator: '-',
+  slugifyLowercase: true,
+  trackFiles: false,
+  trackingProperty: 'uri',
+  deleteDuplicates: false, // Avoid deleting duplicates by default (as this is destructive behavior)
+  protectFrontmatter: false,
+  protectedFields: 'connections\nstatus\ntags',
+  updateFrontmatter: true,
+  syncPropertiesToReadwise: false,
+  titleProperty: 'title',
+  authorProperty: 'author',
+  debugMode: false,
+  useCustomFilename: false,
+  filenameTemplate: '{{title}}',
 };
 
-export const FRONTMATTER_TO_ESCAPE = ["title", "sanitized_title", "author", "authorStr"];
-export const EMPTY_FRONTMATTER: string = "---\n---\n";
+export const FRONTMATTER_TO_ESCAPE = ['title', 'sanitized_title', 'author', 'authorStr'];
+export const EMPTY_FRONTMATTER: string = '---\n---\n';
 
 // YAML options
 // Don't line-break (mainly for compatiblity with platers/obsidian-linter#1227)

@@ -1,11 +1,12 @@
 {
     "name": "readwise-mirror",
-    "version": "2.0.1",
+    "version": "2.1.0-beta.7",
     "description": "This is a plugin for Obsidian (https://obsidian.md)",
     "main": "main.js",
     "scripts": {
         "dev": "rollup --config rollup.config.mjs -w",
         "build": "rollup --config rollup.config.mjs --environment BUILD:production",
+        "build:dev": "rollup --config rollup.config.mjs --environment BUILD:development",
         "deploy:local": "npm run build && cross-env PACKAGE_NAME=$npm_package_name node deploy-local.mjs",
         "release:local": "npm ci && npm run build && semantic-release --dry-run false",
         "release:dry-run": "npm ci && npm run build && semantic-release --dry-run"
@@ -14,7 +15,7 @@
     "author": "",
     "license": "MIT",
     "devDependencies": {
-        "@biomejs/biome": "1.9.4",
+        "@biomejs/biome": "2.0.6",
         "@rollup/plugin-commonjs": "^28.0.2",
         "@rollup/plugin-node-resolve": "^16.0.0",
         "@rollup/plugin-typescript": "^12.1.2",

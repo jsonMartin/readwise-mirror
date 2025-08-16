@@ -1,7 +1,7 @@
-import { requestUrl, type RequestUrlResponse } from 'obsidian';
+import { type RequestUrlResponse, requestUrl } from 'obsidian';
+import type Logger from 'services/logger';
 import type { Export, Library } from 'types';
 import type Notify from 'ui/notify';
-import type Logger from 'services/logger';
 
 const API_ENDPOINT = 'https://readwise.io/api/v2';
 const API_PAGE_SIZE = 1000; // number of results per page, default 100 / max 1000
@@ -41,12 +41,14 @@ export default class ReadwiseApi {
    */
   setToken(apiToken: string) {
     this.apiToken = apiToken;
-    this.validateToken().then((isValid) => {
-      this.validToken = isValid;
-    }).catch((e) => {
-      this.logger.error(`Failed to set token: ${e.message}`);
-      this.validToken = false;
-    });
+    this.validateToken()
+      .then((isValid) => {
+        this.validToken = isValid;
+      })
+      .catch((e) => {
+        this.logger.error(`Failed to set token: ${e.message}`);
+        this.validToken = false;
+      });
   }
 
   /**
@@ -81,7 +83,7 @@ export default class ReadwiseApi {
     try {
       const response = await requestUrl({ url: `${API_ENDPOINT}/auth`, ...this.options });
 
-      this.validToken = (response.status === 204);
+      this.validToken = response.status === 204;
       return this.validToken;
     } catch (error) {
       throw new TokenValidationError(

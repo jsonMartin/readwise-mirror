@@ -1,5 +1,5 @@
-import { type ConfigureOptions, Environment, type ILoaderAny } from 'nunjucks';
 import type { Moment } from 'moment';
+import { type ConfigureOptions, Environment, type ILoaderAny } from 'nunjucks';
 
 /**
  * Custom Nunjucks environment with Readwise-specific filters

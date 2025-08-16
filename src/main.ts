@@ -1,24 +1,21 @@
 import slugify from '@sindresorhus/slugify';
+// Constants
+import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS } from 'constants/index';
 import filenamify from 'filenamify';
 import { Template } from 'nunjucks';
-import { Plugin, TFile, TFolder, normalizePath } from 'obsidian';
+import { normalizePath, Plugin, TFile, TFolder } from 'obsidian';
 import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
 import { FrontmatterManager } from 'services/frontmatter-manager';
-import { ReadwiseEnvironment } from 'services/readwise-environment';
-import spacetime from 'spacetime';
-
 // Plugin classes
 import Logger from 'services/logger';
 import ReadwiseApi from 'services/readwise-api';
-import Notify from 'ui/notify';
-import ReadwiseMirrorSettingTab from 'ui/settings-tab';
-import { createdDate, updatedDate, lastHighlightedDate } from 'utils/highlight-date-utils';
-
+import { ReadwiseEnvironment } from 'services/readwise-environment';
+import spacetime from 'spacetime';
 // Types
 import type { Export, Highlight, Library, PluginSettings, ReadwiseDocument, ReadwiseFile, Tag } from 'types';
-
-// Constants
-import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS } from 'constants/index';
+import Notify from 'ui/notify';
+import ReadwiseMirrorSettingTab from 'ui/settings-tab';
+import { createdDate, lastHighlightedDate, updatedDate } from 'utils/highlight-date-utils';
 
 export default class ReadwiseMirror extends Plugin {
   private _settings: PluginSettings;
@@ -242,6 +239,41 @@ export default class ReadwiseMirror extends Plugin {
     }
 
     // Prepare all files first
+    const readwiseFiles: ReadwiseFile[] = this.getReadwiseFilesFromLibrary(library);
+
+    if (readwiseFiles.length === 0) {
+      this.logger.info('No eligible Readwise files to process (all highlights filtered out). Skipping write.');
+      return;
+    }
+
+    // Process all files in batch
+    try {
+      this.logger.time('process');
+      await this.deduplicatingVaultWriter.process(readwiseFiles);
+      this.logger.timeEnd('process');
+    } catch (err) {
+      this.logger.error('Failed to process files batch', err);
+      this.notify.notice('Readwise: Failed to process some files during sync.');
+    }
+  }
+
+  /**
+   * Processes a given Readwise library object and generates an array of `ReadwiseFile` objects,
+   * each representing a book with its associated highlights and metadata.
+   *
+   * For each book in the library:
+   * - Updates the status bar with progress information.
+   * - Extracts and sanitizes book metadata (title, author, summary, etc.).
+   * - Filters and processes highlights, skipping books with no highlights.
+   * - Aggregates tags from both the book and its highlights.
+   * - Formats author information and highlight data.
+   * - Renders a header and formatted highlights for each book.
+   * - Constructs the final file contents and metadata for export.
+   *
+   * @param library - The Readwise library object containing books and their highlights.
+   * @returns An array of `ReadwiseFile` objects, each containing the filename, document metadata, and file contents.
+   */
+  private getReadwiseFilesFromLibrary(library: Library): ReadwiseFile[] {
     const readwiseFiles: ReadwiseFile[] = [];
 
     // Get total number of records
@@ -338,16 +370,7 @@ export default class ReadwiseMirror extends Plugin {
         contents,
       });
     }
-
-    // Process all files in batch
-    try {
-      this.logger.time('process');
-      await this.deduplicatingVaultWriter.process(readwiseFiles);
-      this.logger.timeEnd('process');
-    } catch (err) {
-      this.logger.error('Failed to process files batch', err);
-      this.notify.notice('Readwise: Failed to process some files during sync.');
-    }
+    return readwiseFiles;
   }
 
   /**
@@ -598,17 +621,6 @@ export default class ReadwiseMirror extends Plugin {
     this.headerTemplate = this.settings.headerTemplate;
     this.highlightTemplate = this.settings.highlightTemplate;
 
-    if (!this.settings.apiToken) {
-      this.notify.notice('Readwise: API Token not detected\nPlease enter in configuration page');
-      this.notify.setStatusBarText('Readwise: API Token Required');
-    } else {
-      this._readwiseApi = new ReadwiseApi(this.settings.apiToken, this.notify, this._logger);
-
-      if (this.settings.lastUpdated)
-        this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`);
-      else this.notify.setStatusBarText('Readwise: Click to Sync');
-    }
-
     this.deduplicatingVaultWriter = new DeduplicatingVaultWriter(
       this.app,
       this.settings,
@@ -616,6 +628,31 @@ export default class ReadwiseMirror extends Plugin {
       this.logger,
       this.notify
     );
+
+    if (!this.settings.apiToken) {
+      this.notify.notice('Readwise: API Token not detected\nPlease enter in configuration page');
+      this.notify.setStatusBarText('Readwise: API Token Required');
+    } else {
+      this._readwiseApi = new ReadwiseApi(this.settings.apiToken, this.notify, this._logger);
+
+      this.logger.info('Validating Readwise token ...');
+      // Run sync if we have a valid token and auto sync is enabled
+      this._readwiseApi
+        .validateToken()
+        .then((isValid) => {
+          if (isValid && this.settings.autoSync) {
+            this.notify.notice('Readwise: Run auto sync on startup');
+            this.sync();
+          }
+        })
+        .catch((error) => {
+          this.notify.notice(`Readwise: Error validating token, please check your API token: ${error}`);
+        });
+
+      if (this.settings.lastUpdated)
+        this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`);
+      else this.notify.setStatusBarText('Readwise: Click to Sync');
+    }
 
     this.registerDomEvent(statusBarItem, 'click', this.sync.bind(this));
 
@@ -655,6 +692,15 @@ export default class ReadwiseMirror extends Plugin {
       },
     });
 
+    this.addCommand({
+      id: 'update-all-frontmatter',
+      name: 'Update all Readwise note frontmatter',
+      callback: async () => {
+        this.notify.notice('Readwise: Updating all note frontmatter...');
+        await this.updateAllFrontmatter();
+      },
+    });
+
     this.registerInterval(
       window.setInterval(() => {
         if (/Synced/.test(this.notify.getStatusBarText())) {
@@ -663,9 +709,7 @@ export default class ReadwiseMirror extends Plugin {
       }, 1000)
     );
 
-    this.addSettingTab(new ReadwiseMirrorSettingTab(this.app, this, this.notify, this.frontmatterManager));
-
-    if (this.settings.autoSync) this.sync();
+    this.addSettingTab(new ReadwiseMirrorSettingTab(this.app, this, this.notify));
   }
 
   async loadSettings() {
@@ -674,5 +718,47 @@ export default class ReadwiseMirror extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+
+  /**
+   * Updates the frontmatter for all markdown files within the configured base folder.
+   *
+   * @async
+   * @returns {Promise<void>} Resolves when all eligible files have been processed.
+   */
+  async updateAllFrontmatter() {
+    if (this.isSyncing) {
+      this.notify.notice('Readwise: update already in progress');
+      return;
+    }
+
+    if (!this.settings.frontMatter || !this.settings.trackFiles) {
+      this.notify.notice('Frontmatter can only be updated for tracked files and with frontmatter enabled.');
+      return;
+    }
+
+    if (!(await this._readwiseApi?.hasValidToken())) {
+      this.notify.notice('Readwise: Valid API Token Required');
+      return;
+    }
+
+    try {
+      this.isSyncing = true;
+
+      this.notify.notice('Readwise: downloading full library to update frontmatter...');
+      const library = await this._readwiseApi.downloadFullLibrary();
+
+      const readwiseFiles: ReadwiseFile[] = this.getReadwiseFilesFromLibrary(library);
+      this.logger.time('frontmatter.process');
+      await this.deduplicatingVaultWriter.processFrontmatter(readwiseFiles);
+      this.logger.timeEnd('frontmatter.process');
+      this.notify.notice('Readwise: Frontmatter update complete.');
+    } catch (error) {
+      this.logger.error('Error during frontmatter sync:', error);
+      this.notify.notice(`Readwise: Sync failed. ${error}`);
+    } finally {
+      // Make sure we reset the sync status in case of error
+      this.isSyncing = false;
+    }
   }
 }

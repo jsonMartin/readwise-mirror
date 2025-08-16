@@ -2,7 +2,7 @@
 
 >[!WARNING]  
 >Readwise Mirror 2.x is a major rewrite of the plugin which will break internal links if you update right away. This is due to changes how the filenames for notes created by this plugin are generated and handled.
->The documentation contains a step-by-step guide how you can prepare an existing Readwise library for an upgrade to 2.x.x by adding the `uri` tracking property to the frontmatter of your notes before upgrading. This will ensure links to notes synced from your Readwise library can be updated by Obsidian after the upgrade. You can find the guide [here](#upgrading-from-1xx-to-2xx).
+>The documentation contains a step-by-step guide how you can prepare an existing Readwise library for an upgrade to 2.x.x by adding the `uri` tracking property to the frontmatter of your notes before upgrading. This will ensure links to notes synced from your Readwise library can be updated by Obsidian after the upgrade. You can find the guide [in this section](#upgrading-from-1xx-to-2xx).
 
 **Readwise Mirror** is an unoffical open source plugin for the powerful note-taking and knowledge-base application [Obsidian](http://obsidian.md/). This plugin allows a user to "mirror" their entire Readwise library by automatically downloading all highlights/notes and syncing changes directly into an Obsidian vault.
 
@@ -21,6 +21,7 @@ The first time this plugin is ran, it will do a full sync, downloading all conte
 - `Delete Readwise library`: Remove the Readwise library file folder from the Obsidian vault
 - `Download entire Readwise library (force)`: Forces a full download of all content from Readwise
 - `Adjust Filenames to current settings`: Clean up filenames of existing notes in your Readwise library folder based on current filename settings (whitespace removal and slugify only for the time being)
+- `Update all readwise note frontmatter`: Scan all notes in your Readwise library folder and update their frontmatter according to your current frontmatter template and protection settings, without changing the note content or filename. This is useful after changing your frontmatter template or protection settings. Requires File tracking to be enabled.
 
 ## Settings
 
@@ -226,8 +227,6 @@ The plugin uses three template types to format content, all using Nunjucks templ
 - - **Header Template**: Controls document structure and metadata display
 - **Highlight Template**: Controls individual highlight formatting
 
-### Templates
-
 #### Default frontmatter template
 
 ```markdown+nunjucks
@@ -375,7 +374,7 @@ These variables are different for each highlight and are only available in the h
 | `location_url` | Direct link to location | `"https://readwise.io/to_kindle?..."` |
 | `url` | Source URL | `"https://readwise.io/open/..."` |
 
-#### Metadata
+#### Metadata fields
 
 | Variable | Description | Example |
 |----------|-------------|---------|
@@ -562,6 +561,16 @@ And protect `status`, `tags`, and `category`:
 - `category` would:
   - Be added if not present during the first sync
   - Be protected in future syncs
+
+### Standalone frontmatter update
+
+The command "`Update all readwise note frontmatter`" updates the frontmatter of existing Readwise notes in your vault. It downloads the current Readwise library index and iterates through each existing tracked note, modifying frontmatter as needed, and saves the changes. This is useful for batch updating metadata across all Readwise-imported notes when you only want to change the frontmatter template.
+
+Requirements and behavior:
+
+- Requires File tracking to be enabled so notes can be matched by the tracking property.
+- Does not change note content or filenames.
+- Does not create new Readwise documents or update the last sync date (new documents will be created during the next regular sync).
 
 ## Special Considerations
 
