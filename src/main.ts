@@ -724,7 +724,7 @@ export default class ReadwiseMirror extends Plugin {
       return;
     }
 
-    if (!this.settings.frontMatter && !this.settings.trackFiles) {
+    if (!this.settings.frontMatter || !this.settings.trackFiles) {
       this.notify.notice('Frontmatter can only be updated for tracked files and with frontmatter enabled.');
       return;
     }
@@ -736,7 +736,10 @@ export default class ReadwiseMirror extends Plugin {
       const library = await this._readwiseApi.downloadFullLibrary();
 
       const readwiseFiles: ReadwiseFile[] = this.getReadwiseFilesFromLibrary(library);
-      this.deduplicatingVaultWriter.processFrontmatter(readwiseFiles);
+      this.logger.time('frontmatter.process');
+      await this.deduplicatingVaultWriter.processFrontmatter(readwiseFiles);
+      this.logger.timeEnd('frontmatter.process');
+      this.notify.notice('Readwise: Frontmatter update complete.');
     } catch (error) {
       this.logger.error('Error during frontmatter sync:', error);
       this.notify.notice(`Readwise: Sync failed. ${error}`);
