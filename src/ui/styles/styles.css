@@ -79,4 +79,5 @@
 
 .readwise-auth-validate-btn {
   min-width: 7em; /* Adjust as needed for your longest label */
+  white-space: nowrap;
 }
