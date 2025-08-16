@@ -92,18 +92,17 @@ class TabView {
 export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
   private plugin: ReadwiseMirror;
   private notify: Notify;
-  private frontmatterManager: FrontmatterManager;
+
 
   // Add logger reference
   private get logger() {
     return this.plugin.logger;
   }
 
-  constructor(app: App, plugin: ReadwiseMirror, notify: Notify, manager: FrontmatterManager) {
+  constructor(app: App, plugin: ReadwiseMirror, notify: Notify) {
     super(app, plugin);
     this.plugin = plugin;
     this.notify = notify;
-    this.frontmatterManager = manager;
   }
 
   /**

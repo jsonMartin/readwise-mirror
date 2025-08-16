@@ -704,7 +704,7 @@ export default class ReadwiseMirror extends Plugin {
       }, 1000)
     );
 
-    this.addSettingTab(new ReadwiseMirrorSettingTab(this.app, this, this.notify, this.frontmatterManager));
+    this.addSettingTab(new ReadwiseMirrorSettingTab(this.app, this, this.notify));
   }
 
   async loadSettings() {
