@@ -1,24 +1,21 @@
 import slugify from '@sindresorhus/slugify';
+// Constants
+import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS } from 'constants/index';
 import filenamify from 'filenamify';
 import { Template } from 'nunjucks';
-import { Plugin, TFile, TFolder, normalizePath } from 'obsidian';
+import { normalizePath, Plugin, TFile, TFolder } from 'obsidian';
 import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
 import { FrontmatterManager } from 'services/frontmatter-manager';
-import { ReadwiseEnvironment } from 'services/readwise-environment';
-import spacetime from 'spacetime';
-
 // Plugin classes
 import Logger from 'services/logger';
 import ReadwiseApi from 'services/readwise-api';
-import Notify from 'ui/notify';
-import ReadwiseMirrorSettingTab from 'ui/settings-tab';
-import { createdDate, updatedDate, lastHighlightedDate } from 'utils/highlight-date-utils';
-
+import { ReadwiseEnvironment } from 'services/readwise-environment';
+import spacetime from 'spacetime';
 // Types
 import type { Export, Highlight, Library, PluginSettings, ReadwiseDocument, ReadwiseFile, Tag } from 'types';
-
-// Constants
-import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS } from 'constants/index';
+import Notify from 'ui/notify';
+import ReadwiseMirrorSettingTab from 'ui/settings-tab';
+import { createdDate, lastHighlightedDate, updatedDate } from 'utils/highlight-date-utils';
 
 export default class ReadwiseMirror extends Plugin {
   private _settings: PluginSettings;

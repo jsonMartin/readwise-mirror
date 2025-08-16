@@ -1,8 +1,8 @@
 import md5 from 'md5'; // Fix imports
-import { type App, type TFile, type Vault, normalizePath } from 'obsidian';
+import { type App, normalizePath, type TFile, type Vault } from 'obsidian';
 import type { FrontmatterManager } from 'services/frontmatter-manager';
 import type Logger from 'services/logger';
-import type { ReadwiseFile, PluginSettings, ReadwiseDocument } from 'types';
+import type { PluginSettings, ReadwiseDocument, ReadwiseFile } from 'types';
 import type Notify from 'ui/notify';
 import type { Frontmatter } from './frontmatter';
 

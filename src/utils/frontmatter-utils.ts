@@ -2,20 +2,24 @@
  * FrontmatterUtils.ts
  */
 
-import * as YAML from 'yaml';
 import { FRONTMATTER_TO_ESCAPE } from 'constants/index';
 import { Template } from 'nunjucks';
 import { Frontmatter } from 'services/frontmatter';
 import { ReadwiseEnvironment } from 'services/readwise-environment';
-import type { ReadwiseDocument, YamlEscapeOptions, YamlStringState } from 'types';
 import { sampleMetadata } from 'test/sample-data';
+import type { ReadwiseDocument, YamlEscapeOptions, YamlStringState } from 'types';
+import * as YAML from 'yaml';
 
 /**
  * Validates the frontmatter template
  * @param template - Frontmatter template to validate
  * @returns Validation result
  */
-export function validateFrontmatterTemplate(template: string): { isValidYaml: boolean; error?: string; preview?: string } {
+export function validateFrontmatterTemplate(template: string): {
+  isValidYaml: boolean;
+  error?: string;
+  preview?: string;
+} {
   const renderedTemplate = new Template(template, new ReadwiseEnvironment(), null, true).render(
     escapeMetadata(sampleMetadata, FRONTMATTER_TO_ESCAPE)
   );

@@ -1,18 +1,18 @@
 import { DEFAULT_SETTINGS } from 'constants/index';
+import type ReadwiseMirror from 'main';
 import {
   type App,
   type ButtonComponent,
   Modal,
   PluginSettingTab,
-  requestUrl,
   type RequestUrlResponse,
+  requestUrl,
   Setting,
+  type TextComponent,
 } from 'obsidian';
-import type ReadwiseMirror from 'main';
-import type { FrontmatterManager } from 'services/frontmatter-manager';
+import ReadwiseApi, { TokenValidationError } from 'services/readwise-api';
 import type { TemplateValidationResult } from 'types';
 import type Notify from 'ui/notify';
-import ReadwiseApi, { TokenValidationError } from 'services/readwise-api';
 import { validateFrontmatterTemplate } from 'utils/frontmatter-utils';
 
 interface SettingsTab {

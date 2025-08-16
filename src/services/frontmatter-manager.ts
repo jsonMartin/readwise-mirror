@@ -1,11 +1,11 @@
-import { escapeMetadata } from 'utils/frontmatter-utils';
 import { EMPTY_FRONTMATTER, FRONTMATTER_TO_ESCAPE } from 'constants/index';
 import { Template } from 'nunjucks';
 import type { FrontMatterCache, TFile } from 'obsidian';
 import { Frontmatter, FrontmatterError } from 'services/frontmatter';
+import type Logger from 'services/logger';
 import { ReadwiseEnvironment } from 'services/readwise-environment';
 import type { PluginSettings, ReadwiseDocument } from 'types';
-import type Logger from 'services/logger';
+import { escapeMetadata } from 'utils/frontmatter-utils';
 import * as YAML from 'yaml';
 
 export class FrontmatterManager {
