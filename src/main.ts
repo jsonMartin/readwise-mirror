@@ -737,6 +737,11 @@ export default class ReadwiseMirror extends Plugin {
       return;
     }
 
+    if (!(await this._readwiseApi?.hasValidToken())) {
+      this.notify.notice('Readwise: Valid API Token Required');
+      return;
+    }
+
     try {
       this.isSyncing = true;
 
