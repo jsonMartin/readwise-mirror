@@ -273,7 +273,7 @@ export default class ReadwiseMirror extends Plugin {
    * @param library - The Readwise library object containing books and their highlights.
    * @returns An array of `ReadwiseFile` objects, each containing the filename, document metadata, and file contents.
    */
-  private getReadwiseFilesFromLibrary(library: Library) {
+  private getReadwiseFilesFromLibrary(library: Library): ReadwiseFile[] {
     const readwiseFiles: ReadwiseFile[] = [];
 
     // Get total number of records
