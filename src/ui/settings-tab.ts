@@ -384,7 +384,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           fragment.createEl('strong', { text: 'How to authenticate: ' });
           fragment.appendText('Paste your API key from ');
           fragment.createEl('a', { text: 'readwise.io/access_token', href: 'readwise.io/access_token' });
-          fragment.appendText(', or use the "Authenticate with Readwise" button for automatic setup.');
+          fragment.appendText(', or use the "Authenticate with Readwise" button for automatic retrieval of the token.');
           fragment.createEl('br');
           fragment.append(this.tokenValidationMessage);
           // Show success or error message based on token validity
