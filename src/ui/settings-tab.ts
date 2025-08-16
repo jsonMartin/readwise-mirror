@@ -93,6 +93,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
   private plugin: ReadwiseMirror;
   private notify: Notify;
 
+  private tokenValidationMessage: HTMLElement;
+  private retrievalButton: ButtonComponent;
+  private tokenValue: TextComponent;
+  private validationButton: ButtonComponent;
 
   // Add logger reference
   private get logger() {
@@ -141,7 +145,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
   };
 
   // Button-based authentication inspired by the official Readwise plugin
-  private async getUserAuthToken(button: HTMLElement, attempt = 0): Promise<boolean> {
+  private async getUserAuthToken(attempt = 0): Promise<boolean> {
     const MAX_ATTEMPTS = 20;
     const BASE_TIMEOUT = 1000;
     const MAX_TIMEOUT = 10000;
@@ -180,7 +184,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
     const timeout = Math.min(BASE_TIMEOUT * 2 ** attempt, MAX_TIMEOUT);
     await new Promise((resolve) => setTimeout(resolve, timeout));
-    return this.getUserAuthToken(button, attempt + 1);
+    return this.getUserAuthToken(attempt + 1);
   }
 
   // Button-based authentication inspired by the official Readwise plugin
@@ -286,6 +290,66 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     new TabView(containerEl, tabs).render();
   }
 
+  /**
+   * Updates the authentication buttons based on the current state.
+   * @param state The current authentication state
+   */
+  private updateAuthButtons(state: 'empty' | 'valid' | 'invalid' | 'verifying'): void {
+    switch (state) {
+      case 'valid':
+        this.validationButton?.setDisabled(true).removeCta().setButtonText('Verified');
+        this.retrievalButton?.setDisabled(true).setButtonText('Re-authenticate with Readwise');
+        if (this.tokenValue) {
+          this.tokenValue.inputEl.type = 'password';
+        }
+        break;
+      case 'invalid':
+        this.validationButton?.setDisabled(false).setCta().setButtonText('Apply');
+        this.retrievalButton?.setDisabled(false).setButtonText('Authenticate with Readwise');
+        if (this.tokenValue) this.tokenValue.inputEl.type = 'text';
+        break;
+      case 'verifying':
+        this.validationButton?.setDisabled(true).setButtonText('Verifying...');
+        this.retrievalButton?.setDisabled(true);
+        break;
+      default:
+        this.validationButton?.setDisabled(false).setButtonText('Apply');
+        this.retrievalButton?.setDisabled(false).setButtonText('Authenticate with Readwise');
+        break;
+    }
+  }
+
+  /**
+   * Updates the validation message div based on status.
+   * @param status 'invalid' | 'success' | 'running' | 'error'
+   * @param errorMsg Optional error message for 'error' status
+   */
+  private setTokenValidationStatus(status: 'invalid' | 'success' | 'running' | 'error' | 'empty', errorMsg?: string) {
+    const el = this.tokenValidationMessage;
+    el.show();
+    switch (status) {
+      case 'invalid':
+        el.setText('Invalid token');
+        el.setAttr('style', 'color: var(--text-error); margin-top: 0.5em;');
+        break;
+      case 'success':
+        el.setText('Token validated successfully');
+        el.setAttr('style', 'color: var(--text-success); margin-top: 0.5em;');
+        break;
+      case 'running':
+        el.setText('Validating token...');
+        el.setAttr('style', 'color: var(--text-accent); margin-top: 0.5em;');
+        break;
+      case 'error':
+        el.setText(errorMsg || 'Token validation error');
+        el.setAttr('style', 'color: var(--text-error); margin-top: 0.5em;');
+        break;
+      default:
+        el.setText('');
+        el.hide();
+    }
+  }
+
   private renderDebugMode(containerEl: HTMLElement): void {
     new Setting(containerEl)
       .setName('Debug mode')
@@ -304,34 +368,12 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     new Setting(containerEl).setName('Authentication').setHeading();
 
     let hasValidToken: boolean | null = null;
-    let validationButton: ButtonComponent;
 
-    const tokenValidationInvalid = containerEl.createDiv({
-      cls: 'setting-item-description validation-error',
-      text: 'Invalid token',
+    // Create a single validation message div and a function to update its status
+    this.tokenValidationMessage = containerEl.createDiv({
+      cls: 'setting-item-description validation-message',
       attr: {
-        style: 'color: var(--text-error); margin-top: 0.5em; display: none;',
-      },
-    });
-    const tokenValidationSuccess = containerEl.createDiv({
-      cls: 'setting-item-description validation-success',
-      text: 'Token validated successfully',
-      attr: {
-        style: 'color: var(--text-success); margin-top: 0.5em; display: none;',
-      },
-    });
-    const tokenValidationRunning = containerEl.createDiv({
-      cls: 'setting-item-description validation-running',
-      text: 'Validating token...',
-      attr: {
-        style: 'color: var(--text-accent); margin-top: 0.5em; display: none;',
-      },
-    });
-    const tokenValidationError = containerEl.createDiv({
-      cls: 'setting-item-description validation-error',
-      text: 'Token validation error',
-      attr: {
-        style: 'color: var(--text-error); margin-top: 0.5em; display: none;',
+        style: 'margin-top: 0.5em; display: none;',
       },
     });
 
@@ -339,26 +381,19 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setName('Readwise authentication')
       .setDesc(
         createFragment(async (fragment) => {
+          fragment.createEl('strong', { text: 'How to authenticate: ' });
+          fragment.appendText('Paste your API key from ');
+          fragment.createEl('a', { text: 'readwise.io/access_token', href: 'readwise.io/access_token' });
+          fragment.appendText(', or use the "Authenticate with Readwise" button for automatic setup.');
           fragment.createEl('br');
-          fragment.createEl('br');
-          fragment.createEl('strong', { text: 'Important: ' });
-          fragment.appendText('After successful authentication, a window with an error message will appear.');
-          fragment.createEl('br');
-          fragment.appendText('This is expected and can be safely closed.');
-          fragment.createEl('br');
-          fragment.createEl('br');
-          fragment.append(tokenValidationRunning);
-          fragment.append(tokenValidationInvalid);
-          fragment.append(tokenValidationSuccess);
-          fragment.append(tokenValidationError);
-
+          fragment.append(this.tokenValidationMessage);
           // Show success or error message based on token validity
           if (this.plugin.readwiseApi) {
-            tokenValidationRunning.show();
+            this.setTokenValidationStatus('running');
           } else {
-            tokenValidationError.show();
+            this.setTokenValidationStatus('error');
           }
-          validationButton?.setDisabled(true);
+          this.updateAuthButtons('verifying');
 
           // Validate the token on load
           if (this.plugin.readwiseApi) {
@@ -367,67 +402,113 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
                 this.plugin.readwiseApi.hasValidToken() ?? (await this.plugin.readwiseApi.validateToken());
 
               if (hasValidToken) this.notify.setStatusBarText('Readwise: Click to Sync');
-              validationButton?.setDisabled(hasValidToken);
-              validationButton?.setButtonText(
-                hasValidToken ? 'Re-authenticate with Readwise' : 'Authenticate with Readwise'
-              );
-              tokenValidationSuccess.toggle(hasValidToken);
-              tokenValidationInvalid.toggle(!hasValidToken);
+              this.updateAuthButtons(hasValidToken ? 'valid' : 'invalid');
+              this.setTokenValidationStatus(hasValidToken ? 'success' : 'invalid');
             } catch (error) {
-              validationButton?.setDisabled(true);
+              this.updateAuthButtons('invalid');
               if (error instanceof TokenValidationError) {
-                tokenValidationError.setText(error.message);
+                this.setTokenValidationStatus('error', error.message);
               } else {
-                tokenValidationError.setText('Token validation error');
+                this.setTokenValidationStatus('error', 'Token validation error');
               }
-              tokenValidationError.show();
             } finally {
-              tokenValidationRunning.hide();
+              this.setTokenValidationStatus('empty');
             }
           }
         })
       )
       .addButton((button) => {
-        validationButton = button;
-        validationButton
+        this.retrievalButton = button;
+        this.retrievalButton
           .setButtonText(!hasValidToken === false ? 'Re-authenticate with Readwise' : 'Authenticate with Readwise')
-          .setCta()
-          .onClick(async (evt) => {
-            const buttonEl = evt.target as HTMLElement;
+          .onClick(async () => {
+            const authModal = new Modal(this.app);
+            authModal.titleEl.setText('Authenticate with Readwise');
+            authModal.contentEl.createEl('p', {
+              text: 'A new window will open for Readwise authentication. After logging in, an error page may appear—this is normal and can be closed.',
+            });
+            authModal.contentEl.createEl('p', {
+              text: 'Check your authentication status here in Obsidian settings after completing the process.',
+            });
+            authModal.contentEl.createEl('br');
+            const buttonContainer = authModal.contentEl.createDiv();
+            buttonContainer.style.display = 'flex';
+            buttonContainer.style.justifyContent = 'flex-end';
+            buttonContainer.style.gap = '10px';
 
-            // Reset validation messages
-            tokenValidationSuccess.hide();
-            tokenValidationInvalid.hide();
-            tokenValidationError.hide();
+            const cancelButton = buttonContainer.createEl('button', { text: 'Cancel' });
+            const continueButton = buttonContainer.createEl('button', { text: 'Understood' });
+            continueButton.addClass('mod-cta');
 
-            this.getUserAuthToken(buttonEl)
-              .then((isValid) => {
-                validationButton?.setDisabled(isValid);
-                validationButton?.setButtonText(
-                  isValid ? 'Re-authenticate with Readwise' : 'Authenticate with Readwise'
-                );
-                tokenValidationSuccess.toggle(isValid);
-                tokenValidationInvalid.toggle(!isValid);
-                tokenValidationRunning.hide();
-              })
-              .catch(() => {
-                tokenValidationRunning.hide();
-                tokenValidationInvalid.hide();
-                tokenValidationSuccess.hide();
-                tokenValidationError.show();
+            cancelButton.onclick = () => authModal.close();
+            continueButton.onclick = async () => {
+              authModal.close();
+              this.getUserAuthToken().then((isAuthenticated) => {
+                this.updateAuthButtons(isAuthenticated ? 'valid' : 'invalid');
+                this.setTokenValidationStatus(isAuthenticated ? 'success' : 'invalid');
               });
+            };
+            authModal.open();
           })
           .setDisabled(hasValidToken);
-        return validationButton;
+        return this.retrievalButton;
       })
       .addText((text) => {
+        this.tokenValue = text;
         const token = this.plugin.settings.apiToken;
-        const maskedToken = token ? token.slice(0, 6) + '*'.repeat(token.length - 6) : '';
 
-        text
-          .setPlaceholder('Token will be filled automatically after authentication')
-          .setValue(maskedToken)
-          .setDisabled(true);
+        this.tokenValue.setPlaceholder('API Token').setValue(token);
+        this.tokenValue.onChange(() => {
+          const value = this.tokenValue.inputEl.value;
+          if (value !== this.plugin.settings.apiToken) {
+            this.updateAuthButtons('invalid');
+            this.tokenValue.inputEl.type = 'text';
+          }
+        });
+        this.tokenValue.inputEl.type = 'password';
+      })
+      .addButton((button) => {
+        this.validationButton = button;
+        this.validationButton
+          .setDisabled(hasValidToken)
+          .setCta()
+          .setIcon('check')
+          .setButtonText(hasValidToken ? 'Verified' : 'Apply')
+          .onClick(async () => {
+            const value = this.tokenValue.inputEl.value;
+            if (value === '') {
+              //
+              this.updateAuthButtons('empty');
+              this.setTokenValidationStatus('empty');
+              this.plugin.settings.apiToken = value;
+              await this.plugin.saveSettings();
+              this.notify.notice('Cleared token. Add or retrieve token to sync.');
+            } else if (value !== this.plugin.settings.apiToken) {
+              this.updateAuthButtons('verifying');
+              this.plugin.settings.apiToken = value;
+              await this.plugin.saveSettings();
+              this.notify.notice('New token set.');
+
+              if (this.plugin.readwiseApi) {
+                this.plugin.readwiseApi.setToken(value);
+              } else {
+                this.plugin.readwiseApi = new ReadwiseApi(value, this.notify, this.logger);
+              }
+              this.plugin.readwiseApi
+                .validateToken()
+                .then((isValid) => {
+                  this.updateAuthButtons(isValid ? 'valid' : 'invalid');
+                })
+                .catch(() => {
+                  this.notify.notice('Failed to verify token.');
+                  this.setTokenValidationStatus('invalid');
+                  this.updateAuthButtons('invalid');
+                });
+            }
+          });
+        // Add fixed width class
+        this.validationButton.buttonEl.addClass('readwise-auth-validate-btn');
+        return this.validationButton;
       });
   }
 

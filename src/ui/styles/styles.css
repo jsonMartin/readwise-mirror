@@ -76,3 +76,7 @@
 #frontmatter-template.invalid-template {
   border-color: var(--color-red) !important;
 }
+
+.readwise-auth-validate-btn {
+  min-width: 7em; /* Adjust as needed for your longest label */
+}
