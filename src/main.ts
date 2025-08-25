@@ -1,6 +1,6 @@
 import slugify from '@sindresorhus/slugify';
 // Constants
-import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS } from 'constants/index';
+import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS, READWISE_REVIEW_URL_BASE } from 'constants/index';
 import filenamify from 'filenamify';
 import { Template } from 'nunjucks';
 import { normalizePath, Plugin, TFile, TFolder } from 'obsidian';
@@ -701,6 +701,15 @@ export default class ReadwiseMirror extends Plugin {
       },
     });
 
+    this.addCommand({
+      id: 'update-current-note',
+      name: 'Update current note',
+      callback: async () => {
+        await this.updateCurrentNote();
+        this.notify.notice('Readwise: Updating current note...');
+      },
+    });
+
     this.registerInterval(
       window.setInterval(() => {
         if (/Synced/.test(this.notify.getStatusBarText())) {
@@ -760,5 +769,83 @@ export default class ReadwiseMirror extends Plugin {
       // Make sure we reset the sync status in case of error
       this.isSyncing = false;
     }
+  }
+
+  /**
+   * Fetch single book by bookId via downloadSingleBook
+   */
+  async updateCurrentNote() {
+    if (this.isSyncing) {
+      this.notify.notice('Readwise: update already in progress');
+      return;
+    }
+
+    if (!this.settings.frontMatter || !this.settings.trackFiles) {
+      this.notify.notice('Current note can only be updated when tracking files');
+      return;
+    }
+
+    if (!(await this._readwiseApi?.hasValidToken())) {
+      this.notify.notice('Readwise: Valid API Token Required');
+      return;
+    }
+
+    try {
+      this.isSyncing = true;
+
+      // Assuming 'this' is your plugin instance and you want to get metadata for the active file in the editor
+      const activeFile = this.app.workspace.getActiveFile();
+      if (!activeFile) {
+        console.log('No active file selected in the editor.');
+        return;
+      }
+
+      const fileCache = await this.app.metadataCache.getFileCache(activeFile);
+      const tracking = this._settings.trackingProperty;
+      if (
+        fileCache.frontmatter?.[tracking]?.startsWith(READWISE_REVIEW_URL_BASE) &&
+        this.isInReadwiseLibrary(activeFile)
+      ) {
+        const trackingUrl = fileCache.frontmatter[tracking];
+        const id = trackingUrl.replace(READWISE_REVIEW_URL_BASE, ''); // Extract the ID from the URL
+
+        this.notify.notice(`Readwise: downloading current book with ID ${id}...`);
+        const library = await this._readwiseApi.downloadSingleBook(id);
+
+        if (Object.keys(library.books).length > 0) {
+          this.writeLibraryToMarkdown(library);
+
+          if (this.settings.logFile) this.writeLogToMarkdown(library);
+
+          this.notify.notice('Readwise: Book update complete.');
+        } else {
+          this.notify.notice('Readwise: Note not found on Readwise.');
+          return;
+        }
+      } else {
+        this.notify.notice('Readwise: Current note is not in Readwise library.');
+        return;
+      }
+    } catch (error) {
+      this.logger.error('Error during frontmatter sync:', error);
+      this.notify.notice(`Readwise: Sync failed. ${error}`);
+    } finally {
+      // Make sure we reset the sync status in case of error
+      this.isSyncing = false;
+    }
+  }
+
+  // Verify if file is part of the readwise library
+  private isInReadwiseLibrary(file: TFile): boolean {
+    const baseFolderName = this._settings.baseFolderName; // Replace with your actual base folder name
+    let currentFolder = file.parent;
+
+    while (currentFolder) {
+      if (currentFolder.path === baseFolderName) {
+        return true;
+      }
+      currentFolder = currentFolder.parent;
+    }
+    return false;
   }
 }

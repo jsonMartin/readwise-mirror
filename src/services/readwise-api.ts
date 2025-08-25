@@ -220,4 +220,15 @@ export default class ReadwiseApi {
     // Essentially return an empty library
     return this.buildLibrary(recordsUpdated);
   }
+
+  /**
+   * Fetch single book from Readwise API
+   * @param bookId - The ID of the book to fetch
+   * @returns {Promise<Library>} - Returns a promise that resolves to a Library object
+   */
+  async downloadSingleBook(bookId: number): Promise<Library> {
+    // Fetch single book and return library
+    const recordsUpdated = (await this.fetchData('export', '', [bookId])) as Export[];
+    return this.buildLibrary(recordsUpdated);
+  }
 }

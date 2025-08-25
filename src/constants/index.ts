@@ -97,3 +97,5 @@ export const EMPTY_FRONTMATTER: string = '---\n---\n';
 export const YAML_TOSTRING_OPTIONS: ToStringOptions = { lineWidth: -1 };
 
 export const AUTHOR_SEPARATORS = /(?:,\s*and\s*)|(?:\s+and\s+)|(?:,\s*)/;
+
+export const READWISE_REVIEW_URL_BASE = 'https://readwise.io/bookreview/';
