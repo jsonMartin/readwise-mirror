@@ -3,7 +3,7 @@ import slugify from '@sindresorhus/slugify';
 import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS, READWISE_REVIEW_URL_BASE } from 'constants/index';
 import filenamify from 'filenamify';
 import { Template } from 'nunjucks';
-import { normalizePath, Plugin, TFile, TFolder } from 'obsidian';
+import { type Editor, MarkdownView, normalizePath, Plugin, TFile, TFolder } from 'obsidian';
 import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
 import { FrontmatterManager } from 'services/frontmatter-manager';
 // Plugin classes
@@ -666,7 +666,7 @@ export default class ReadwiseMirror extends Plugin {
       id: 'test',
       name: 'Test Readwise API key',
       callback: async () => {
-        const isTokenValid = await this._readwiseApi.hasValidToken();
+        const isTokenValid = this._readwiseApi.hasValidToken();
         this.notify.notice(`Readwise: ${isTokenValid ? 'Token is valid' : 'INVALID TOKEN'}`);
       },
     });
@@ -756,7 +756,7 @@ export default class ReadwiseMirror extends Plugin {
       return;
     }
 
-    if (!(await this._readwiseApi?.hasValidToken())) {
+    if (!this._readwiseApi?.hasValidToken()) {
       this.notify.notice('Readwise: Valid API Token Required');
       return;
     }
@@ -795,7 +795,7 @@ export default class ReadwiseMirror extends Plugin {
       return;
     }
 
-    if (!(await this._readwiseApi?.hasValidToken())) {
+    if (!this._readwiseApi?.hasValidToken()) {
       this.notify.notice('Readwise: Valid API Token Required');
       return;
     }
