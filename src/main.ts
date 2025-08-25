@@ -704,9 +704,19 @@ export default class ReadwiseMirror extends Plugin {
     this.addCommand({
       id: 'update-current-note',
       name: 'Update current note',
-      callback: async () => {
-        await this.updateCurrentNote();
-        this.notify.notice('Readwise: Updating current note...');
+      editorCheckCallback: (checking: boolean, _editor: Editor, view: MarkdownView) => {
+        if (
+          view instanceof MarkdownView &&
+          this.isTrackedReadwiseNote(view.file) &&
+          this.isInReadwiseLibrary(view.file)
+        ) {
+          if (!checking) {
+            this.notify.notice('Readwise: Updating current note...');
+            this.updateCurrentNote(view.file);
+          }
+          return true;
+        }
+        return false;
       },
     });
 
@@ -774,7 +784,7 @@ export default class ReadwiseMirror extends Plugin {
   /**
    * Fetch single book by bookId via downloadSingleBook
    */
-  async updateCurrentNote() {
+  async updateCurrentNote(file: TFile = this.app.workspace.getActiveFile()) {
     if (this.isSyncing) {
       this.notify.notice('Readwise: update already in progress');
       return;
@@ -794,19 +804,14 @@ export default class ReadwiseMirror extends Plugin {
       this.isSyncing = true;
 
       // Assuming 'this' is your plugin instance and you want to get metadata for the active file in the editor
-      const activeFile = this.app.workspace.getActiveFile();
-      if (!activeFile) {
+      if (!file) {
         console.log('No active file selected in the editor.');
         return;
       }
 
-      const fileCache = await this.app.metadataCache.getFileCache(activeFile);
-      const tracking = this._settings.trackingProperty;
-      if (
-        fileCache.frontmatter?.[tracking]?.startsWith(READWISE_REVIEW_URL_BASE) &&
-        this.isInReadwiseLibrary(activeFile)
-      ) {
-        const trackingUrl = fileCache.frontmatter[tracking];
+      if (this.isTrackedReadwiseNote(file) && this.isInReadwiseLibrary(file)) {
+        const fileCache = this.app.metadataCache.getFileCache(file);
+        const trackingUrl = fileCache.frontmatter[this._settings.trackingProperty];
         const id = trackingUrl.replace(READWISE_REVIEW_URL_BASE, ''); // Extract the ID from the URL
 
         this.notify.notice(`Readwise: downloading current book with ID ${id}...`);
@@ -835,7 +840,14 @@ export default class ReadwiseMirror extends Plugin {
     }
   }
 
-  // Verify if file is part of the readwise library
+  // Verify if file is tracked by checking for the tracking property in frontmatter
+  private isTrackedReadwiseNote(file: TFile): boolean {
+    const trackingProperty = this._settings.trackingProperty;
+    const fileCache = this.app.metadataCache.getFileCache(file);
+    return fileCache.frontmatter?.[trackingProperty]?.startsWith(READWISE_REVIEW_URL_BASE);
+  }
+
+  // Verify if file is part of the readwise library folder hierarchy
   private isInReadwiseLibrary(file: TFile): boolean {
     const baseFolderName = this._settings.baseFolderName; // Replace with your actual base folder name
     let currentFolder = file.parent;
