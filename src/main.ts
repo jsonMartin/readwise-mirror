@@ -261,15 +261,6 @@ export default class ReadwiseMirror extends Plugin {
    * Processes a given Readwise library object and generates an array of `ReadwiseFile` objects,
    * each representing a book with its associated highlights and metadata.
    *
-   * For each book in the library:
-   * - Updates the status bar with progress information.
-   * - Extracts and sanitizes book metadata (title, author, summary, etc.).
-   * - Filters and processes highlights, skipping books with no highlights.
-   * - Aggregates tags from both the book and its highlights.
-   * - Formats author information and highlight data.
-   * - Renders a header and formatted highlights for each book.
-   * - Constructs the final file contents and metadata for export.
-   *
    * @param library - The Readwise library object containing books and their highlights.
    * @returns An array of `ReadwiseFile` objects, each containing the filename, document metadata, and file contents.
    */
