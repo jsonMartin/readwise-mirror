@@ -704,15 +704,11 @@ export default class ReadwiseMirror extends Plugin {
     this.addCommand({
       id: 'update-current-note',
       name: 'Update current note',
-      editorCheckCallback: (checking: boolean, _editor: Editor, view: MarkdownView) => {
-        if (
-          view instanceof MarkdownView &&
-          this.isTrackedReadwiseNote(view.file) &&
-          this.isInReadwiseLibrary(view.file) &&
-          this.settings.trackFiles
-        ) {
+      checkCallback: (checking: boolean) => {
+        const file = this.app.workspace.getActiveFile();
+        if (this.isTrackedReadwiseNote(file) && this.isInReadwiseLibrary(file) && this.settings.trackFiles) {
           if (!checking) {
-            this.updateCurrentNote(view.file);
+            this.updateCurrentNote(file);
           }
           return true;
         }
@@ -846,7 +842,7 @@ export default class ReadwiseMirror extends Plugin {
   private isTrackedReadwiseNote(file: TFile): boolean {
     const trackingProperty = this._settings.trackingProperty;
     const fileCache = this.app.metadataCache.getFileCache(file);
-    return fileCache.frontmatter?.[trackingProperty]?.startsWith(READWISE_REVIEW_URL_BASE);
+    return fileCache?.frontmatter?.[trackingProperty]?.startsWith(READWISE_REVIEW_URL_BASE);
   }
 
   // Verify if file is part of the readwise library folder hierarchy
