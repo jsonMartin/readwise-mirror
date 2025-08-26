@@ -3,7 +3,7 @@ import slugify from '@sindresorhus/slugify';
 import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS, READWISE_REVIEW_URL_BASE } from 'constants/index';
 import filenamify from 'filenamify';
 import { Template } from 'nunjucks';
-import { type Editor, MarkdownView, normalizePath, Plugin, TFile, TFolder } from 'obsidian';
+import { normalizePath, Plugin, TFile, TFolder } from 'obsidian';
 import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
 import { FrontmatterManager } from 'services/frontmatter-manager';
 // Plugin classes
@@ -802,18 +802,18 @@ export default class ReadwiseMirror extends Plugin {
 
       // Assuming 'this' is your plugin instance and you want to get metadata for the active file in the editor
       if (!file) {
-        console.log('No active file selected in the editor.');
+        this.logger.warn('No active file selected in the editor.');
         return;
       }
 
       if (this.isTrackedReadwiseNote(file) && this.isInReadwiseLibrary(file)) {
-        this.notify.notice('Readwise: Updating current note...');
+        this.logger.debug('Readwise: Updating current note...');
 
         const fileCache = this.app.metadataCache.getFileCache(file);
         const trackingUrl = fileCache.frontmatter[this._settings.trackingProperty];
         const id = trackingUrl.replace(READWISE_REVIEW_URL_BASE, ''); // Extract the ID from the URL
 
-        this.notify.notice(`Readwise: downloading current book with ID ${id}...`);
+        this.logger.debug(`Readwise: downloading current book with ID ${id}...`);
         const library = await this._readwiseApi.downloadSingleBook(id);
 
         if (Object.keys(library.books).length > 0) {
