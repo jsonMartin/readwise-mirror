@@ -695,9 +695,14 @@ export default class ReadwiseMirror extends Plugin {
     this.addCommand({
       id: 'update-all-frontmatter',
       name: 'Update all Readwise note frontmatter',
-      callback: async () => {
-        this.notify.notice('Readwise: Updating all note frontmatter...');
-        await this.updateAllFrontmatter();
+      checkCallback: (checking: boolean) => {
+        if (this.settings.frontMatter && this.settings.trackFiles) {
+          if (!checking) {
+            this.updateAllFrontmatter();
+          }
+          return true;
+        }
+        return false;
       },
     });
 
@@ -747,20 +752,16 @@ export default class ReadwiseMirror extends Plugin {
       return;
     }
 
-    if (!this.settings.frontMatter || !this.settings.trackFiles) {
-      this.notify.notice('Frontmatter can only be updated for tracked files and with frontmatter enabled.');
-      return;
-    }
-
     if (!this._readwiseApi?.hasValidToken()) {
       this.notify.notice('Readwise: Valid API Token Required');
       return;
     }
 
+    this.notify.notice('Readwise: Updating all note frontmatter...');
     try {
       this.isSyncing = true;
 
-      this.notify.notice('Readwise: downloading full library to update frontmatter...');
+      this.logger.info('Readwise: downloading full library to update frontmatter...');
       const library = await this._readwiseApi.downloadFullLibrary();
 
       const readwiseFiles: ReadwiseFile[] = this.getReadwiseFilesFromLibrary(library);
