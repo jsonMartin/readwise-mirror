@@ -127,6 +127,8 @@ export interface PluginSettings {
   debugMode: boolean; // Enable debug mode for detailed logging
   useCustomFilename: boolean; // Use custom filename template
   filenameTemplate: string; // Template for generating filenames
+  filterByTag: boolean; // Whether to filter books by tag
+  filterTags: string; // Comma-separated list of tags to include/exclude
 }
 
 export interface YamlStringState {

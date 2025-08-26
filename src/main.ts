@@ -266,6 +266,11 @@ export default class ReadwiseMirror extends Plugin {
    */
   private getReadwiseFilesFromLibrary(library: Library): ReadwiseFile[] {
     const readwiseFiles: ReadwiseFile[] = [];
+    const filterTags: string[] =
+      this.settings.filterTags
+        .split(/[,;\n]/) // Split on comma, semicolon, or newline
+        .map((tag) => tag.trim())
+        .filter((tag) => tag.length > 0) || [];
 
     // Get total number of records
     const booksTotal = Object.keys(library.books).length;
@@ -277,6 +282,14 @@ export default class ReadwiseMirror extends Plugin {
       );
       bookCurrent += 1;
       const book: Export = library.books[bookId];
+
+      if (this.settings.filterByTag && filterTags.length > 0) {
+        this.logger.debug('Filtering by tags:', this.settings.filterTags);
+        if (!book.book_tags.some((tag) => filterTags.includes(tag.name))) {
+          this.logger.debug(`Skipping readwise item '${book.title}' (${book.source_url}) due to tag filter`);
+          continue;
+        }
+      }
 
       const {
         user_book_id,
@@ -466,9 +479,11 @@ export default class ReadwiseMirror extends Plugin {
 
         if (this.settings.logFile) this.writeLogToMarkdown(library);
 
-        this.notify.notice(
-          `Readwise: Downloaded ${library.highlightCount} Highlights from ${Object.keys(library.books).length} Sources`
-        );
+        let message = `Readwise: Downloaded ${library.highlightCount} Highlights from ${Object.keys(library.books).length} Sources`;
+        if (this.settings.filterByTag && this.settings.filterTags) {
+          message += ` (filtered by tags: ${this.settings.filterTags})`;
+        }
+        this.notify.notice(message);
       } else {
         this.notify.notice('Readwise: No new content available');
       }

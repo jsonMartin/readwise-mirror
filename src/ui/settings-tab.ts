@@ -531,6 +531,47 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    // Add new Filter by tag setting
+    new Setting(containerEl)
+      .setName('Filter by tag')
+      .setDesc('Only sync readwise items with specific document tags')
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.filterByTag).onChange(async (value) => {
+          this.plugin.settings.filterByTag = value;
+          // Trigger a refresh of the settings display to show/hide the tags input
+          await this.plugin.saveSettings();
+          this.display();
+        })
+      );
+
+    // Add tags input field (only visible when filterByTag is enabled)
+    if (this.plugin.settings.filterByTag) {
+      new Setting(containerEl)
+        .setName('Tags to include')
+        .setDesc(
+          'Enter tags separated by commas (e.g., important, todo, review). Only readwise items matching ANY of these tags (document level) will be synced.'
+        )
+        .addTextArea((text) => {
+          text
+            .setPlaceholder('tag1, tag2, tag3')
+            .setValue(this.plugin.settings.filterTags)
+            .onChange(async (value) => {
+              // Store tags as a trimmed string, removing empty entries
+              this.plugin.settings.filterTags = value
+                .split(',')
+                .map((tag) => tag.trim())
+                .filter((tag) => tag.length > 0)
+                .join(', ');
+              await this.plugin.saveSettings();
+            });
+
+          // Adjust the height of the text area
+          text.inputEl.rows = 2;
+
+          return text;
+        });
+    }
   }
 
   private renderSyncSettings(containerEl: HTMLElement): void {
@@ -1104,7 +1145,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setDesc(
         createFragment((fragment) => {
           fragment.appendText(
-            'Controls YAML frontmatter metadata. The same variables are available as for the Header template, with specific versions optimised for YAML frontmatter (tags), and escaped values for YAML compatibility.'
+            'Controls YAML frontmatter metadata. The same variables are available as for the Header template, with specific versions optimised for YAML (tags), and escaped values for YAML compatibility.'
           );
         })
       )

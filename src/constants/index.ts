@@ -87,6 +87,8 @@ Tags: {{ tags }}
   debugMode: false,
   useCustomFilename: false,
   filenameTemplate: '{{title}}',
+  filterByTag: false,
+  filterTags: '',
 };
 
 export const FRONTMATTER_TO_ESCAPE = ['title', 'sanitized_title', 'author', 'authorStr'];
