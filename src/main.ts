@@ -708,10 +708,10 @@ export default class ReadwiseMirror extends Plugin {
         if (
           view instanceof MarkdownView &&
           this.isTrackedReadwiseNote(view.file) &&
-          this.isInReadwiseLibrary(view.file)
+          this.isInReadwiseLibrary(view.file) &&
+          this.settings.trackFiles
         ) {
           if (!checking) {
-            this.notify.notice('Readwise: Updating current note...');
             this.updateCurrentNote(view.file);
           }
           return true;
@@ -790,7 +790,7 @@ export default class ReadwiseMirror extends Plugin {
       return;
     }
 
-    if (!this.settings.frontMatter || !this.settings.trackFiles) {
+    if (!this.settings.trackFiles) {
       this.notify.notice('Current note can only be updated when tracking files');
       return;
     }
@@ -810,6 +810,8 @@ export default class ReadwiseMirror extends Plugin {
       }
 
       if (this.isTrackedReadwiseNote(file) && this.isInReadwiseLibrary(file)) {
+        this.notify.notice('Readwise: Updating current note...');
+
         const fileCache = this.app.metadataCache.getFileCache(file);
         const trackingUrl = fileCache.frontmatter[this._settings.trackingProperty];
         const id = trackingUrl.replace(READWISE_REVIEW_URL_BASE, ''); // Extract the ID from the URL
@@ -818,9 +820,9 @@ export default class ReadwiseMirror extends Plugin {
         const library = await this._readwiseApi.downloadSingleBook(id);
 
         if (Object.keys(library.books).length > 0) {
-          this.writeLibraryToMarkdown(library);
+          await this.writeLibraryToMarkdown(library);
 
-          if (this.settings.logFile) this.writeLogToMarkdown(library);
+          if (this.settings.logFile) await this.writeLogToMarkdown(library);
 
           this.notify.notice('Readwise: Book update complete.');
         } else {
