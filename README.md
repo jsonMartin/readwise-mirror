@@ -35,6 +35,7 @@ General settings of the plugin:
 - **Debug mode**: Will generate lots of debug messages, usually not needed.
 - **Authentication**: The plugin provides OAuth-based authentication with Readwise. After installing, visit the plugin settings and use the "Authenticate with Readwise" button to set up the connection.
 - **Library folder name**: Specify the folder where the Readwise library will be stored (defaults to `Readwise`).
+- **Filter by tags**: Filter Readwise items by tag.
 - **Auto sync on startup**: Automatically sync new highlights when Obsidian starts.
 - **Sync log**: Enable writing sync results to a file.
 - **Log filename**: Specify the name of the log file (defaults to `Sync.md`).
@@ -116,6 +117,13 @@ The current recommended way to test beta features is through frozen beta version
   - If it refuses to activate with an error message, open the developer console (with Ctrl-Shift-I) and check for error messages.
 
 ## Advanced features
+
+### Filter by tag
+
+When this setting is enabled, you can specify a comma-separated list of tags which will be used to filter items which are written to your Obsidian library. Any readwise item which has a document tag matching any of the defined tags will be sycned. This applies to a full download and updates.
+
+>[!CAUTION]
+>**Enabling or disabling this setting might have wide reaching consequences**. Please maker sure you are fully aware of the effects filtering by tags might have. If you plan to use this feature you should consider recreating your Readwise library folder in Obsidian from scratch or make sure you delete all *unwanted* Readwise items manually. Enabling or disabling between update syncs might leave your library in an undefined state with missing highlights. You should be particularly cautios if you use features like protected frontmatter, e.g. to create persistent links in readwise notes.
 
 ### File tracking
 
