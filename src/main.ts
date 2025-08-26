@@ -266,11 +266,6 @@ export default class ReadwiseMirror extends Plugin {
    */
   private getReadwiseFilesFromLibrary(library: Library): ReadwiseFile[] {
     const readwiseFiles: ReadwiseFile[] = [];
-    const filterTags: string[] =
-      this.settings.filterTags
-        .split(/[,;\n]/) // Split on comma, semicolon, or newline
-        .map((tag) => tag.trim())
-        .filter((tag) => tag.length > 0) || [];
 
     // Get total number of records
     const booksTotal = Object.keys(library.books).length;
@@ -282,14 +277,6 @@ export default class ReadwiseMirror extends Plugin {
       );
       bookCurrent += 1;
       const book: Export = library.books[bookId];
-
-      if (this.settings.filterByTag && filterTags.length > 0) {
-        this.logger.debug('Filtering by tags:', this.settings.filterTags);
-        if (!book.book_tags.some((tag) => filterTags.includes(tag.name))) {
-          this.logger.debug(`Skipping readwise item '${book.title}' (${book.source_url}) due to tag filter`);
-          continue;
-        }
-      }
 
       const {
         user_book_id,
@@ -464,6 +451,11 @@ export default class ReadwiseMirror extends Plugin {
 
       let library: Library;
       const lastUpdated = this.settings.lastUpdated;
+      const filterTags: string[] =
+        this.settings.filterTags
+          .split(/[,;\n]/) // Split on comma, semicolon, or newline
+          .map((tag) => tag.trim())
+          .filter((tag) => tag.length > 0) || [];
 
       if (!lastUpdated) {
         this.notify.notice('Readwise: Previous sync not detected...\nDownloading full Readwise library');
@@ -472,6 +464,19 @@ export default class ReadwiseMirror extends Plugin {
         // Load Upadtes and cache
         this.notify.notice(`Readwise: Checking for new updates since ${this.lastUpdatedHumanReadableFormat()}`);
         library = await this._readwiseApi.downloadUpdates(lastUpdated);
+      }
+
+      if (this.settings.filterByTag && filterTags.length > 0) {
+        this.logger.debug('Filtering by tags:', this.settings.filterTags);
+        const originalCount = Object.keys(library.books).length;
+
+        library.books = Object.fromEntries(
+          Object.entries(library.books).filter(([_, book]) =>
+            book.book_tags.some((tag) => filterTags.includes(tag.name))
+          )
+        );
+
+        this.logger.debug(`Filtered library from ${originalCount} to ${Object.keys(library.books).length} books`);
       }
 
       if (Object.keys(library.books).length > 0) {
