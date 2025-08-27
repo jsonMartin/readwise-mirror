@@ -64,6 +64,7 @@ export class DeduplicatingVaultWriter {
     }
 
     // Get all files in the vault
+    // TODO: Optimize by limiting to the Readwise library folder
     const files = this.vault.getMarkdownFiles();
 
     // Filter files by the tracking property
