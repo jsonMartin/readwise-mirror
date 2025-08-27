@@ -119,8 +119,8 @@ export class DeduplicatingVaultWriter {
         await this.vault.process(file, () => `${frontmatter.toString()}\n${readwiseFile.contents}`);
       }
 
-      // We only rename files if the respective setting is enabled
-      if (readwiseFile.basename !== file.basename && this.settings.enableFileNameUpdates) {
+      // We only rename files if the respective settings are enabled and the filenames differ
+      if (this.settings.trackFiles && this.settings.enableFileNameUpdates && readwiseFile.basename !== file.basename) {
         let newPath = this.getNormalizedPath(file.parent.path, `${readwiseFile.basename}.md`);
         const newFileExists = await this.app.vault.adapter.exists(newPath, false);
         if (newFileExists) {
