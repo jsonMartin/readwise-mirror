@@ -77,7 +77,8 @@ Tags: {{ tags }}
   slugifyLowercase: true,
   trackFiles: false,
   trackingProperty: 'uri',
-  deleteDuplicates: false, // Avoid deleting duplicates by default (as this is destructive behavior)
+  deleteDuplicates: false,
+  enableFileNameUpdates: false,
   protectFrontmatter: false,
   protectedFields: 'connections\nstatus\ntags',
   updateFrontmatter: true,

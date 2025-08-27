@@ -118,6 +118,7 @@ export interface PluginSettings {
   trackFiles: boolean; // Track files using unique Readwise URLs
   trackingProperty: string; // Frontmatter property for storing tracking URL
   deleteDuplicates: boolean; // Remove duplicate files instead of marking them
+  enableFileNameUpdates: boolean; // Allow updating of file names
   protectFrontmatter: boolean; // Protect specified frontmatter fields from updates
   protectedFields: string; // List of frontmatter fields to protect
   updateFrontmatter: boolean; // Allow updating of non-protected frontmatter fields

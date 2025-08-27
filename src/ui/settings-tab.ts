@@ -638,158 +638,6 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       );
   }
 
-  private renderFilenameSettings(containerEl: HTMLElement): void {
-    new Setting(containerEl).setName('Filenames').setHeading();
-
-    new Setting(containerEl)
-      .setName('Use custom filename template')
-      .setDesc(
-        createFragment((fragment) => {
-          fragment.appendText(
-            'Use a custom template to generate filenames. Slugify and colon replacement will be applied after the filename has been generated.'
-          );
-          fragment.createEl('br');
-          fragment.createEl('br');
-          fragment.appendText('Available variables:');
-          fragment.createEl('ul', undefined, (ul) => {
-            ul.createEl('li', { text: '{{title}} - Document title' });
-            ul.createEl('li', { text: '{{author}} - Author name(s)' });
-            ul.createEl('li', {
-              text: '{{category}} - Content type (books, articles, etc)',
-            });
-            ul.createEl('li', { text: '{{source}} - Original content URL' });
-            ul.createEl('li', { text: '{{book_id}} - Unique document ID' });
-            ul.createEl('li', { text: '{{created}} - Created date' });
-            ul.createEl('li', { text: '{{updated}} - Updated date' });
-          });
-          fragment.createEl('br');
-          fragment.appendText('Example: {{ created | date("YYYYMMDDHHMMSS") }}⁝ {{title}} - {{author|trim}}');
-          fragment.createEl('br');
-          fragment.createEl('br');
-          fragment.appendText('Built-in and custom filters:');
-          fragment.createEl('br');
-          fragment.appendText('You can use Nunjucks built-in filters like ');
-          fragment.createEl('code', { text: 'trim' });
-          fragment.appendText(', ');
-          fragment.createEl('code', { text: 'upper' });
-          fragment.appendText(', ');
-          fragment.createEl('code', { text: 'lower' });
-          fragment.appendText(', etc. See the ');
-          const link = fragment.createEl('a', {
-            text: 'Nunjucks documentation',
-            href: 'https://mozilla.github.io/nunjucks/templating.html#builtin-filters',
-          });
-          link.setAttr('target', '_blank');
-          fragment.appendText(' for all available filters.');
-        })
-      )
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.useCustomFilename).onChange(async (value) => {
-          this.plugin.settings.useCustomFilename = value;
-          await this.plugin.saveSettings();
-          this.display();
-        })
-      );
-
-    if (this.plugin.settings.useCustomFilename) {
-      new Setting(containerEl)
-        .setClass('indent')
-        .setName('Filename template')
-        .setDesc('Template used to generate filenames. All special characters will be sanitized.')
-        .addText((text) =>
-          text
-            .setPlaceholder('{{title}}')
-            .setValue(this.plugin.settings.filenameTemplate)
-            .onChange(async (value) => {
-              this.plugin.settings.filenameTemplate = value || '{{title}}';
-              await this.plugin.saveSettings();
-            })
-        );
-    }
-
-    new Setting(containerEl)
-      .setName('Colon replacement in filenames')
-      .setDesc(
-        "Set the string to be used for replacement of colon (:) in filenames derived from the title. The default value for this setting is '-'."
-      )
-      .addText((text) =>
-        text
-          .setPlaceholder('Colon replacement in title')
-          .setValue(this.plugin.settings.colonSubstitute)
-          .onChange(async (value) => {
-            if (!value || /[:<>"/\\|?*]/.test(value)) {
-              this.logger.warn(`Colon replacement: empty or invalid value: ${value}`);
-              this.plugin.settings.colonSubstitute = DEFAULT_SETTINGS.colonSubstitute;
-            } else {
-              this.logger.info(`Colon replacement: setting value: ${value}`);
-              this.plugin.settings.colonSubstitute = value;
-            }
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName('Use slugify for filenames')
-      .setDesc(
-        createFragment((fragment) => {
-          fragment.appendText(
-            'Use slugify to create clean filenames. This removes diacritics and other special characters, including emojis.'
-          );
-          fragment.createEl('br');
-          fragment.createEl('br');
-          fragment.appendText('Example filename: "Déjà Vu with a 🦄"');
-          fragment.createEl('br');
-          fragment.createEl('blockquote', {
-            text: 'Slugify disabled: "Deja Vu with a "',
-          });
-          fragment.createEl('blockquote', {
-            text: 'Slugify enabled (default settings): "deja-vu-with-a"',
-          });
-          fragment.createEl('blockquote', {
-            text: 'Slugify + custom separator "_": "deja_vu_with_a"',
-          });
-          fragment.createEl('blockquote', {
-            text: 'Slugify + lowercase disabled: "Deja-Vu-With-A"',
-          });
-        })
-      )
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.useSlugify).onChange(async (value) => {
-          this.plugin.settings.useSlugify = value;
-          await this.plugin.saveSettings();
-          // Trigger re-render to show/hide property selector
-          this.display();
-        })
-      );
-
-    if (this.plugin.settings.useSlugify) {
-      new Setting(containerEl)
-        .setClass('indent')
-        .setName('Slugify separator')
-        .setDesc('Character to use as separator in slugified filenames (default: -)')
-        .addText((text) =>
-          text
-            .setPlaceholder('-')
-            .setValue(this.plugin.settings.slugifySeparator)
-            .onChange(async (value) => {
-              this.plugin.settings.slugifySeparator = value || '-';
-              await this.plugin.saveSettings();
-            })
-        );
-
-      new Setting(containerEl)
-        .setClass('indent')
-        .setName('Slugify lowercase')
-        .setDesc('Convert slugified filenames to lowercase')
-        .addToggle((toggle) =>
-          toggle.setValue(this.plugin.settings.slugifyLowercase).onChange(async (value) => {
-            this.plugin.settings.slugifyLowercase = value;
-            await this.plugin.saveSettings();
-          })
-        );
-    }
-  }
-
   private renderFileTracking(containerEl: HTMLElement): void {
     new Setting(containerEl).setName('File tracking').setHeading();
 
@@ -798,17 +646,14 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setDesc(
         createFragment((fragment) => {
           fragment.appendText(
-            'Track files using their unique Readwise URL to maintain consistency when titles or properties change.'
+            'Track your Readwise notes using their unique Readwise URL. Used for Check out the Wiki for more info: '
           );
-          fragment.createEl('br');
-          fragment.appendText(
-            'This prevents duplicate files and maintains links when articles are updated in Readwise.'
-          );
-          fragment.createEl('br');
-          fragment.createEl('br');
-          fragment.appendText(
-            'Note: The tracking field will automatically be added to the Frontmatter, independent of the "Frontmatter" setting. File tracking works across the whole Obsidian vault. If you move a tracked note outside of the Readwise library, it will still be found by the plugin. Remove the tracking property manually in these notes to sever the tracking.'
-          );
+          fragment
+            .createEl('a', {
+              text: 'File tracking and naming',
+              href: 'https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-File-tracking-and-naming',
+            })
+            .setAttr('target', '_blank');
         })
       )
       .addToggle((toggle) =>
@@ -859,9 +704,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       new Setting(containerEl)
         .setClass('indent')
         .setName('Tracking property')
-        .setDesc(
-          'Frontmatter property used to track the unique Readwise URL across syncs (default: uri). This field will be automatically managed in the frontmatter.'
-        )
+        .setDesc('Protected frontmatter property used to track the unique Readwise URL across syncs (default: uri).')
         .addText((text) =>
           text.setValue(this.plugin.settings.trackingProperty).onChange(async (value) => {
             this.plugin.settings.trackingProperty = value || 'uri';
@@ -875,12 +718,8 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         .setDesc(
           createFragment((fragment) => {
             fragment.appendText(
-              'When enabled, duplicate files with the same Readwise URL in the tracking property will be removed. Otherwise, they will be marked with duplicate: true in frontmatter.'
+              'Duplicate notes with the same Readwise URL will be removed when enabled. Otherwise, they will be marked with duplicate: true in frontmatter.'
             );
-            fragment.createEl('br');
-            fragment.createEl('blockquote', {
-              text: 'Default: Mark duplicates in frontmatter',
-            });
           })
         )
         .addToggle((toggle) =>
@@ -924,6 +763,123 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             }
           })
         );
+    }
+  }
+
+  private renderFilenameSettings(containerEl: HTMLElement): void {
+    if (this.plugin.settings.trackFiles) {
+      new Setting(containerEl).setName('Filename updates and filename templates').setHeading();
+
+      new Setting(containerEl)
+        .setName('File name updates')
+        .setDesc(
+          createFragment((fragment) => {
+            fragment.appendText('Enable file name updates on sync and customize how filenames are generated.');
+            fragment.createEl('br');
+            fragment.appendText('See the ');
+            fragment
+              .createEl('a', {
+                text: 'File tracking and naming',
+                href: 'https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-File-tracking-and-naming',
+              })
+              .setAttr('target', '_blank');
+            fragment.appendText(' wiki for details.');
+          })
+        )
+        .addToggle((toggle) =>
+          toggle.setValue(this.plugin.settings.enableFileNameUpdates).onChange(async (value) => {
+            this.plugin.settings.enableFileNameUpdates = value;
+            await this.plugin.saveSettings();
+            this.display();
+          })
+        );
+    }
+
+    if (this.plugin.settings.trackFiles && this.plugin.settings.enableFileNameUpdates) {
+      new Setting(containerEl)
+        .setName('Use custom filename template')
+        .setDesc('Enable custom filename templates using Nunjucks variables.')
+        .addToggle((toggle) =>
+          toggle.setValue(this.plugin.settings.useCustomFilename).onChange(async (value) => {
+            this.plugin.settings.useCustomFilename = value;
+            await this.plugin.saveSettings();
+            this.display();
+          })
+        );
+
+      if (this.plugin.settings.useCustomFilename) {
+        new Setting(containerEl)
+          .setClass('indent')
+          .setName('Filename template')
+          .setDesc('Nunjucks template used to generate filenames.')
+          .addText((text) =>
+            text
+              .setPlaceholder('{{title}}')
+              .setValue(this.plugin.settings.filenameTemplate)
+              .onChange(async (value) => {
+                this.plugin.settings.filenameTemplate = value || '{{title}}';
+                await this.plugin.saveSettings();
+              })
+          );
+      }
+
+      new Setting(containerEl)
+        .setName('Colon replacement in filenames')
+        .setDesc('String used to replace colons (:) in filenames.')
+        .addText((text) =>
+          text
+            .setPlaceholder('Colon replacement in title')
+            .setValue(this.plugin.settings.colonSubstitute)
+            .onChange(async (value) => {
+              if (!value || /[:<>"/\\|?*]/.test(value)) {
+                this.logger.warn(`Colon replacement: empty or invalid value: ${value}`);
+                this.plugin.settings.colonSubstitute = DEFAULT_SETTINGS.colonSubstitute;
+              } else {
+                this.logger.info(`Colon replacement: setting value: ${value}`);
+                this.plugin.settings.colonSubstitute = value;
+              }
+              await this.plugin.saveSettings();
+            })
+        );
+
+      new Setting(containerEl)
+        .setName('Use slugify for filenames')
+        .setDesc('Enable slugification to create clean filenames.')
+        .addToggle((toggle) =>
+          toggle.setValue(this.plugin.settings.useSlugify).onChange(async (value) => {
+            this.plugin.settings.useSlugify = value;
+            await this.plugin.saveSettings();
+            // Trigger re-render to show/hide property selector
+            this.display();
+          })
+        );
+
+      if (this.plugin.settings.useSlugify) {
+        new Setting(containerEl)
+          .setClass('indent')
+          .setName('Slugify separator')
+          .setDesc('Character used as separator in slugified filenames.')
+          .addText((text) =>
+            text
+              .setPlaceholder('-')
+              .setValue(this.plugin.settings.slugifySeparator)
+              .onChange(async (value) => {
+                this.plugin.settings.slugifySeparator = value || '-';
+                await this.plugin.saveSettings();
+              })
+          );
+
+        new Setting(containerEl)
+          .setClass('indent')
+          .setName('Slugify lowercase')
+          .setDesc('Convert slugified filenames to lowercase.')
+          .addToggle((toggle) =>
+            toggle.setValue(this.plugin.settings.slugifyLowercase).onChange(async (value) => {
+              this.plugin.settings.slugifyLowercase = value;
+              await this.plugin.saveSettings();
+            })
+          );
+      }
     }
   }
 
