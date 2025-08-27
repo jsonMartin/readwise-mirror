@@ -22,7 +22,7 @@ The first time this plugin is ran, it will do a full sync, downloading all conte
 - `Download entire Readwise library (force)`: Forces a full download of all content from Readwise
 - `Adjust Filenames to current settings`: Clean up filenames of existing notes in your Readwise library folder based on current filename settings (whitespace removal and slugify only for the time being)
 - `Update all readwise note frontmatter`: Scan all notes in your Readwise library folder and update their frontmatter according to your current frontmatter template and protection settings, without changing the note content or filename. This is useful after changing your frontmatter template or protection settings. Command is only available if file tracking and frontmatter are enabled.
-- `Update current note`: Update the currently selected note based on the Readwise tracking property. Command is only available for notes in the Readwise Library folder and when file tracking is enabled.
+- `Update current note`: Update the currently selected note based on the Readwise tracking property. Command is only available for notes in the Readwise Library folder and when file tracking is enabled. Pro tip: You can use this command to quickly test how changes to templates or the file name properties will impact your notes before you go and rebuild your entire Readwise Library in your Vault.
 
 ## Settings
 
@@ -151,6 +151,7 @@ Your subsequent syncs will then use the `uri` property to track unique files and
 [^3]: Readwise has a quite elaborate deduplication strategy itself where a number of factors outside of our control define if a new item is created for a highlight or if it ends up being appended to an existing item. It is therefore entirely possible, although usually unlikely, that a Readwise library contains different items of the same type with the same title.
 [^4]: The use of `highlights_url` is a deliberate choice over the `id` value alone, both because, as an URL, it contains a namespace (allowing differention from other ID values) and because it allows the user to jump directly to the Readwise item in question.
 [^5]: If at all possible, it is always better to change mistakes at the source, that is in Readwise itself. If, for example, Readwise has not correctly parsed an author's name, you might want to change this in the metadata in Readwise instead of manually updating (and protecting) the `author` property in Readwise. Nevertheless, there might be use cases where a *sync once, protect afterwards* approach might be useful.
+
 
 
 
