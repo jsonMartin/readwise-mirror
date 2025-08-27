@@ -537,6 +537,7 @@ export default class ReadwiseMirror extends Plugin {
     const path = `${this.settings.baseFolderName}`;
     const readwiseFolder = vault.getAbstractFileByPath(path);
     if (readwiseFolder && readwiseFolder instanceof TFolder) {
+      this.notify.notice('Readwise: Filename adjustment started');
       // Iterate all files in the Readwise folder and "fix" their names according to the current settings using
       // this.normalizeFilename()
       const renamedFiles = await this.iterativeReadwiseRenamer(readwiseFolder);
@@ -697,9 +698,15 @@ export default class ReadwiseMirror extends Plugin {
     this.addCommand({
       id: 'adjust-filenames',
       name: 'Adjust Filenames to current settings',
-      callback: async () => {
-        this.notify.notice('Readwise: Filename adjustment started');
-        await this.handleFilenameAdjustment();
+      checkCallback: (checking: boolean) => {
+        // Only enable if tracking files and filename updates are enabled
+        if (this.settings.trackFiles && this.settings.enableFileNameUpdates) {
+          if (!checking) {
+            this.handleFilenameAdjustment();
+          }
+          return true;
+        }
+        return false;
       },
     });
 
