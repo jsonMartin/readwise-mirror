@@ -293,8 +293,6 @@ export default class ReadwiseMirror extends Plugin {
         book_tags,
       } = book;
 
-      // Get highlight count
-      const num_highlights = highlights.length;
       const created = createdDate(highlights); // No reverse sort: we want the oldest entry
       const updated = updatedDate(highlights);
 
@@ -305,6 +303,9 @@ export default class ReadwiseMirror extends Plugin {
 
       // Filter highlights
       const filteredHighlights = this.filterHighlights(highlights);
+
+      // Get highlight count from filtered highlights
+      const num_highlights = filteredHighlights.length;
 
       if (filteredHighlights.length === 0) {
         this.logger.debug(`No highlights found for '${title}' (${source_url})`);
