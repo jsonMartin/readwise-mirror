@@ -205,7 +205,7 @@ export default class ReadwiseApi {
    * @returns {Promise<Library>} - Returns a promise that resolves to a Library object
    */
   async downloadFullLibrary(): Promise<Library> {
-    const records = (await this.fetchData('export')) as Export[];
+    const records = (await this.fetchData('export', undefined, undefined, true)) as Export[];
 
     return this.buildLibrary(records);
   }
@@ -217,12 +217,15 @@ export default class ReadwiseApi {
    */
   async downloadUpdates(lastUpdated: string): Promise<Library> {
     // Fetch updated books and then fetch all their highlights
-    const recordsUpdated = (await this.fetchData('export', lastUpdated)) as Export[];
+    const recordsUpdated = (await this.fetchData('export', lastUpdated, undefined, true)) as Export[];
     const bookIds = recordsUpdated.map((r) => r.user_book_id);
 
     if (bookIds.length > 0) {
-      // Build a library which contains *all* highlights only for changed books
-      const records = (await this.fetchData('export', '', bookIds)) as Export[];
+      // Build a library which contains *all* highlights, but only for changed books
+      // TODO: An alternative to this would be to keep a local cache of all highlights
+      // and only update the changed ones. This would be more efficient, but also more complex.
+      // For now, this is simpler and should be sufficient for most use cases.
+      const records = (await this.fetchData('export', undefined, bookIds, true)) as Export[];
       return this.buildLibrary(records);
     }
     // Essentially return an empty library
@@ -236,7 +239,7 @@ export default class ReadwiseApi {
    */
   async downloadSingleBook(bookId: number): Promise<Library> {
     // Fetch single book and return library
-    const recordsUpdated = (await this.fetchData('export', '', [bookId])) as Export[];
+    const recordsUpdated = (await this.fetchData('export', undefined, [bookId], true)) as Export[];
     return this.buildLibrary(recordsUpdated);
   }
 }

@@ -123,6 +123,12 @@ export default class ReadwiseMirror extends Plugin {
     return highlights.filter((highlight: Highlight) => {
       if (this.settings.syncNotesOnly && !highlight.note) return false;
 
+      // Check if is deleted
+      if (highlight.is_deleted) {
+        this.logger.debug('Found deleted highlight, removing', highlight);
+        return false;
+      }
+
       // Check if is discarded
       if (this.settings.highlightDiscard && highlight.is_discard) {
         this.logger.debug('Found discarded highlight, removing', highlight);
