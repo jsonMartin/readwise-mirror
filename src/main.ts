@@ -119,19 +119,12 @@ export default class ReadwiseMirror extends Plugin {
     });
   }
 
-  private highlightIsDiscarded = (highlight: Highlight) => {
-    // is_discard is not a field in the API response for (https://readwise.io/api/v2/highlights/), so we need to check if the highlight has the discard tag
-    // is_discard field only showing under the /export API endpoint in the API docs: https://readwise.io/api_deets
-
-    return highlight.tags.some((tag) => tag.name === 'discard');
-  };
-
   private filterHighlights(highlights: Highlight[]) {
     return highlights.filter((highlight: Highlight) => {
       if (this.settings.syncNotesOnly && !highlight.note) return false;
 
       // Check if is discarded
-      if (this.settings.highlightDiscard && this.highlightIsDiscarded(highlight)) {
+      if (this.settings.highlightDiscard && highlight.is_discard) {
         this.logger.debug('Found discarded highlight, removing', highlight);
         return false;
       }
