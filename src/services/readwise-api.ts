@@ -112,6 +112,8 @@ export default class ReadwiseApi {
 
     const results = [];
 
+    this.logger.group(`Fetch Data: ${contentType}`);
+    this.logger.debug('Fetch parameters:', { lastUpdated, bookId, includeDeleted });
     while (true) {
       const queryParams = new URLSearchParams();
       queryParams.append('page_size', API_PAGE_SIZE.toString());
@@ -128,6 +130,7 @@ export default class ReadwiseApi {
         queryParams.append('includeDeleted', 'true');
       }
 
+      // Notify user of progress
       if (lastUpdated) this.logger.info(`Checking for new content since ${lastUpdated}`);
       if (bookId) this.logger.debug(`Checking for all highlights on book ID: ${bookId}`);
       let statusBarText = `Readwise: Fetching ${contentType}`;
@@ -171,6 +174,8 @@ export default class ReadwiseApi {
         this.logger.debug(`There are more records left, proceeding to next page: ${data.nextPageCursor}`);
       }
     }
+
+    this.logger.groupEnd();
 
     if (results.length > 0) this.logger.info(`Processed ${results.length} total ${contentType} results successfully`);
     return results;
@@ -219,6 +224,8 @@ export default class ReadwiseApi {
     // Fetch updated books and then fetch all their highlights
     const recordsUpdated = (await this.fetchData('export', lastUpdated, undefined, true)) as Export[];
     const bookIds = recordsUpdated.map((r) => r.user_book_id);
+
+    this.logger.debug(`Fetched ids of ${bookIds.length} updated books...`);
 
     if (bookIds.length > 0) {
       // Build a library which contains *all* highlights, but only for changed books

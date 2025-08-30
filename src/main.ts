@@ -229,11 +229,14 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   async writeLibraryToMarkdown(library: Library) {
+    this.logger.group('Write Library to Markdown');
     try {
       await this.deduplicatingVaultWriter.createCategoryFolders(library.categories);
     } catch (err) {
       this.logger.error('Failed to create category folders', err);
       this.notify.notice('Readwise: Failed to create category folders. Sync aborted.');
+      this.isSyncing = false;
+      this.logger.groupEnd();
       return;
     }
 
@@ -253,6 +256,9 @@ export default class ReadwiseMirror extends Plugin {
     } catch (err) {
       this.logger.error('Failed to process files batch', err);
       this.notify.notice('Readwise: Failed to process some files during sync.');
+    } finally {
+      this.logger.groupEnd();
+      this.isSyncing = false;
     }
   }
 
@@ -465,7 +471,9 @@ export default class ReadwiseMirror extends Plugin {
         library = await this._readwiseApi.downloadUpdates(lastUpdated);
       }
 
+      this.logger.group('Filter Library: Deleted and by Tag');
       this.logger.debug(`Filtering books: deleted ${this.settings.filterTags ? 'or by tag ' : ''}(${filterTags})`);
+      // Remove deleted books
       for (const bookId in library.books) {
         const book = library.books[bookId];
         if (book.is_deleted) {
@@ -480,6 +488,7 @@ export default class ReadwiseMirror extends Plugin {
         }
       }
 
+      this.logger.groupEnd();
 
       if (Object.keys(library.books).length > 0) {
         this.writeLibraryToMarkdown(library);
