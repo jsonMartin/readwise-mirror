@@ -618,7 +618,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Filter discarded highlights')
-      .setDesc('If enabled, do not display discarded highlights in the Readwise library.')
+      .setDesc(
+        'If enabled, do not display discarded highlights in the Readwise library. (Deleted highlights will still be removed on sync)'
+      )
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.highlightDiscard).onChange(async (value) => {
           this.plugin.settings.highlightDiscard = value;
@@ -702,7 +704,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             if (!value) {
               new WarningDialog(
                 this.app,
-                'Disabling file tracking across the vault may lead to loss of consistency in your Obsidian vault. Tracked Readwise notes that you previously moved outside the Readwise library folder might be re-created inside the Readwise library. Are you sure you want to continue?',
+                'Once enabled, disabling file tracking across the vault may lead to loss of consistency in your Obsidian vault and duplicate notes. Tracked Readwise notes that you previously moved outside the Readwise library folder might be re-created inside the Readwise library. Are you sure you want to continue?',
                 async (confirmed: boolean) => {
                   if (confirmed) {
                     this.plugin.settings.trackAcrossVault = false;
