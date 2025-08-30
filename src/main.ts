@@ -740,6 +740,33 @@ export default class ReadwiseMirror extends Plugin {
       },
     });
 
+    // Special debug command, only enabled if debug mode is active
+    this.addCommand({
+      id: 'reset-last-updated',
+      name: 'Reset lastUpdated setting to 2 months ago (debug)',
+      checkCallback: (checking: boolean) => {
+        if (this.settings.debugMode) {
+          if (!checking) {
+            const d = spacetime.now().subtract(2, 'months');
+            new ConfirmDialog(
+              this.app,
+              `Do you really want to reset 'last updated' date to ${spacetime.now().since(d).rounded}?`,
+              (result) => {
+                if (result) {
+                  this.settings.lastUpdated = d.iso();
+                  this.saveSettings();
+                  this.notify.setStatusBarText(`Readwise: lastUpdated reset to ${spacetime.now().since(d).rounded}`);
+                }
+              }
+            ).open();
+          }
+          return true;
+        }
+        return false;
+      },
+    });
+
+    // Update status bar every second if synced
     this.registerInterval(
       window.setInterval(() => {
         if (/Synced/.test(this.notify.getStatusBarText())) {
