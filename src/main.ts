@@ -13,6 +13,7 @@ import { ReadwiseEnvironment } from 'services/readwise-environment';
 import spacetime from 'spacetime';
 // Types
 import type { Export, Highlight, Library, PluginSettings, ReadwiseDocument, ReadwiseFile, Tag } from 'types';
+import { ConfirmDialog } from 'ui/dialog';
 import Notify from 'ui/notify';
 import ReadwiseMirrorSettingTab from 'ui/settings-tab';
 import { createdDate, lastHighlightedDate, updatedDate } from 'utils/highlight-date-utils';
