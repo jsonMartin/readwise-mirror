@@ -302,7 +302,6 @@ export default class ReadwiseMirror extends Plugin {
 
       if (filteredHighlights.length === 0) {
         this.logger.debug(`No highlights found for '${title}' (${source_url})`);
-        continue;
       }
 
       // get an array with all tags from highlights
@@ -460,18 +459,21 @@ export default class ReadwiseMirror extends Plugin {
         library = await this._readwiseApi.downloadUpdates(lastUpdated);
       }
 
-      if (this.settings.filterByTag && filterTags.length > 0) {
-        this.logger.debug('Filtering by tags:', this.settings.filterTags);
-        const originalCount = Object.keys(library.books).length;
-
-        library.books = Object.fromEntries(
-          Object.entries(library.books).filter(([_, book]) =>
-            book.book_tags.some((tag) => filterTags.includes(tag.name))
-          )
-        );
-
-        this.logger.debug(`Filtered library from ${originalCount} to ${Object.keys(library.books).length} books`);
+      this.logger.debug(`Filtering books: deleted ${this.settings.filterTags ? 'or by tag ' : ''}(${filterTags})`);
+      for (const bookId in library.books) {
+        const book = library.books[bookId];
+        if (book.is_deleted) {
+          this.logger.warn(`Removing deleted book: ${book.title} (${book.user_book_id})`);
+          delete library.books[bookId];
+        }
+        if (this.settings.filterByTag && filterTags.length > 0) {
+          if (book.book_tags.every((tag) => !filterTags.includes(tag.name))) {
+            this.logger.debug(`Removing book not matching filter tags: ${book.title} (${book.user_book_id})`);
+            delete library.books[bookId];
+          }
+        }
       }
+
 
       if (Object.keys(library.books).length > 0) {
         this.writeLibraryToMarkdown(library);
