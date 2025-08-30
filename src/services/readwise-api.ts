@@ -100,7 +100,12 @@ export default class ReadwiseApi {
    * @returns {Promise<Export[]>} - Returns a promise that resolves to an array of Export objects
    * @throws {Error} - Throws an error if the request fails
    */
-  async fetchData(contentType = 'export', lastUpdated?: string, bookId?: number[]): Promise<Export[]> {
+  async fetchData(
+    contentType = 'export',
+    lastUpdated?: string,
+    bookId?: number[],
+    includeDeleted?: boolean
+  ): Promise<Export[]> {
     const url = `${API_ENDPOINT}/${contentType}?`;
     let data: Record<string, unknown>;
     let nextPageCursor: string;
@@ -118,6 +123,9 @@ export default class ReadwiseApi {
       }
       if (nextPageCursor) {
         queryParams.append('pageCursor', nextPageCursor);
+      }
+      if (contentType === 'export' && includeDeleted) {
+        queryParams.append('includeDeleted', 'true');
       }
 
       if (lastUpdated) this.logger.info(`Checking for new content since ${lastUpdated}`);

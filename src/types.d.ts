@@ -1,5 +1,6 @@
 export interface Export {
   user_book_id: number;
+  is_deleted: boolean;
   title: string;
   author: string;
   readable_title: string;
@@ -18,6 +19,7 @@ export interface Export {
 
 export interface Highlight {
   id: number;
+  is_deleted: boolean;
   text: string;
   note: string;
   location: number;
@@ -29,6 +31,8 @@ export interface Highlight {
   color: string;
   book_id: number;
   tags: Tag[];
+  is_favorite: boolean;
+  is_discard: boolean;
 }
 
 export interface Tag {
