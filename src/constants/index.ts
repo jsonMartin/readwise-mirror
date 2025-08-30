@@ -77,6 +77,7 @@ Tags: {{ tags }}
   slugifyLowercase: true,
   trackFiles: false,
   trackingProperty: 'uri',
+  trackAcrossVault: false,
   deleteDuplicates: false,
   enableFileNameUpdates: false,
   protectFrontmatter: false,

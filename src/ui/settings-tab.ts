@@ -12,6 +12,7 @@ import {
 } from 'obsidian';
 import ReadwiseApi, { TokenValidationError } from 'services/readwise-api';
 import type { TemplateValidationResult } from 'types';
+import { WarningDialog } from 'ui/dialog';
 import type Notify from 'ui/notify';
 import { validateFrontmatterTemplate } from 'utils/frontmatter-utils';
 
@@ -659,39 +660,19 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.trackFiles).onChange(async (value) => {
           if (!value) {
-            const modal = new Modal(this.app);
-            modal.titleEl.setText('Warning');
-            modal.contentEl.createEl('p', {
-              text: 'Disabling and re-enabling file tracking might lead to loss of consistency in your Obsidian vault if you sync Readwise notes without tracking properties and then re-enable file tracking again. Are you sure you want to continue?',
-            });
-
-            const buttonContainer = modal.contentEl.createDiv();
-            buttonContainer.style.display = 'flex';
-            buttonContainer.style.justifyContent = 'flex-end';
-            buttonContainer.style.gap = '10px';
-            buttonContainer.style.marginTop = '20px';
-
-            const cancelButton = buttonContainer.createEl('button', {
-              text: 'Cancel',
-            });
-            const confirmButton = buttonContainer.createEl('button', {
-              text: 'Confirm',
-            });
-            confirmButton.style.backgroundColor = 'var(--background-modifier-error)';
-
-            cancelButton.onclick = () => {
-              toggle.setValue(true);
-              modal.close();
-            };
-
-            confirmButton.onclick = async () => {
-              this.plugin.settings.trackFiles = value;
-              await this.plugin.saveSettings();
-              this.display();
-              modal.close();
-            };
-
-            modal.open();
+            new WarningDialog(
+              this.app,
+              'Disabling file tracking may lead to loss of consistency in your Obsidian vault if you sync Readwise notes without tracking properties and then re-enable file tracking again. Are you sure you want to continue?',
+              async (confirmed: boolean) => {
+                if (confirmed) {
+                  this.plugin.settings.trackFiles = false;
+                  await this.plugin.saveSettings();
+                  this.display();
+                } else {
+                  toggle.setValue(true);
+                }
+              }
+            ).open();
           } else {
             this.plugin.settings.trackFiles = value;
             await this.plugin.saveSettings();
@@ -709,6 +690,34 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           text.setValue(this.plugin.settings.trackingProperty).onChange(async (value) => {
             this.plugin.settings.trackingProperty = value || 'uri';
             await this.plugin.saveSettings();
+          })
+        );
+
+      new Setting(containerEl)
+        .setClass('indent')
+        .setName('Track across vault')
+        .setDesc('Track, and update files across your entire vault, and not just inside the Readwise library folder.')
+        .addToggle((toggle) =>
+          toggle.setValue(this.plugin.settings.trackAcrossVault).onChange(async (value) => {
+            if (!value) {
+              new WarningDialog(
+                this.app,
+                'Disabling file tracking across the vault may lead to loss of consistency in your Obsidian vault. Tracked Readwise notes that you previously moved outside the Readwise library folder might be re-created inside the Readwise library. Are you sure you want to continue?',
+                async (confirmed: boolean) => {
+                  if (confirmed) {
+                    this.plugin.settings.trackAcrossVault = false;
+                    await this.plugin.saveSettings();
+                    this.display();
+                  } else {
+                    toggle.setValue(true);
+                  }
+                }
+              ).open();
+            } else {
+              this.plugin.settings.trackAcrossVault = value;
+              await this.plugin.saveSettings();
+              this.display();
+            }
           })
         );
 

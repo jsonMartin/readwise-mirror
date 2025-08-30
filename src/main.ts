@@ -17,6 +17,7 @@ import { ConfirmDialog } from 'ui/dialog';
 import Notify from 'ui/notify';
 import ReadwiseMirrorSettingTab from 'ui/settings-tab';
 import { createdDate, lastHighlightedDate, updatedDate } from 'utils/highlight-date-utils';
+import { isInReadwiseLibrary, isTrackedReadwiseNote } from 'utils/tracking-utils';
 
 export default class ReadwiseMirror extends Plugin {
   private _settings: PluginSettings;
@@ -741,7 +742,14 @@ export default class ReadwiseMirror extends Plugin {
       name: 'Update current note',
       checkCallback: (checking: boolean) => {
         const file = this.app.workspace.getActiveFile();
-        if (this.isTrackedReadwiseNote(file) && this.isInReadwiseLibrary(file) && this.settings.trackFiles) {
+        const isReadwiseNote = isTrackedReadwiseNote(file, this.app, this.settings);
+        const isInLibrary = isInReadwiseLibrary(file, this.settings);
+
+        // If trackAcrossVault is enabled, only check if it's a Readwise note.
+        // Otherwise, check if it's a Readwise note AND in the Readwise library.
+        const shouldEnable = this.settings.trackAcrossVault ? isReadwiseNote : isReadwiseNote && isInLibrary;
+
+        if (shouldEnable && this.settings.trackFiles) {
           if (!checking) {
             this.updateCurrentNote(file);
           }
@@ -863,7 +871,14 @@ export default class ReadwiseMirror extends Plugin {
         return;
       }
 
-      if (this.isTrackedReadwiseNote(file) && this.isInReadwiseLibrary(file)) {
+      const isReadwiseNote = isTrackedReadwiseNote(file, this.app, this.settings);
+      const isInLibrary = isInReadwiseLibrary(file, this.settings);
+
+      // If trackAcrossVault is enabled, only check if it's a Readwise note.
+      // Otherwise, check if it's a Readwise note AND in the Readwise library.
+      const allowUpdate = this.settings.trackAcrossVault ? isReadwiseNote : isReadwiseNote && isInLibrary;
+
+      if (allowUpdate) {
         this.logger.debug('Readwise: Updating current note...');
 
         const fileCache = this.app.metadataCache.getFileCache(file);
@@ -880,7 +895,8 @@ export default class ReadwiseMirror extends Plugin {
 
           this.notify.notice('Readwise: Book update complete.');
         } else {
-          this.notify.notice('Readwise: Note not found on Readwise.');
+          this.notify.notice(`Readwise: Note with id ${id} not found on Readwise.`);
+          this.logger.warn(`Readwise: Note with id ${id} not found on Readwise.`);
           return;
         }
       } else {
@@ -894,26 +910,5 @@ export default class ReadwiseMirror extends Plugin {
       // Make sure we reset the sync status in case of error
       this.isSyncing = false;
     }
-  }
-
-  // Verify if file is tracked by checking for the tracking property in frontmatter
-  private isTrackedReadwiseNote(file: TFile): boolean {
-    const trackingProperty = this._settings.trackingProperty;
-    const fileCache = this.app.metadataCache.getFileCache(file);
-    return fileCache?.frontmatter?.[trackingProperty]?.startsWith(READWISE_REVIEW_URL_BASE);
-  }
-
-  // Verify if file is part of the readwise library folder hierarchy
-  private isInReadwiseLibrary(file: TFile): boolean {
-    const baseFolderName = this._settings.baseFolderName; // Replace with your actual base folder name
-    let currentFolder = file.parent;
-
-    while (currentFolder) {
-      if (currentFolder.path === baseFolderName) {
-        return true;
-      }
-      currentFolder = currentFolder.parent;
-    }
-    return false;
   }
 }

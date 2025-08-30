@@ -121,6 +121,7 @@ export interface PluginSettings {
   slugifyLowercase: boolean; // Convert slugified names to lowercase
   trackFiles: boolean; // Track files using unique Readwise URLs
   trackingProperty: string; // Frontmatter property for storing tracking URL
+  trackAcrossVault: boolean; // Track files across the entire vault, not just within the base folder
   deleteDuplicates: boolean; // Remove duplicate files instead of marking them
   enableFileNameUpdates: boolean; // Allow updating of file names
   protectFrontmatter: boolean; // Protect specified frontmatter fields from updates
