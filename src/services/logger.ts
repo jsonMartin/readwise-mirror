@@ -10,11 +10,11 @@ class Logger {
   }
 
   group(label: string): void {
-    console.group(`Readwise Mirror: ${label}`);
+    if (this.debugMode) console.group(`Readwise Mirror: ${label}`);
   }
 
   groupEnd(): void {
-    console.groupEnd();
+    if (this.debugMode) console.groupEnd();
   }
 
   setDebugMode(debugMode: boolean): void {
