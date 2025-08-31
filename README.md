@@ -21,9 +21,9 @@ The first time this plugin is ran, it will do a full sync, downloading all conte
 - `Delete Readwise library`: Remove the Readwise library file folder from the Obsidian vault
 - `Download entire Readwise library (force)`: Forces a full download of all content from Readwise
 - `Adjust Filenames to current settings`: Clean up filenames of existing notes in your Readwise library folder based on current filename settings (whitespace removal and slugify only for the time being)
-`Update all Readwise note frontmatter`: Scan all notes in your Readwise library folder and update their frontmatter according to your current frontmatter template and protection settings, without changing the note content or filename. This is useful after changing your frontmatter template or protection settings. Command is only available if file tracking and frontmatter are enabled.
+- `Update all readwise note frontmatter`: Scan all notes in your Readwise library folder and update their frontmatter according to your current frontmatter template and protection settings, without changing note content or filename. Useful after changing your frontmatter template or protection settings. Available only if file tracking and frontmatter are enabled.
 
-`Update current note`: Update the currently selected note based on the Readwise tracking property. Command is only available for notes in the Readwise library folder and when file tracking is enabled. Pro tip: Use this to quickly test how changes to templates or filename settings will impact your notes before you rebuild your entire Readwise library in your vault.
+- `Update current note`: Update the currently opened Readwise note using its tracking property. Available only for notes in the Readwise Library folder when file tracking is enabled. Pro tip: Use this to quickly test template or filename changes before rebuilding your entire Readwise library.
 
 ## Settings
 
@@ -106,7 +106,7 @@ Please consult [Installation & Setup](https://github.com/jsonMartin/readwise-mir
 
 ## Advanced features
 
-The plugin uses three template types to format content, all using Nunjucks templating syntax and a set of defined variables for each template type. It also provides filters for Readwise specifics like Q&A, multiple authors in one field, and more. Additionally, it offers features to control filename generation from Readwise titles, track notes when a Readwise title changes, and keep certain properties synced while protecting others. See the [**Templating**](https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-Templating), [**Frontmatter Management**](https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-Frontmatter-management), and [**File Tracking & Naming**](https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-File-tracking-and-naming) guides to learn more.
+The plugin uses three template types (Nunjucks) with defined variables per template. It provides filters for Readwise-specific features (e.g., Q&A, multiple authors), controls for filename generation, tracking for title changes, and options to sync or protect selected properties. See the [**Templating**](https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-Templating), [**Frontmatter Management**](https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-Frontmatter-management), and [**File Tracking & Naming**](https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-File-tracking-and-naming) guides.
 
 You also might want to check out some of the advanced [**Recipes**](https://github.com/jsonMartin/readwise-mirror/wiki/Recipes:-Advanced-use-of-the-Readwise-mirror-plugin) to make the best use of the plugin.
 
