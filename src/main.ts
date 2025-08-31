@@ -738,6 +738,7 @@ export default class ReadwiseMirror extends Plugin {
       },
     });
 
+    // TODO: #73 We could even check if the current note is found on Readwise *before* enabling the command
     this.addCommand({
       id: 'update-current-note',
       name: 'Update current note',
