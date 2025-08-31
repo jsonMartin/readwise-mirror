@@ -739,6 +739,7 @@ export default class ReadwiseMirror extends Plugin {
       name: 'Update current note',
       checkCallback: (checking: boolean) => {
         const file = this.app.workspace.getActiveFile();
+        if (!file) return false;
         const isReadwiseNote = isTrackedReadwiseNote(file, this.app, this.settings);
         const isInLibrary = isInReadwiseLibrary(file, this.settings);
 
