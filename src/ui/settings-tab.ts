@@ -468,6 +468,14 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             this.updateAuthButtons('invalid');
           }
         });
+        this.tokenValue.inputEl.onfocus = () => {
+          this.tokenValue.inputEl.type = 'text';
+        };
+        this.tokenValue.inputEl.onblur = () => {
+          if (hasValidToken) {
+            this.tokenValue.inputEl.type = 'password';
+          }
+        };
       })
       .addButton((button) => {
         this.validationButton = button;
