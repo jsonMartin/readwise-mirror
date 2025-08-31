@@ -1,13 +1,17 @@
 import { type App, Modal, Setting } from 'obsidian';
 
 export class ConfirmDialog extends Modal {
-  constructor(app: App, prompt: string, onSubmit: (confirm: boolean) => void) {
+  constructor(app: App, title: string, prompt: string | DocumentFragment, onSubmit: (confirm: boolean) => void) {
     super(app);
-    this.titleEl.setText('Are you sure?');
+    this.titleEl.setText(title);
 
-    this.contentEl.createEl('p', {
-      text: prompt,
-    });
+    if (typeof prompt === 'string') {
+      this.contentEl.createEl('p', {
+        text: prompt,
+      });
+    } else {
+      this.contentEl.appendChild(prompt);
+    }
 
     new Setting(this.contentEl)
       .addButton((btn) =>
@@ -29,13 +33,17 @@ export class ConfirmDialog extends Modal {
 }
 
 export class WarningDialog extends Modal {
-  constructor(app: App, prompt: string, onSubmit: (confirm: boolean) => void) {
+  constructor(app: App, title: string, prompt: string | DocumentFragment, onSubmit: (confirm: boolean) => void) {
     super(app);
-    this.titleEl.setText('Warning');
+    this.titleEl.setText(`Warning: ${title}`);
 
-    this.contentEl.createEl('p', {
-      text: prompt,
-    });
+    if (typeof prompt === 'string') {
+      this.contentEl.createEl('p', {
+        text: prompt,
+      });
+    } else {
+      this.contentEl.appendChild(prompt);
+    }
 
     new Setting(this.contentEl)
       .addButton((btn) => {

@@ -662,7 +662,15 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           if (!value) {
             new WarningDialog(
               this.app,
-              'Disabling file tracking may lead to loss of consistency in your Obsidian vault if you sync Readwise notes without tracking properties and then re-enable file tracking again. Are you sure you want to continue?',
+              'Risk of inconsistency',
+              createFragment((fragment) => {
+                fragment.createDiv({
+                  text: 'Disabling file tracking may lead to loss of consistency in your Obsidian vault if you sync Readwise notes without tracking properties and then re-enable file tracking again.',
+                });
+                fragment.createEl('br');
+                fragment.createDiv({ text: 'Are you sure you want to continue?' });
+              }),
+
               async (confirmed: boolean) => {
                 if (confirmed) {
                   this.plugin.settings.trackFiles = false;
@@ -702,7 +710,14 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             if (!value) {
               new WarningDialog(
                 this.app,
-                'Once enabled, disabling file tracking across the vault may lead to loss of consistency in your Obsidian vault and duplicate notes. Tracked Readwise notes that you previously moved outside the Readwise library folder might be re-created inside the Readwise library. Are you sure you want to continue?',
+                'Risk of inconsistency',
+                createFragment((fragment) => {
+                  fragment.createDiv({
+                    text: 'Once enabled, disabling file tracking across the vault may lead to loss of consistency in your Obsidian vault and duplicate notes. Tracked Readwise notes that you previously moved outside the Readwise library folder might be re-created inside the Readwise library. ',
+                  });
+                  fragment.createEl('br');
+                  fragment.createDiv({ text: 'Are you sure you want to continue?' });
+                }),
                 async (confirmed: boolean) => {
                   if (confirmed) {
                     this.plugin.settings.trackAcrossVault = false;

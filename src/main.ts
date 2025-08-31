@@ -767,6 +767,7 @@ export default class ReadwiseMirror extends Plugin {
             const d = spacetime.now().subtract(2, 'months');
             new ConfirmDialog(
               this.app,
+              'Are you sure?',
               `Do you really want to reset 'last updated' date to ${spacetime.now().since(d).rounded}?`,
               (result) => {
                 if (result) {
