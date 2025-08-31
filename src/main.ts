@@ -890,8 +890,14 @@ export default class ReadwiseMirror extends Plugin {
           this.logger.warn('Tracking URL missing/invalid for current note.');
           return;
         }
-        const id = trackingUrl.replace(READWISE_REVIEW_URL_BASE, ''); // Extract the ID from the URL
+        const idStr = trackingUrl.replace(READWISE_REVIEW_URL_BASE, ''); // Extract the ID from the URL
+        const id = Number.parseInt(idStr, 10);
 
+        if (Number.isNaN(id)) {
+          this.notify.notice(`Readwise: Tracking URL in current note is invalid (ID ${idStr} is not a valid number).`);
+          this.logger.warn(`Tracking URL in current note is invalid (ID ${idStr} is not a valid number).`);
+          return;
+        }
         this.logger.debug(`Readwise: downloading current book with ID ${id}...`);
         const library = await this._readwiseApi.downloadSingleBook(id);
 
