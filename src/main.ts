@@ -833,11 +833,34 @@ export default class ReadwiseMirror extends Plugin {
       this.logger.info('Readwise: downloading full library to update frontmatter...');
       const library = await this._readwiseApi.downloadFullLibrary();
 
+      // Remove deleted books
+      for (const bookId in library.books) {
+        const book = library.books[bookId];
+        if (book.is_deleted) {
+          this.logger.warn(`Removing deleted book: ${book.title} (${book.user_book_id})`);
+          delete library.books[bookId];
+        }
+        if (
+          this.settings.filterNotesByTag &&
+          Array.isArray(this.settings.filteredTags) &&
+          this.settings.filteredTags.length > 0
+        ) {
+          if (book.book_tags.every((tag) => !this.settings.filteredTags.includes(tag.name))) {
+            this.logger.debug(`Removing book not matching filter tags: ${book.title} (${book.user_book_id})`);
+            delete library.books[bookId];
+          }
+        }
+      }
+
       const readwiseFiles: ReadwiseFile[] = this.getReadwiseFilesFromLibrary(library);
-      this.logger.time('frontmatter.process');
+      this.logger.group('Frontmatter Update');
       await this.deduplicatingVaultWriter.processFrontmatter(readwiseFiles);
-      this.logger.timeEnd('frontmatter.process');
-      this.notify.notice('Readwise: Frontmatter update complete.');
+      this.logger.groupEnd();
+      let message = `Readwise: Updated ${Object.keys(library.books).length} notes`;
+      if (this.settings.filterNotesByTag && this.settings.filteredTags?.length > 0) {
+        message += ` (filtered by tags: ${this.settings.filteredTags.join(', ')})`;
+      }
+      this.notify.notice(message);
     } catch (error) {
       this.logger.error('Error during frontmatter sync:', error);
       this.notify.notice(`Readwise: Sync failed. ${error}`);
