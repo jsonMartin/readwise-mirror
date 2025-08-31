@@ -458,11 +458,6 @@ export default class ReadwiseMirror extends Plugin {
 
       let library: Library;
       const lastUpdated = this.settings.lastUpdated;
-      const filterTags: string[] =
-        this.settings.filterTags
-          .split(/[,;\n]/) // Split on comma, semicolon, or newline
-          .map((tag) => tag.trim())
-          .filter((tag) => tag.length > 0) || [];
 
       if (!lastUpdated) {
         this.notify.notice('Readwise: Previous sync not detected...\nDownloading full Readwise library');
@@ -474,7 +469,9 @@ export default class ReadwiseMirror extends Plugin {
       }
 
       this.logger.group('Filter Library: Deleted and by Tag');
-      this.logger.debug(`Filtering books: deleted ${this.settings.filterTags ? 'or by tag ' : ''}(${filterTags})`);
+      this.logger.debug(
+        `Filtering books: deleted ${this.settings.filteredTags ? 'or by tag ' : ''}(${this.settings.filteredTags})`
+      );
       // Remove deleted books
       for (const bookId in library.books) {
         const book = library.books[bookId];
@@ -482,8 +479,8 @@ export default class ReadwiseMirror extends Plugin {
           this.logger.warn(`Removing deleted book: ${book.title} (${book.user_book_id})`);
           delete library.books[bookId];
         }
-        if (this.settings.filterByTag && filterTags.length > 0) {
-          if (book.book_tags.every((tag) => !filterTags.includes(tag.name))) {
+        if (this.settings.filterByTag && this.settings.filteredTags.length > 0) {
+          if (book.book_tags.every((tag) => !this.settings.filteredTags.includes(tag.name))) {
             this.logger.debug(`Removing book not matching filter tags: ${book.title} (${book.user_book_id})`);
             delete library.books[bookId];
           }
@@ -498,8 +495,8 @@ export default class ReadwiseMirror extends Plugin {
         if (this.settings.logFile) this.writeLogToMarkdown(library);
 
         let message = `Readwise: Downloaded ${library.highlightCount} Highlights from ${Object.keys(library.books).length} Sources`;
-        if (this.settings.filterByTag && this.settings.filterTags) {
-          message += ` (filtered by tags: ${this.settings.filterTags})`;
+        if (this.settings.filterByTag && this.settings.filteredTags) {
+          message += ` (filtered by tags: ${this.settings.filteredTags})`;
         }
         this.notify.notice(message);
       } else {

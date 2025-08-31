@@ -90,7 +90,7 @@ Tags: {{ tags }}
   useCustomFilename: false,
   filenameTemplate: '{{title}}',
   filterByTag: false,
-  filterTags: '',
+  filteredTags: [],
 };
 
 export const FRONTMATTER_TO_ESCAPE = ['title', 'sanitized_title', 'author', 'authorStr'];

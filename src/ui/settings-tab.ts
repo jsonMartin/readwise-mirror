@@ -556,14 +556,12 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         .addTextArea((text) => {
           text
             .setPlaceholder('tag1, tag2, tag3')
-            .setValue(this.plugin.settings.filterTags)
+            .setValue(this.plugin.settings.filteredTags.join(', '))
             .onChange(async (value) => {
-              // Store tags as a trimmed string, removing empty entries
-              this.plugin.settings.filterTags = value
-                .split(',')
+              this.plugin.settings.filteredTags = value
+                .split(/[,;\n]/) // We are bit more generous with separation characters
                 .map((tag) => tag.trim())
-                .filter((tag) => tag.length > 0)
-                .join(', ');
+                .filter((tag) => tag !== '');
               await this.plugin.saveSettings();
             });
 
