@@ -10,8 +10,13 @@ export function isTrackedReadwiseNote(file: TFile, app: App, settings: PluginSet
 }
 
 // Verify if file is part of the readwise library folder hierarchy
-export function isInReadwiseLibrary(file: TFile, settings: PluginSettings): boolean {
-  const baseFolderName = settings.baseFolderName; // Replace with your actual base folder name
+export function isInReadwiseLibrary(
+  file: TFile | null | undefined,
+  settings: PluginSettings
+): boolean {
+  if (!file) return false;
+  const baseFolderName = settings.baseFolderName?.trim();
+  if (!baseFolderName) return false;
   let currentFolder = file.parent;
 
   while (currentFolder) {
@@ -21,4 +26,5 @@ export function isInReadwiseLibrary(file: TFile, settings: PluginSettings): bool
     currentFolder = currentFolder.parent;
   }
   return false;
+}
 }
