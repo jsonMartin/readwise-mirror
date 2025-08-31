@@ -230,19 +230,21 @@ export default class ReadwiseApi {
     this.logger.debug(`Fetched ids of ${bookIds.length} updated books...`);
 
     if (bookIds.length > 0) {
-      // Build a library which contains *all* highlights, but only for changed books
-      // TODO: An alternative to this would be to keep a local cache of all highlights
-      // and only update the changed ones. This would be more efficient, but also more complex.
-      // For now, this is simpler and should be sufficient for most use cases.
-      const records = (await this.fetchData('export', undefined, bookIds, true)) as Export[];
-      return this.buildLibrary(records);
+      const CHUNK = 100;
+      let merged: Export[] = [];
+      for (let i = 0; i < bookIds.length; i += CHUNK) {
+        const chunk = bookIds.slice(i, i + CHUNK);
+        const page = (await this.fetchData('export', undefined, chunk, true)) as Export[];
+        merged = merged.concat(page);
+      }
+      return this.buildLibrary(merged);
     }
     // Essentially return an empty library
     return this.buildLibrary(recordsUpdated);
   }
 
   /**
-   * Fetch single book from Readwise API
+   * Fetches single book from Readwise API
    * @param bookId - The ID of the book to fetch
    * @returns {Promise<Library>} - Returns a promise that resolves to a Library object
    */
