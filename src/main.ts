@@ -496,7 +496,7 @@ export default class ReadwiseMirror extends Plugin {
 
         let message = `Readwise: Downloaded ${library.highlightCount} Highlights from ${Object.keys(library.books).length} Sources`;
         if (this.settings.filterNotesByTag && this.settings.filteredTags?.length > 0) {
-          message += ` (filtered by tags: ${this.settings.filteredTags})`;
+          message += ` (filtered by tags: ${this.settings.filteredTags.join(', ')})`;
         }
         this.notify.notice(message);
       } else {
