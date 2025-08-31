@@ -77,7 +77,9 @@ Tags: {{ tags }}
   slugifyLowercase: true,
   trackFiles: false,
   trackingProperty: 'uri',
-  deleteDuplicates: false, // Avoid deleting duplicates by default (as this is destructive behavior)
+  trackAcrossVault: false,
+  deleteDuplicates: false,
+  enableFileNameUpdates: false,
   protectFrontmatter: false,
   protectedFields: 'connections\nstatus\ntags',
   updateFrontmatter: true,
@@ -87,6 +89,8 @@ Tags: {{ tags }}
   debugMode: false,
   useCustomFilename: false,
   filenameTemplate: '{{title}}',
+  filterNotesByTag: false,
+  filteredTags: [],
 };
 
 export const FRONTMATTER_TO_ESCAPE = ['title', 'sanitized_title', 'author', 'authorStr'];
@@ -97,3 +101,5 @@ export const EMPTY_FRONTMATTER: string = '---\n---\n';
 export const YAML_TOSTRING_OPTIONS: ToStringOptions = { lineWidth: -1 };
 
 export const AUTHOR_SEPARATORS = /(?:,\s*and\s*)|(?:\s+and\s+)|(?:,\s*)/;
+
+export const READWISE_REVIEW_URL_BASE = 'https://readwise.io/bookreview/';

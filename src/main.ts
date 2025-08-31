@@ -1,6 +1,6 @@
 import slugify from '@sindresorhus/slugify';
 // Constants
-import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS } from 'constants/index';
+import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS, READWISE_REVIEW_URL_BASE } from 'constants/index';
 import filenamify from 'filenamify';
 import { Template } from 'nunjucks';
 import { normalizePath, Plugin, TFile, TFolder } from 'obsidian';
@@ -13,9 +13,11 @@ import { ReadwiseEnvironment } from 'services/readwise-environment';
 import spacetime from 'spacetime';
 // Types
 import type { Export, Highlight, Library, PluginSettings, ReadwiseDocument, ReadwiseFile, Tag } from 'types';
+import { ConfirmDialog } from 'ui/dialog';
 import Notify from 'ui/notify';
 import ReadwiseMirrorSettingTab from 'ui/settings-tab';
 import { createdDate, lastHighlightedDate, updatedDate } from 'utils/highlight-date-utils';
+import { isInReadwiseLibrary, isTrackedReadwiseNote } from 'utils/tracking-utils';
 
 export default class ReadwiseMirror extends Plugin {
   private _settings: PluginSettings;
@@ -119,19 +121,18 @@ export default class ReadwiseMirror extends Plugin {
     });
   }
 
-  private highlightIsDiscarded = (highlight: Highlight) => {
-    // is_discard is not a field in the API response for (https://readwise.io/api/v2/highlights/), so we need to check if the highlight has the discard tag
-    // is_discard field only showing under the /export API endpoint in the API docs: https://readwise.io/api_deets
-
-    return highlight.tags.some((tag) => tag.name === 'discard');
-  };
-
   private filterHighlights(highlights: Highlight[]) {
     return highlights.filter((highlight: Highlight) => {
       if (this.settings.syncNotesOnly && !highlight.note) return false;
 
+      // Check if is deleted
+      if (highlight.is_deleted) {
+        this.logger.debug('Found deleted highlight, removing', highlight);
+        return false;
+      }
+
       // Check if is discarded
-      if (this.settings.highlightDiscard && this.highlightIsDiscarded(highlight)) {
+      if (this.settings.highlightDiscard && highlight.is_discard) {
         this.logger.debug('Found discarded highlight, removing', highlight);
         return false;
       }
@@ -208,7 +209,7 @@ export default class ReadwiseMirror extends Plugin {
 
       const { highlights } = book;
       const num_highlights = highlights.length;
-      this.logger.warn(`Replacing colon with ${this.settings.colonSubstitute}`);
+      this.logger.debug(`Replacing colon with ${this.settings.colonSubstitute}`);
       const sanitizedTitle = this.getFileNameFromDoc(book);
       const contents = `\n- [[${sanitizedTitle}]] *(${num_highlights} highlights)*`;
       logString += contents;
@@ -230,11 +231,14 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   async writeLibraryToMarkdown(library: Library) {
+    this.logger.group('Write Library to Markdown');
     try {
       await this.deduplicatingVaultWriter.createCategoryFolders(library.categories);
     } catch (err) {
       this.logger.error('Failed to create category folders', err);
       this.notify.notice('Readwise: Failed to create category folders. Sync aborted.');
+      this.isSyncing = false;
+      this.logger.groupEnd();
       return;
     }
 
@@ -254,21 +258,15 @@ export default class ReadwiseMirror extends Plugin {
     } catch (err) {
       this.logger.error('Failed to process files batch', err);
       this.notify.notice('Readwise: Failed to process some files during sync.');
+    } finally {
+      this.logger.groupEnd();
+      this.isSyncing = false;
     }
   }
 
   /**
    * Processes a given Readwise library object and generates an array of `ReadwiseFile` objects,
    * each representing a book with its associated highlights and metadata.
-   *
-   * For each book in the library:
-   * - Updates the status bar with progress information.
-   * - Extracts and sanitizes book metadata (title, author, summary, etc.).
-   * - Filters and processes highlights, skipping books with no highlights.
-   * - Aggregates tags from both the book and its highlights.
-   * - Formats author information and highlight data.
-   * - Renders a header and formatted highlights for each book.
-   * - Constructs the final file contents and metadata for export.
    *
    * @param library - The Readwise library object containing books and their highlights.
    * @returns An array of `ReadwiseFile` objects, each containing the filename, document metadata, and file contents.
@@ -302,8 +300,6 @@ export default class ReadwiseMirror extends Plugin {
         book_tags,
       } = book;
 
-      // Get highlight count
-      const num_highlights = highlights.length;
       const created = createdDate(highlights); // No reverse sort: we want the oldest entry
       const updated = updatedDate(highlights);
 
@@ -315,9 +311,11 @@ export default class ReadwiseMirror extends Plugin {
       // Filter highlights
       const filteredHighlights = this.filterHighlights(highlights);
 
+      // Get highlight count from filtered highlights
+      const num_highlights = filteredHighlights.length;
+
       if (filteredHighlights.length === 0) {
         this.logger.debug(`No highlights found for '${title}' (${source_url})`);
-        continue;
       }
 
       // get an array with all tags from highlights
@@ -470,14 +468,41 @@ export default class ReadwiseMirror extends Plugin {
         library = await this._readwiseApi.downloadUpdates(lastUpdated);
       }
 
+      this.logger.group('Filter Library: Deleted and by Tag');
+      this.logger.debug(
+        `Filtering books: deleted ${this.settings.filteredTags ? 'or by tag ' : ''}(${this.settings.filteredTags})`
+      );
+      // Remove deleted books
+      for (const bookId in library.books) {
+        const book = library.books[bookId];
+        if (book.is_deleted) {
+          this.logger.warn(`Removing deleted book: ${book.title} (${book.user_book_id})`);
+          delete library.books[bookId];
+        }
+        if (
+          this.settings.filterNotesByTag &&
+          Array.isArray(this.settings.filteredTags) &&
+          this.settings.filteredTags.length > 0
+        ) {
+          if (book.book_tags.every((tag) => !this.settings.filteredTags.includes(tag.name))) {
+            this.logger.debug(`Removing book not matching filter tags: ${book.title} (${book.user_book_id})`);
+            delete library.books[bookId];
+          }
+        }
+      }
+
+      this.logger.groupEnd();
+
       if (Object.keys(library.books).length > 0) {
-        this.writeLibraryToMarkdown(library);
+        await this.writeLibraryToMarkdown(library);
 
-        if (this.settings.logFile) this.writeLogToMarkdown(library);
+        if (this.settings.logFile) await this.writeLogToMarkdown(library);
 
-        this.notify.notice(
-          `Readwise: Downloaded ${library.highlightCount} Highlights from ${Object.keys(library.books).length} Sources`
-        );
+        let message = `Readwise: Downloaded ${library.highlightCount} Highlights from ${Object.keys(library.books).length} Sources`;
+        if (this.settings.filterNotesByTag && this.settings.filteredTags?.length > 0) {
+          message += ` (filtered by tags: ${this.settings.filteredTags.join(', ')})`;
+        }
+        this.notify.notice(message);
       } else {
         this.notify.notice('Readwise: No new content available');
       }
@@ -526,6 +551,7 @@ export default class ReadwiseMirror extends Plugin {
     const path = `${this.settings.baseFolderName}`;
     const readwiseFolder = vault.getAbstractFileByPath(path);
     if (readwiseFolder && readwiseFolder instanceof TFolder) {
+      this.notify.notice('Readwise: Filename adjustment started');
       // Iterate all files in the Readwise folder and "fix" their names according to the current settings using
       // this.normalizeFilename()
       const renamedFiles = await this.iterativeReadwiseRenamer(readwiseFolder);
@@ -589,7 +615,7 @@ export default class ReadwiseMirror extends Plugin {
     this.logger.info('Reloading settings due to external change');
     await this.loadSettings();
     if (this.settings.lastUpdated)
-      this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()} elsewhere`);
+      this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`);
     if (!this.settings.apiToken) {
       this.notify.notice('Readwise: API Token not detected\nPlease enter in configuration page');
       this.notify.setStatusBarText('Readwise: API Token Required');
@@ -666,7 +692,7 @@ export default class ReadwiseMirror extends Plugin {
       id: 'test',
       name: 'Test Readwise API key',
       callback: async () => {
-        const isTokenValid = await this._readwiseApi.hasValidToken();
+        const isTokenValid = this._readwiseApi.hasValidToken();
         this.notify.notice(`Readwise: ${isTokenValid ? 'Token is valid' : 'INVALID TOKEN'}`);
       },
     });
@@ -686,21 +712,84 @@ export default class ReadwiseMirror extends Plugin {
     this.addCommand({
       id: 'adjust-filenames',
       name: 'Adjust Filenames to current settings',
-      callback: async () => {
-        this.notify.notice('Readwise: Filename adjustment started');
-        await this.handleFilenameAdjustment();
+      checkCallback: (checking: boolean) => {
+        // Only enable if tracking files and filename updates are enabled
+        if (this.settings.trackFiles && this.settings.enableFileNameUpdates) {
+          if (!checking) {
+            this.handleFilenameAdjustment();
+          }
+          return true;
+        }
+        return false;
       },
     });
 
     this.addCommand({
       id: 'update-all-frontmatter',
       name: 'Update all Readwise note frontmatter',
-      callback: async () => {
-        this.notify.notice('Readwise: Updating all note frontmatter...');
-        await this.updateAllFrontmatter();
+      checkCallback: (checking: boolean) => {
+        if (this.settings.frontMatter && this.settings.trackFiles) {
+          if (!checking) {
+            this.updateAllFrontmatter();
+          }
+          return true;
+        }
+        return false;
       },
     });
 
+    // TODO: #73 We could even check if the current note is found on Readwise *before* enabling the command
+    this.addCommand({
+      id: 'update-current-note',
+      name: 'Update current note',
+      checkCallback: (checking: boolean) => {
+        const file = this.app.workspace.getActiveFile();
+        if (!file) return false;
+        const isReadwiseNote = isTrackedReadwiseNote(file, this.app, this.settings);
+        const isInLibrary = isInReadwiseLibrary(file, this.settings);
+
+        // If trackAcrossVault is enabled, only check if it's a Readwise note.
+        // Otherwise, check if it's a Readwise note AND in the Readwise library.
+        const shouldEnable = this.settings.trackAcrossVault ? isReadwiseNote : isReadwiseNote && isInLibrary;
+
+        if (shouldEnable && this.settings.trackFiles) {
+          if (!checking) {
+            this.updateCurrentNote(file);
+          }
+          return true;
+        }
+        return false;
+      },
+    });
+
+    // Special debug command, only enabled if debug mode is active
+    this.addCommand({
+      id: 'reset-last-updated',
+      name: 'Reset lastUpdated setting to 2 months ago (debug)',
+      checkCallback: (checking: boolean) => {
+        if (this.settings.debugMode) {
+          if (!checking) {
+            const d = spacetime.now().subtract(2, 'months');
+            new ConfirmDialog(
+              this.app,
+              'Are you sure?',
+              `Do you really want to reset 'last updated' date to ${spacetime.now().since(d).rounded}?`,
+              (result) => {
+                if (result) {
+                  this.settings.lastUpdated = d.iso();
+                  this.saveSettings();
+                  this.notify.setStatusBarText(`Readwise: lastUpdated reset to ${spacetime.now().since(d).rounded}`);
+                }
+              }
+            ).open();
+          }
+          return true;
+        }
+        return false;
+      },
+    });
+
+    // Update status bar every second if synced
     this.registerInterval(
       window.setInterval(() => {
         if (/Synced/.test(this.notify.getStatusBarText())) {
@@ -732,12 +821,70 @@ export default class ReadwiseMirror extends Plugin {
       return;
     }
 
-    if (!this.settings.frontMatter || !this.settings.trackFiles) {
-      this.notify.notice('Frontmatter can only be updated for tracked files and with frontmatter enabled.');
+    if (!this._readwiseApi?.hasValidToken()) {
+      this.notify.notice('Readwise: Valid API Token Required');
       return;
     }
 
-    if (!(await this._readwiseApi?.hasValidToken())) {
+    this.notify.notice('Readwise: Updating all note frontmatter...');
+    try {
+      this.isSyncing = true;
+
+      this.logger.info('Readwise: downloading full library to update frontmatter...');
+      const library = await this._readwiseApi.downloadFullLibrary();
+
+      // Remove deleted books
+      for (const bookId in library.books) {
+        const book = library.books[bookId];
+        if (book.is_deleted) {
+          this.logger.warn(`Removing deleted book: ${book.title} (${book.user_book_id})`);
+          delete library.books[bookId];
+        }
+        if (
+          this.settings.filterNotesByTag &&
+          Array.isArray(this.settings.filteredTags) &&
+          this.settings.filteredTags.length > 0
+        ) {
+          if (book.book_tags.every((tag) => !this.settings.filteredTags.includes(tag.name))) {
+            this.logger.debug(`Removing book not matching filter tags: ${book.title} (${book.user_book_id})`);
+            delete library.books[bookId];
+          }
+        }
+      }
+
+      const readwiseFiles: ReadwiseFile[] = this.getReadwiseFilesFromLibrary(library);
+      this.logger.group('Frontmatter Update');
+      await this.deduplicatingVaultWriter.processFrontmatter(readwiseFiles);
+      this.logger.groupEnd();
+      let message = `Readwise: Updated ${Object.keys(library.books).length} notes`;
+      if (this.settings.filterNotesByTag && this.settings.filteredTags?.length > 0) {
+        message += ` (filtered by tags: ${this.settings.filteredTags.join(', ')})`;
+      }
+      this.notify.notice(message);
+    } catch (error) {
+      this.logger.error('Error during frontmatter sync:', error);
+      this.notify.notice(`Readwise: Sync failed. ${error}`);
+    } finally {
+      // Make sure we reset the sync status in case of error
+      this.isSyncing = false;
+    }
+  }
+
+  /**
+   * Fetch single book by bookId via downloadSingleBook
+   */
+  async updateCurrentNote(file: TFile = this.app.workspace.getActiveFile()) {
+    if (this.isSyncing) {
+      this.notify.notice('Readwise: update already in progress');
+      return;
+    }
+
+    if (!this.settings.trackFiles) {
+      this.notify.notice('Current note can only be updated when tracking files');
+      return;
+    }
+
+    if (!this._readwiseApi?.hasValidToken()) {
       this.notify.notice('Readwise: Valid API Token Required');
       return;
     }
@@ -745,16 +892,60 @@ export default class ReadwiseMirror extends Plugin {
     try {
       this.isSyncing = true;
 
-      this.notify.notice('Readwise: downloading full library to update frontmatter...');
-      const library = await this._readwiseApi.downloadFullLibrary();
+      // Assuming 'this' is your plugin instance and you want to get metadata for the active file in the editor
+      if (!file) {
+        this.logger.warn('No active file selected in the editor.');
+        return;
+      }
 
-      const readwiseFiles: ReadwiseFile[] = this.getReadwiseFilesFromLibrary(library);
-      this.logger.time('frontmatter.process');
-      await this.deduplicatingVaultWriter.processFrontmatter(readwiseFiles);
-      this.logger.timeEnd('frontmatter.process');
-      this.notify.notice('Readwise: Frontmatter update complete.');
+      const isReadwiseNote = isTrackedReadwiseNote(file, this.app, this.settings);
+      const isInLibrary = isInReadwiseLibrary(file, this.settings);
+
+      // If trackAcrossVault is enabled, only check if it's a Readwise note.
+      // Otherwise, check if it's a Readwise note AND in the Readwise library.
+      const allowUpdate = this.settings.trackAcrossVault ? isReadwiseNote : isReadwiseNote && isInLibrary;
+
+      if (allowUpdate) {
+        this.logger.debug('Readwise: Updating current note...'); // FIXME: Simplify. In theory, we only reach this point of trackingUrl is valid (due to isReadwiseNote checks above) so the following is not needed. The root problem is the double call to getFileCache (here and in isTrackedReadwiseNote()) which should be avoided.
+        const fileCache = this.app.metadataCache.getFileCache(file);
+        const trackingUrl = fileCache?.frontmatter?.[this._settings.trackingProperty];
+        if (typeof trackingUrl !== 'string' || !trackingUrl.startsWith(READWISE_REVIEW_URL_BASE)) {
+          this.notify.notice('Readwise: Tracking URL missing or invalid in current note.');
+          this.logger.warn('Tracking URL missing/invalid for current note.');
+          return;
+        }
+        const idStr = trackingUrl.replace(READWISE_REVIEW_URL_BASE, ''); // Extract the ID from the URL
+        const id = Number.parseInt(idStr, 10);
+
+        if (Number.isNaN(id)) {
+          this.notify.notice(`Readwise: Tracking URL in current note is invalid (ID ${idStr} is not a valid number).`);
+          this.logger.warn(`Tracking URL in current note is invalid (ID ${idStr} is not a valid number).`);
+          return;
+        }
+        this.logger.debug(`Readwise: downloading current book with ID ${id}...`);
+        const library = await this._readwiseApi.downloadSingleBook(id);
+
+        if (Object.keys(library.books).length > 0) {
+          await this.writeLibraryToMarkdown(library);
+
+          if (this.settings.logFile) await this.writeLogToMarkdown(library);
+
+          this.notify.notice('Readwise: Book update complete.');
+        } else {
+          this.notify.notice(`Readwise: Note with id ${id} not found on Readwise.`);
+          this.logger.warn(`Readwise: Note with id ${id} not found on Readwise.`);
+          return;
+        }
+      } else {
+        this.notify.notice(
+          this.settings.trackAcrossVault
+            ? 'Readwise: Current note is not a tracked Readwise note.'
+            : 'Readwise: Current note is not a tracked Readwise note in the Readwise library folder.'
+        );
+        return;
+      }
     } catch (error) {
-      this.logger.error('Error during frontmatter sync:', error);
+      this.logger.error('Error during single-book update:', error);
       this.notify.notice(`Readwise: Sync failed. ${error}`);
     } finally {
       // Make sure we reset the sync status in case of error

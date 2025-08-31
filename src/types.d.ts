@@ -1,5 +1,6 @@
 export interface Export {
   user_book_id: number;
+  is_deleted: boolean;
   title: string;
   author: string;
   readable_title: string;
@@ -18,6 +19,7 @@ export interface Export {
 
 export interface Highlight {
   id: number;
+  is_deleted: boolean;
   text: string;
   note: string;
   location: number;
@@ -29,6 +31,8 @@ export interface Highlight {
   color: string;
   book_id: number;
   tags: Tag[];
+  is_favorite: boolean;
+  is_discard: boolean;
 }
 
 export interface Tag {
@@ -117,7 +121,9 @@ export interface PluginSettings {
   slugifyLowercase: boolean; // Convert slugified names to lowercase
   trackFiles: boolean; // Track files using unique Readwise URLs
   trackingProperty: string; // Frontmatter property for storing tracking URL
+  trackAcrossVault: boolean; // Track files across the entire vault, not just within the base folder
   deleteDuplicates: boolean; // Remove duplicate files instead of marking them
+  enableFileNameUpdates: boolean; // Allow updating of file names
   protectFrontmatter: boolean; // Protect specified frontmatter fields from updates
   protectedFields: string; // List of frontmatter fields to protect
   updateFrontmatter: boolean; // Allow updating of non-protected frontmatter fields
@@ -127,6 +133,8 @@ export interface PluginSettings {
   debugMode: boolean; // Enable debug mode for detailed logging
   useCustomFilename: boolean; // Use custom filename template
   filenameTemplate: string; // Template for generating filenames
+  filterNotesByTag: boolean; // Whether to filter books by tag
+  filteredTags: string[]; // list of tags to include/exclude
 }
 
 export interface YamlStringState {

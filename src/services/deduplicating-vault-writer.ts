@@ -4,6 +4,7 @@ import type { FrontmatterManager } from 'services/frontmatter-manager';
 import type Logger from 'services/logger';
 import type { PluginSettings, ReadwiseDocument, ReadwiseFile } from 'types';
 import type Notify from 'ui/notify';
+import { isInReadwiseLibrary, isTrackedReadwiseNote } from 'utils/tracking-utils';
 import type { Frontmatter } from './frontmatter';
 
 export class DeduplicatingVaultWriter {
@@ -69,6 +70,18 @@ export class DeduplicatingVaultWriter {
     // Filter files by the tracking property
     return files.filter((file) => {
       const metadata = this.app.metadataCache.getFileCache(file);
+      const isTracked = isTrackedReadwiseNote(file, this.app, this.settings);
+      const isInLibrary = isInReadwiseLibrary(file, this.settings);
+
+      // If trackAcrossVault is enabled, only check if it's a Readwise note.
+      // Otherwise, check if it's a Readwise note AND in the Readwise library.
+      const shouldKeep = this.settings.trackAcrossVault ? isTracked : isTracked && isInLibrary;
+
+      if (!shouldKeep) {
+        return false;
+      }
+
+      // Compare the tracking property value to the highlights_url
       return metadata?.frontmatter?.[this.settings.trackingProperty] === doc.highlights_url;
     });
   }
@@ -118,7 +131,8 @@ export class DeduplicatingVaultWriter {
         await this.vault.process(file, () => `${frontmatter.toString()}\n${readwiseFile.contents}`);
       }
 
-      if (readwiseFile.basename !== file.basename) {
+      // We only rename files if the respective settings are enabled and the filenames differ
+      if (this.settings.trackFiles && this.settings.enableFileNameUpdates && readwiseFile.basename !== file.basename) {
         let newPath = this.getNormalizedPath(file.parent.path, `${readwiseFile.basename}.md`);
         const newFileExists = await this.app.vault.adapter.exists(newPath, false);
         if (newFileExists) {

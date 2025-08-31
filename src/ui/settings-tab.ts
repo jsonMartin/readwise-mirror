@@ -12,6 +12,7 @@ import {
 } from 'obsidian';
 import ReadwiseApi, { TokenValidationError } from 'services/readwise-api';
 import type { TemplateValidationResult } from 'types';
+import { WarningDialog } from 'ui/dialog';
 import type Notify from 'ui/notify';
 import { validateFrontmatterTemplate } from 'utils/frontmatter-utils';
 
@@ -383,7 +384,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         createFragment(async (fragment) => {
           fragment.createEl('strong', { text: 'How to authenticate: ' });
           fragment.appendText('Paste your API key from ');
-          fragment.createEl('a', { text: 'readwise.io/access_token', href: 'readwise.io/access_token' });
+          fragment.createEl('a', { text: 'readwise.io/access_token', href: 'https://readwise.io/access_token' });
           fragment.appendText(', or use the "Authenticate with Readwise" button for automatic retrieval of the token.');
           fragment.createEl('br');
           fragment.append(this.tokenValidationMessage);
@@ -399,7 +400,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           if (this.plugin.readwiseApi) {
             try {
               hasValidToken =
-                this.plugin.readwiseApi.hasValidToken() ?? (await this.plugin.readwiseApi.validateToken());
+                this.plugin.readwiseApi.hasValidToken() || (await this.plugin.readwiseApi.validateToken());
 
               if (hasValidToken) this.notify.setStatusBarText('Readwise: Click to Sync');
               this.updateAuthButtons(hasValidToken ? 'valid' : 'invalid');
@@ -467,6 +468,14 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             this.updateAuthButtons('invalid');
           }
         });
+        this.tokenValue.inputEl.onfocus = () => {
+          this.tokenValue.inputEl.type = 'text';
+        };
+        this.tokenValue.inputEl.onblur = () => {
+          if (hasValidToken) {
+            this.tokenValue.inputEl.type = 'password';
+          }
+        };
       })
       .addButton((button) => {
         this.validationButton = button;
@@ -531,6 +540,45 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    // Add new Filter by tag setting
+    new Setting(containerEl)
+      .setName('Filter by tag')
+      .setDesc('Only sync readwise items with specific document tags')
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.filterNotesByTag).onChange(async (value) => {
+          this.plugin.settings.filterNotesByTag = value;
+          // Trigger a refresh of the settings display to show/hide the tags input
+          await this.plugin.saveSettings();
+          this.display();
+        })
+      );
+
+    // Add tags input field (only visible when filterByTag is enabled)
+    if (this.plugin.settings.filterNotesByTag) {
+      new Setting(containerEl)
+        .setName('Tags to include')
+        .setDesc(
+          'Enter tags separated by commas (e.g., important, todo, review). Only readwise items matching ANY of these tags (document level) will be synced.'
+        )
+        .addTextArea((text) => {
+          text
+            .setPlaceholder('tag1, tag2, tag3')
+            .setValue(this.plugin.settings.filteredTags.join(', '))
+            .onChange(async (value) => {
+              this.plugin.settings.filteredTags = value
+                .split(/[,;\n]/) // We are bit more generous with separation characters
+                .map((tag) => tag.trim())
+                .filter((tag) => tag !== '');
+              await this.plugin.saveSettings();
+            });
+
+          // Adjust the height of the text area
+          text.inputEl.rows = 2;
+
+          return text;
+        });
+    }
   }
 
   private renderSyncSettings(containerEl: HTMLElement): void {
@@ -576,7 +624,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Filter discarded highlights')
-      .setDesc('If enabled, do not display discarded highlights in the Readwise library.')
+      .setDesc(
+        'If enabled, do not display discarded highlights in the Readwise library. (Deleted highlights will still be removed on sync)'
+      )
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.highlightDiscard).onChange(async (value) => {
           this.plugin.settings.highlightDiscard = value;
@@ -597,158 +647,6 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       );
   }
 
-  private renderFilenameSettings(containerEl: HTMLElement): void {
-    new Setting(containerEl).setName('Filenames').setHeading();
-
-    new Setting(containerEl)
-      .setName('Use custom filename template')
-      .setDesc(
-        createFragment((fragment) => {
-          fragment.appendText(
-            'Use a custom template to generate filenames. Slugify and colon replacement will be applied after the filename has been generated.'
-          );
-          fragment.createEl('br');
-          fragment.createEl('br');
-          fragment.appendText('Available variables:');
-          fragment.createEl('ul', undefined, (ul) => {
-            ul.createEl('li', { text: '{{title}} - Document title' });
-            ul.createEl('li', { text: '{{author}} - Author name(s)' });
-            ul.createEl('li', {
-              text: '{{category}} - Content type (books, articles, etc)',
-            });
-            ul.createEl('li', { text: '{{source}} - Original content URL' });
-            ul.createEl('li', { text: '{{book_id}} - Unique document ID' });
-            ul.createEl('li', { text: '{{created}} - Created date' });
-            ul.createEl('li', { text: '{{updated}} - Updated date' });
-          });
-          fragment.createEl('br');
-          fragment.appendText('Example: {{ created | date("YYYYMMDDHHMMSS") }}⁝ {{title}} - {{author|trim}}');
-          fragment.createEl('br');
-          fragment.createEl('br');
-          fragment.appendText('Built-in and custom filters:');
-          fragment.createEl('br');
-          fragment.appendText('You can use Nunjucks built-in filters like ');
-          fragment.createEl('code', { text: 'trim' });
-          fragment.appendText(', ');
-          fragment.createEl('code', { text: 'upper' });
-          fragment.appendText(', ');
-          fragment.createEl('code', { text: 'lower' });
-          fragment.appendText(', etc. See the ');
-          const link = fragment.createEl('a', {
-            text: 'Nunjucks documentation',
-            href: 'https://mozilla.github.io/nunjucks/templating.html#builtin-filters',
-          });
-          link.setAttr('target', '_blank');
-          fragment.appendText(' for all available filters.');
-        })
-      )
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.useCustomFilename).onChange(async (value) => {
-          this.plugin.settings.useCustomFilename = value;
-          await this.plugin.saveSettings();
-          this.display();
-        })
-      );
-
-    if (this.plugin.settings.useCustomFilename) {
-      new Setting(containerEl)
-        .setClass('indent')
-        .setName('Filename template')
-        .setDesc('Template used to generate filenames. All special characters will be sanitized.')
-        .addText((text) =>
-          text
-            .setPlaceholder('{{title}}')
-            .setValue(this.plugin.settings.filenameTemplate)
-            .onChange(async (value) => {
-              this.plugin.settings.filenameTemplate = value || '{{title}}';
-              await this.plugin.saveSettings();
-            })
-        );
-    }
-
-    new Setting(containerEl)
-      .setName('Colon replacement in filenames')
-      .setDesc(
-        "Set the string to be used for replacement of colon (:) in filenames derived from the title. The default value for this setting is '-'."
-      )
-      .addText((text) =>
-        text
-          .setPlaceholder('Colon replacement in title')
-          .setValue(this.plugin.settings.colonSubstitute)
-          .onChange(async (value) => {
-            if (!value || /[:<>"/\\|?*]/.test(value)) {
-              this.logger.warn(`Colon replacement: empty or invalid value: ${value}`);
-              this.plugin.settings.colonSubstitute = DEFAULT_SETTINGS.colonSubstitute;
-            } else {
-              this.logger.info(`Colon replacement: setting value: ${value}`);
-              this.plugin.settings.colonSubstitute = value;
-            }
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName('Use slugify for filenames')
-      .setDesc(
-        createFragment((fragment) => {
-          fragment.appendText(
-            'Use slugify to create clean filenames. This removes diacritics and other special characters, including emojis.'
-          );
-          fragment.createEl('br');
-          fragment.createEl('br');
-          fragment.appendText('Example filename: "Déjà Vu with a 🦄"');
-          fragment.createEl('br');
-          fragment.createEl('blockquote', {
-            text: 'Slugify disabled: "Deja Vu with a "',
-          });
-          fragment.createEl('blockquote', {
-            text: 'Slugify enabled (default settings): "deja-vu-with-a"',
-          });
-          fragment.createEl('blockquote', {
-            text: 'Slugify + custom separator "_": "deja_vu_with_a"',
-          });
-          fragment.createEl('blockquote', {
-            text: 'Slugify + lowercase disabled: "Deja-Vu-With-A"',
-          });
-        })
-      )
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.useSlugify).onChange(async (value) => {
-          this.plugin.settings.useSlugify = value;
-          await this.plugin.saveSettings();
-          // Trigger re-render to show/hide property selector
-          this.display();
-        })
-      );
-
-    if (this.plugin.settings.useSlugify) {
-      new Setting(containerEl)
-        .setClass('indent')
-        .setName('Slugify separator')
-        .setDesc('Character to use as separator in slugified filenames (default: -)')
-        .addText((text) =>
-          text
-            .setPlaceholder('-')
-            .setValue(this.plugin.settings.slugifySeparator)
-            .onChange(async (value) => {
-              this.plugin.settings.slugifySeparator = value || '-';
-              await this.plugin.saveSettings();
-            })
-        );
-
-      new Setting(containerEl)
-        .setClass('indent')
-        .setName('Slugify lowercase')
-        .setDesc('Convert slugified filenames to lowercase')
-        .addToggle((toggle) =>
-          toggle.setValue(this.plugin.settings.slugifyLowercase).onChange(async (value) => {
-            this.plugin.settings.slugifyLowercase = value;
-            await this.plugin.saveSettings();
-          })
-        );
-    }
-  }
-
   private renderFileTracking(containerEl: HTMLElement): void {
     new Setting(containerEl).setName('File tracking').setHeading();
 
@@ -757,55 +655,40 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setDesc(
         createFragment((fragment) => {
           fragment.appendText(
-            'Track files using their unique Readwise URL to maintain consistency when titles or properties change.'
+            'Track your Readwise notes using their unique Readwise URL to enable reliable updates and deduplication. See the Wiki: '
           );
-          fragment.createEl('br');
-          fragment.appendText(
-            'This prevents duplicate files and maintains links when articles are updated in Readwise.'
-          );
-          fragment.createEl('br');
-          fragment.createEl('br');
-          fragment.appendText(
-            'Note: The tracking field will automatically be added to the Frontmatter, independent of the "Frontmatter" setting. File tracking works across the whole Obsidian vault. If you move a tracked note outside of the Readwise library, it will still be found by the plugin. Remove the tracking property manually in these notes to sever the tracking.'
-          );
+          fragment
+            .createEl('a', {
+              text: 'File tracking and naming',
+              href: 'https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-File-tracking-and-naming',
+            })
+            .setAttr('target', '_blank');
         })
       )
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.trackFiles).onChange(async (value) => {
           if (!value) {
-            const modal = new Modal(this.app);
-            modal.titleEl.setText('Warning');
-            modal.contentEl.createEl('p', {
-              text: 'Disabling and re-enabling file tracking might lead to loss of consistency in your Obsidian vault if you sync Readwise notes without tracking properties and then re-enable file tracking again. Are you sure you want to continue?',
-            });
+            new WarningDialog(
+              this.app,
+              'Risk of inconsistency',
+              createFragment((fragment) => {
+                fragment.createDiv({
+                  text: 'Disabling file tracking may lead to loss of consistency in your Obsidian vault if you sync Readwise notes without tracking properties and then re-enable file tracking again.',
+                });
+                fragment.createEl('br');
+                fragment.createDiv({ text: 'Are you sure you want to continue?' });
+              }),
 
-            const buttonContainer = modal.contentEl.createDiv();
-            buttonContainer.style.display = 'flex';
-            buttonContainer.style.justifyContent = 'flex-end';
-            buttonContainer.style.gap = '10px';
-            buttonContainer.style.marginTop = '20px';
-
-            const cancelButton = buttonContainer.createEl('button', {
-              text: 'Cancel',
-            });
-            const confirmButton = buttonContainer.createEl('button', {
-              text: 'Confirm',
-            });
-            confirmButton.style.backgroundColor = 'var(--background-modifier-error)';
-
-            cancelButton.onclick = () => {
-              toggle.setValue(true);
-              modal.close();
-            };
-
-            confirmButton.onclick = async () => {
-              this.plugin.settings.trackFiles = value;
-              await this.plugin.saveSettings();
-              this.display();
-              modal.close();
-            };
-
-            modal.open();
+              async (confirmed: boolean) => {
+                if (confirmed) {
+                  this.plugin.settings.trackFiles = false;
+                  await this.plugin.saveSettings();
+                  this.display();
+                } else {
+                  toggle.setValue(true);
+                }
+              }
+            ).open();
           } else {
             this.plugin.settings.trackFiles = value;
             await this.plugin.saveSettings();
@@ -818,9 +701,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       new Setting(containerEl)
         .setClass('indent')
         .setName('Tracking property')
-        .setDesc(
-          'Frontmatter property used to track the unique Readwise URL across syncs (default: uri). This field will be automatically managed in the frontmatter.'
-        )
+        .setDesc('Protected frontmatter property used to track the unique Readwise URL across syncs (default: uri).')
         .addText((text) =>
           text.setValue(this.plugin.settings.trackingProperty).onChange(async (value) => {
             this.plugin.settings.trackingProperty = value || 'uri';
@@ -830,16 +711,47 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
       new Setting(containerEl)
         .setClass('indent')
+        .setName('Track across vault')
+        .setDesc('Track, and update files across your entire vault, and not just inside the Readwise library folder.')
+        .addToggle((toggle) =>
+          toggle.setValue(this.plugin.settings.trackAcrossVault).onChange(async (value) => {
+            if (!value) {
+              new WarningDialog(
+                this.app,
+                'Risk of inconsistency',
+                createFragment((fragment) => {
+                  fragment.createDiv({
+                    text: 'Once enabled, disabling file tracking across the vault may lead to loss of consistency in your Obsidian vault and duplicate notes. Tracked Readwise notes that you previously moved outside the Readwise library folder might be re-created inside the Readwise library. ',
+                  });
+                  fragment.createEl('br');
+                  fragment.createDiv({ text: 'Are you sure you want to continue?' });
+                }),
+                async (confirmed: boolean) => {
+                  if (confirmed) {
+                    this.plugin.settings.trackAcrossVault = false;
+                    await this.plugin.saveSettings();
+                    this.display();
+                  } else {
+                    toggle.setValue(true);
+                  }
+                }
+              ).open();
+            } else {
+              this.plugin.settings.trackAcrossVault = value;
+              await this.plugin.saveSettings();
+              this.display();
+            }
+          })
+        );
+
+      new Setting(containerEl)
+        .setClass('indent')
         .setName('Remove duplicate files')
         .setDesc(
           createFragment((fragment) => {
             fragment.appendText(
-              'When enabled, duplicate files with the same Readwise URL in the tracking property will be removed. Otherwise, they will be marked with duplicate: true in frontmatter.'
+              'Duplicate notes with the same Readwise URL will be removed when enabled. Otherwise, they will be marked with duplicate: true in frontmatter.'
             );
-            fragment.createEl('br');
-            fragment.createEl('blockquote', {
-              text: 'Default: Mark duplicates in frontmatter',
-            });
           })
         )
         .addToggle((toggle) =>
@@ -883,6 +795,123 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             }
           })
         );
+    }
+  }
+
+  private renderFilenameSettings(containerEl: HTMLElement): void {
+    if (this.plugin.settings.trackFiles) {
+      new Setting(containerEl).setName('Filename updates and filename templates').setHeading();
+
+      new Setting(containerEl)
+        .setName('File name updates')
+        .setDesc(
+          createFragment((fragment) => {
+            fragment.appendText('Enable file name updates on sync and customize how filenames are generated.');
+            fragment.createEl('br');
+            fragment.appendText('See the ');
+            fragment
+              .createEl('a', {
+                text: 'File tracking and naming',
+                href: 'https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-File-tracking-and-naming',
+              })
+              .setAttr('target', '_blank');
+            fragment.appendText(' wiki for details.');
+          })
+        )
+        .addToggle((toggle) =>
+          toggle.setValue(this.plugin.settings.enableFileNameUpdates).onChange(async (value) => {
+            this.plugin.settings.enableFileNameUpdates = value;
+            await this.plugin.saveSettings();
+            this.display();
+          })
+        );
+    }
+
+    if (this.plugin.settings.trackFiles && this.plugin.settings.enableFileNameUpdates) {
+      new Setting(containerEl)
+        .setName('Use custom filename template')
+        .setDesc('Enable custom filename templates using Nunjucks variables.')
+        .addToggle((toggle) =>
+          toggle.setValue(this.plugin.settings.useCustomFilename).onChange(async (value) => {
+            this.plugin.settings.useCustomFilename = value;
+            await this.plugin.saveSettings();
+            this.display();
+          })
+        );
+
+      if (this.plugin.settings.useCustomFilename) {
+        new Setting(containerEl)
+          .setClass('indent')
+          .setName('Filename template')
+          .setDesc('Nunjucks template used to generate filenames.')
+          .addText((text) =>
+            text
+              .setPlaceholder('{{title}}')
+              .setValue(this.plugin.settings.filenameTemplate)
+              .onChange(async (value) => {
+                this.plugin.settings.filenameTemplate = value || '{{title}}';
+                await this.plugin.saveSettings();
+              })
+          );
+      }
+
+      new Setting(containerEl)
+        .setName('Colon replacement in filenames')
+        .setDesc('String used to replace colons (:) in filenames.')
+        .addText((text) =>
+          text
+            .setPlaceholder('Colon replacement in title')
+            .setValue(this.plugin.settings.colonSubstitute)
+            .onChange(async (value) => {
+              if (!value || /[:<>"/\\|?*]/.test(value)) {
+                this.logger.warn(`Colon replacement: empty or invalid value: ${value}`);
+                this.plugin.settings.colonSubstitute = DEFAULT_SETTINGS.colonSubstitute;
+              } else {
+                this.logger.info(`Colon replacement: setting value: ${value}`);
+                this.plugin.settings.colonSubstitute = value;
+              }
+              await this.plugin.saveSettings();
+            })
+        );
+
+      new Setting(containerEl)
+        .setName('Use slugify for filenames')
+        .setDesc('Enable slugification to create clean filenames.')
+        .addToggle((toggle) =>
+          toggle.setValue(this.plugin.settings.useSlugify).onChange(async (value) => {
+            this.plugin.settings.useSlugify = value;
+            await this.plugin.saveSettings();
+            // Trigger re-render to show/hide property selector
+            this.display();
+          })
+        );
+
+      if (this.plugin.settings.useSlugify) {
+        new Setting(containerEl)
+          .setClass('indent')
+          .setName('Slugify separator')
+          .setDesc('Character used as separator in slugified filenames.')
+          .addText((text) =>
+            text
+              .setPlaceholder('-')
+              .setValue(this.plugin.settings.slugifySeparator)
+              .onChange(async (value) => {
+                this.plugin.settings.slugifySeparator = value || '-';
+                await this.plugin.saveSettings();
+              })
+          );
+
+        new Setting(containerEl)
+          .setClass('indent')
+          .setName('Slugify lowercase')
+          .setDesc('Convert slugified filenames to lowercase.')
+          .addToggle((toggle) =>
+            toggle.setValue(this.plugin.settings.slugifyLowercase).onChange(async (value) => {
+              this.plugin.settings.slugifyLowercase = value;
+              await this.plugin.saveSettings();
+            })
+          );
+      }
     }
   }
 
@@ -1104,7 +1133,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setDesc(
         createFragment((fragment) => {
           fragment.appendText(
-            'Controls YAML frontmatter metadata. The same variables are available as for the Header template, with specific versions optimised for YAML frontmatter (tags), and escaped values for YAML compatibility.'
+            'Controls YAML frontmatter metadata. The same variables are available as for the Header template, with specific versions optimised for YAML (tags), and escaped values for YAML compatibility.'
           );
         })
       )

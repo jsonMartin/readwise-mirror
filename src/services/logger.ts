@@ -9,6 +9,14 @@ class Logger {
     this.debugMode = debugMode;
   }
 
+  group(label: string): void {
+    if (this.debugMode) console.group(`Readwise Mirror: ${label}`);
+  }
+
+  groupEnd(): void {
+    if (this.debugMode) console.groupEnd();
+  }
+
   setDebugMode(debugMode: boolean): void {
     this.debugMode = debugMode;
   }
@@ -33,8 +41,7 @@ class Logger {
     console.error('Readwise Mirror:', ...messages);
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: console.time accepts any type
-  time(label: string, ...messages: any[]): void {
+  time(label: string): void {
     console.time(`Readwise Mirror: ${label}`);
   }
 
