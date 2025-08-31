@@ -114,68 +114,70 @@ export default class ReadwiseApi {
 
     this.logger.group(`Fetch Data: ${contentType}`);
     this.logger.debug('Fetch parameters:', { lastUpdated, bookId, includeDeleted });
-    while (true) {
-      const queryParams = new URLSearchParams();
-      queryParams.append('page_size', API_PAGE_SIZE.toString());
-      if (lastUpdated && lastUpdated !== '') {
-        queryParams.append('updatedAfter', lastUpdated);
-      }
-      if (bookId) {
-        queryParams.append('ids', bookId.toString());
-      }
-      if (nextPageCursor) {
-        queryParams.append('pageCursor', nextPageCursor);
-      }
-      if (contentType === 'export' && includeDeleted) {
-        queryParams.append('includeDeleted', 'true');
-      }
+    try {
+      while (true) {
+        const queryParams = new URLSearchParams();
+        queryParams.append('page_size', API_PAGE_SIZE.toString());
+        if (lastUpdated && lastUpdated !== '') {
+          queryParams.append('updatedAfter', lastUpdated);
+        }
+        if (bookId) {
+          queryParams.append('ids', bookId.toString());
+        }
+        if (nextPageCursor) {
+          queryParams.append('pageCursor', nextPageCursor);
+        }
+        if (contentType === 'export' && includeDeleted) {
+          queryParams.append('includeDeleted', 'true');
+        }
 
-      // Notify user of progress
-      if (lastUpdated) this.logger.info(`Checking for new content since ${lastUpdated}`);
-      if (bookId) this.logger.debug(`Checking for all highlights on book ID: ${bookId}`);
-      let statusBarText = `Readwise: Fetching ${contentType}`;
-      if (data?.count) statusBarText += ` (${results.length})`;
-      this.notify.setStatusBarText(statusBarText);
+        // Notify user of progress
+        if (lastUpdated) this.logger.info(`Checking for new content since ${lastUpdated}`);
+        if (bookId) this.logger.debug(`Checking for all highlights on book ID: ${bookId}`);
+        let statusBarText = `Readwise: Fetching ${contentType}`;
+        if (data?.count) statusBarText += ` (${results.length})`;
+        this.notify.setStatusBarText(statusBarText);
 
-      // FIXME: When fetching very long period of data, the request might fail due to an URL which is too long (Error 414)
-      const response: RequestUrlResponse = await requestUrl({ url: url + queryParams.toString(), ...this.options });
-      data = response.json;
+        // FIXME: When fetching very long period of data, the request might fail due to an URL which is too long (Error 414)
+        const response: RequestUrlResponse = await requestUrl({ url: url + queryParams.toString(), ...this.options });
+        data = response.json;
 
-      if (!response && response.status !== 429) {
-        this.logger.error(`Failed to fetch data. Status: ${response.status}`);
-        throw new Error(`Failed to fetch data. Status: ${response.status}`);
-      }
+        if (!response && response.status !== 429) {
+          this.logger.error(`Failed to fetch data. Status: ${response.status}`);
+          throw new Error(`Failed to fetch data. Status: ${response.status}`);
+        }
 
-      if (response.status === 429) {
-        // Error handling for rate limit throttling
-        let rateLimitedDelayTime = Number.parseInt(response.headers['Retry-After'], 10) * 1000 + 1000;
-        if (Number.isNaN(rateLimitedDelayTime)) {
-          // Default to a 1-second delay if 'Retry-After' is missing or invalid
-          this.logger.warn("'Retry-After' header is missing or invalid. Defaulting to 1 second delay.");
-          rateLimitedDelayTime = 1000;
+        if (response.status === 429) {
+          // Error handling for rate limit throttling
+          let rateLimitedDelayTime = Number.parseInt(response.headers['Retry-After'], 10) * 1000 + 1000;
+          if (Number.isNaN(rateLimitedDelayTime)) {
+            // Default to a 1-second delay if 'Retry-After' is missing or invalid
+            this.logger.warn("'Retry-After' header is missing or invalid. Defaulting to 1 second delay.");
+            rateLimitedDelayTime = 1000;
+          } else {
+            this.logger.warn(`API Rate Limited, waiting to retry for ${rateLimitedDelayTime}`);
+          }
+          this.notify.setStatusBarText(`Readwise: API Rate Limited, waiting ${rateLimitedDelayTime}`);
+
+          await new Promise((_) => setTimeout(_, rateLimitedDelayTime));
+          this.logger.info('Trying to fetch highlights again...');
+          this.notify.setStatusBarText('Readwise: Attempting to retry...');
         } else {
-          this.logger.warn(`API Rate Limited, waiting to retry for ${rateLimitedDelayTime}`);
+          if (data.results && Array.isArray(data.results)) {
+            results.push(...data.results);
+          } else {
+            this.logger.warn('No results found in the response data.');
+          }
+          nextPageCursor = data.nextPageCursor as string;
+          if (!nextPageCursor) {
+            break;
+          }
+          this.logger.debug(`There are more records left, proceeding to next page: ${data.nextPageCursor}`);
         }
-        this.notify.setStatusBarText(`Readwise: API Rate Limited, waiting ${rateLimitedDelayTime}`);
-
-        await new Promise((_) => setTimeout(_, rateLimitedDelayTime));
-        this.logger.info('Trying to fetch highlights again...');
-        this.notify.setStatusBarText('Readwise: Attempting to retry...');
-      } else {
-        if (data.results && Array.isArray(data.results)) {
-          results.push(...data.results);
-        } else {
-          this.logger.warn('No results found in the response data.');
-        }
-        nextPageCursor = data.nextPageCursor as string;
-        if (!nextPageCursor) {
-          break;
-        }
-        this.logger.debug(`There are more records left, proceeding to next page: ${data.nextPageCursor}`);
       }
+    } finally {
+      this.logger.groupEnd();
     }
-
-    this.logger.groupEnd();
 
     if (results.length > 0) this.logger.info(`Processed ${results.length} total ${contentType} results successfully`);
     return results;
