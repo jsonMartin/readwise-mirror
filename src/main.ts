@@ -490,12 +490,12 @@ export default class ReadwiseMirror extends Plugin {
       this.logger.groupEnd();
 
       if (Object.keys(library.books).length > 0) {
-        this.writeLibraryToMarkdown(library);
+        await this.writeLibraryToMarkdown(library);
 
-        if (this.settings.logFile) this.writeLogToMarkdown(library);
+        if (this.settings.logFile) await this.writeLogToMarkdown(library);
 
         let message = `Readwise: Downloaded ${library.highlightCount} Highlights from ${Object.keys(library.books).length} Sources`;
-        if (this.settings.filterNotesByTag && this.settings.filteredTags) {
+        if (this.settings.filterNotesByTag && this.settings.filteredTags?.length > 0) {
           message += ` (filtered by tags: ${this.settings.filteredTags})`;
         }
         this.notify.notice(message);
