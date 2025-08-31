@@ -29,10 +29,10 @@ The first time this plugin is ran, it will do a full sync, downloading all conte
 
 The plugin can be configured via numerous settings and has different, advanced features that will allow for better integration of your Readwise highlights into your Obsidian vault. Please make sure you read the documentation pages in the [Wiki](https://github.com/jsonMartin/readwise-mirror/wiki/):
 
-*   [**Installation & Setup**](https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-Installation-&-Setup): How to install the Readwise Mirror plugin, authenticating your Readwise account, and performing your first sync.
-*   [**Guide: File Tracking & Naming**](https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-File-tracking-and-naming): Learn how to configure filenames and prevent broken links.
-*   [**Guide: Templating**](https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-Templating): Format your notes exactly how you want them.
-*   [**Guide: Frontmatter Management**](https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-Frontmatter-management): Advanced features for a better experience in Obsidian.
+- [**Installation & Setup**](https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-Installation-&-Setup): How to install the Readwise Mirror plugin, authenticating your Readwise account, and performing your first sync.
+- [**Guide: File Tracking & Naming**](https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-File-tracking-and-naming): Learn how to configure filenames and prevent broken links.
+- [**Guide: Templating**](https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-Templating): Format your notes exactly how you want them.
+- [**Guide: Frontmatter Management**](https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-Frontmatter-management): Advanced features for a better experience in Obsidian.
 
 ### General Settings
 
@@ -61,7 +61,7 @@ Settings related to tracking notes across syncs, renames, and settings related t
 The plugin supports three types of templates for formatting content which can be defined individually.
 
 - **Frontmatter Template**: Defines the template for frontmatter (also called "properties") and how frontmatter is updated and protected across syncs.
-- **Header Template**: Defines the structure and metadata display of the heade of the documents .
+- **Header Template**: Defines the structure and metadata display of the header of the documents.
 - **Highlight Template**: Defines the format of the individual highlights and the way highlights with and without notes are synced into your Obsidian library.
 
 ## Usage
@@ -108,7 +108,7 @@ Please consult [Installation & Setup](https://github.com/jsonMartin/readwise-mir
 
 The plugin uses three template types to format content, all using Nunjucks templating syntax and a set of defined variables for each template type. It also provides filters for Readwise specifics like Q&A, multiple authors in one field, and more. Additionally, it offers features to control filename generation from Readwise titles, track notes when a Readwise title changes, and keep certain properties synced while protecting others. See the [**Templating**](https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-Templating), [**Frontmatter Management**](https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-Frontmatter-management), and [**File Tracking & Naming**](https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-File-tracking-and-naming) guides to learn more.
 
-You also might want to check out some of the advanced [**Recipes**](https://github.com/jsonMartin/readwise-mirror/wiki/Recipes:-Advanced-use-of-the-Readwise-mirror-plugin) to make the best use of the plugin. 
+You also might want to check out some of the advanced [**Recipes**](https://github.com/jsonMartin/readwise-mirror/wiki/Recipes:-Advanced-use-of-the-Readwise-mirror-plugin) to make the best use of the plugin.
 
 ## Special Considerations
 
@@ -148,13 +148,3 @@ Your subsequent syncs will then use the `uri` property to track unique files and
 
 [^1]: You might want to ensure that properties like `author` are omitted from the template as these have a tendency to break frontmatter. Alternatively, you can run a plugin like "Linter" to check and fix all your Readwise notes before upgrading, or you simply remove all properties except `uri` from your template and rebuild it after a successful upgrade.
 [^2]: There are different cases where this can happen. For example, you can manually change Metadata of Reader and Readwise items. Without tracking, this would create a new file during the next sync. With tracking, we can rename the file based on the new metadata, and also based on whatever you chose as custom filename template.
-[^3]: Readwise has a quite elaborate deduplication strategy itself where a number of factors outside of our control define if a new item is created for a highlight or if it ends up being appended to an existing item. It is therefore entirely possible, although usually unlikely, that a Readwise library contains different items of the same type with the same title.
-[^4]: The use of `highlights_url` is a deliberate choice over the `id` value alone, both because, as an URL, it contains a namespace (allowing differention from other ID values) and because it allows the user to jump directly to the Readwise item in question.
-[^5]: If at all possible, it is always better to change mistakes at the source, that is in Readwise itself. If, for example, Readwise has not correctly parsed an author's name, you might want to change this in the metadata in Readwise instead of manually updating (and protecting) the `author` property in Readwise. Nevertheless, there might be use cases where a *sync once, protect afterwards* approach might be useful.
-
-
-
-
-
-
-
