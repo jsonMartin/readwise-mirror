@@ -101,7 +101,7 @@ As a reference for performance, syncing my library of 5,067 Highlights across 92
 
 ## Manual Installation
 
-Please consults [Installation & Setup](https://github.com/jsonMartin/readwise-mirror/wiki/Installation-&-Setup) for instructions how to manually install the plugin.
+Please consult [Installation & Setup](https://github.com/jsonMartin/readwise-mirror/wiki/Installation-&-Setup) for instructions on how to manually install the plugin.
 
 ## Advanced features
 
