@@ -209,7 +209,7 @@ export default class ReadwiseMirror extends Plugin {
 
       const { highlights } = book;
       const num_highlights = highlights.length;
-      this.logger.warn(`Replacing colon with ${this.settings.colonSubstitute}`);
+      this.logger.debug(`Replacing colon with ${this.settings.colonSubstitute}`);
       const sanitizedTitle = this.getFileNameFromDoc(book);
       const contents = `\n- [[${sanitizedTitle}]] *(${num_highlights} highlights)*`;
       logString += contents;
