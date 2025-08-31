@@ -615,7 +615,7 @@ export default class ReadwiseMirror extends Plugin {
     this.logger.info('Reloading settings due to external change');
     await this.loadSettings();
     if (this.settings.lastUpdated)
-      this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()} elsewhere`);
+      this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`);
     if (!this.settings.apiToken) {
       this.notify.notice('Readwise: API Token not detected\nPlease enter in configuration page');
       this.notify.setStatusBarText('Readwise: API Token Required');
@@ -882,10 +882,14 @@ export default class ReadwiseMirror extends Plugin {
       const allowUpdate = this.settings.trackAcrossVault ? isReadwiseNote : isReadwiseNote && isInLibrary;
 
       if (allowUpdate) {
-        this.logger.debug('Readwise: Updating current note...');
-
+        this.logger.debug('Readwise: Updating current note...'); // FIXME: Simplify. In theory, we only reach this point of trackingUrl is valid (due to isReadwiseNote checks above) so the following is not needed. The root problem is the double call to getFileCache (here and in isTrackedReadwiseNote()) which should be avoided.
         const fileCache = this.app.metadataCache.getFileCache(file);
-        const trackingUrl = fileCache.frontmatter[this._settings.trackingProperty];
+        const trackingUrl = fileCache?.frontmatter?.[this._settings.trackingProperty];
+        if (typeof trackingUrl !== 'string' || !trackingUrl.startsWith(READWISE_REVIEW_URL_BASE)) {
+          this.notify.notice('Readwise: Tracking URL missing or invalid in current note.');
+          this.logger.warn('Tracking URL missing/invalid for current note.');
+          return;
+        }
         const id = trackingUrl.replace(READWISE_REVIEW_URL_BASE, ''); // Extract the ID from the URL
 
         this.logger.debug(`Readwise: downloading current book with ID ${id}...`);
@@ -903,11 +907,15 @@ export default class ReadwiseMirror extends Plugin {
           return;
         }
       } else {
-        this.notify.notice('Readwise: Current note is not in Readwise library.');
+        this.notify.notice(
+          this.settings.trackAcrossVault
+            ? 'Readwise: Current note is not a tracked Readwise note.'
+            : 'Readwise: Current note is not a tracked Readwise note in the Readwise library folder.'
+        );
         return;
       }
     } catch (error) {
-      this.logger.error('Error during frontmatter sync:', error);
+      this.logger.error('Error during single-book update:', error);
       this.notify.notice(`Readwise: Sync failed. ${error}`);
     } finally {
       // Make sure we reset the sync status in case of error
