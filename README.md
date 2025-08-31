@@ -21,8 +21,9 @@ The first time this plugin is ran, it will do a full sync, downloading all conte
 - `Delete Readwise library`: Remove the Readwise library file folder from the Obsidian vault
 - `Download entire Readwise library (force)`: Forces a full download of all content from Readwise
 - `Adjust Filenames to current settings`: Clean up filenames of existing notes in your Readwise library folder based on current filename settings (whitespace removal and slugify only for the time being)
-- `Update all readwise note frontmatter`: Scan all notes in your Readwise library folder and update their frontmatter according to your current frontmatter template and protection settings, without changing the note content or filename. This is useful after changing your frontmatter template or protection settings. Command is only available if file tracking and frontmatter are enabled.
-- `Update current note`: Update the currently selected note based on the Readwise tracking property. Command is only available for notes in the Readwise Library folder and when file tracking is enabled. Pro tip: You can use this command to quickly test how changes to templates or the file name properties will impact your notes before you go and rebuild your entire Readwise Library in your Vault.
+`Update all Readwise note frontmatter`: Scan all notes in your Readwise library folder and update their frontmatter according to your current frontmatter template and protection settings, without changing the note content or filename. This is useful after changing your frontmatter template or protection settings. Command is only available if file tracking and frontmatter are enabled.
+
+`Update current note`: Update the currently selected note based on the Readwise tracking property. Command is only available for notes in the Readwise library folder and when file tracking is enabled. Pro tip: Use this to quickly test how changes to templates or filename settings will impact your notes before you rebuild your entire Readwise library in your vault.
 
 ## Settings
 
