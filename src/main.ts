@@ -479,7 +479,11 @@ export default class ReadwiseMirror extends Plugin {
           this.logger.warn(`Removing deleted book: ${book.title} (${book.user_book_id})`);
           delete library.books[bookId];
         }
-        if (this.settings.filterNotesByTag && this.settings.filteredTags.length > 0) {
+        if (
+          this.settings.filterNotesByTag &&
+          Array.isArray(this.settings.filteredTags) &&
+          this.settings.filteredTags.length > 0
+        ) {
           if (book.book_tags.every((tag) => !this.settings.filteredTags.includes(tag.name))) {
             this.logger.debug(`Removing book not matching filter tags: ${book.title} (${book.user_book_id})`);
             delete library.books[bookId];
