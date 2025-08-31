@@ -11,12 +11,6 @@ export class ConfirmDialog extends Modal {
 
     new Setting(this.contentEl)
       .addButton((btn) =>
-        btn.setButtonText('Cancel').onClick(() => {
-          this.close();
-          onSubmit(false);
-        })
-      )
-      .addButton((btn) =>
         btn
           .setButtonText('OK')
           .setCta()
@@ -24,6 +18,12 @@ export class ConfirmDialog extends Modal {
             this.close();
             onSubmit(true);
           })
+      )
+      .addButton((btn) =>
+        btn.setButtonText('Cancel').onClick(() => {
+          this.close();
+          onSubmit(false);
+        })
       );
   }
 }
@@ -38,12 +38,6 @@ export class WarningDialog extends Modal {
     });
 
     new Setting(this.contentEl)
-      .addButton((btn) =>
-        btn.setButtonText('Cancel').onClick(() => {
-          this.close();
-          onSubmit(false);
-        })
-      )
       .addButton((btn) => {
         btn
           .setButtonText('Confirm')
@@ -52,6 +46,12 @@ export class WarningDialog extends Modal {
             this.close();
             onSubmit(true);
           }).buttonEl.style.backgroundColor = 'var(--background-modifier-error)';
-      });
+      })
+      .addButton((btn) =>
+        btn.setButtonText('Cancel').onClick(() => {
+          this.close();
+          onSubmit(false);
+        })
+      );
   }
 }
