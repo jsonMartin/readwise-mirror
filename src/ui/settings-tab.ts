@@ -647,7 +647,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setDesc(
         createFragment((fragment) => {
           fragment.appendText(
-            'Track your Readwise notes using their unique Readwise URL. Used for Check out the Wiki for more info: '
+            'Track your Readwise notes using their unique Readwise URL to enable reliable updates and deduplication. See the Wiki: '
           );
           fragment
             .createEl('a', {
