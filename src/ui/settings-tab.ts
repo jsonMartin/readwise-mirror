@@ -400,7 +400,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           if (this.plugin.readwiseApi) {
             try {
               hasValidToken =
-                this.plugin.readwiseApi.hasValidToken() ?? (await this.plugin.readwiseApi.validateToken());
+                this.plugin.readwiseApi.hasValidToken() || (await this.plugin.readwiseApi.validateToken());
 
               if (hasValidToken) this.notify.setStatusBarText('Readwise: Click to Sync');
               this.updateAuthButtons(hasValidToken ? 'valid' : 'invalid');
