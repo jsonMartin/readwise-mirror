@@ -479,7 +479,7 @@ export default class ReadwiseMirror extends Plugin {
           this.logger.warn(`Removing deleted book: ${book.title} (${book.user_book_id})`);
           delete library.books[bookId];
         }
-        if (this.settings.filterByTag && this.settings.filteredTags.length > 0) {
+        if (this.settings.filterNotesByTag && this.settings.filteredTags.length > 0) {
           if (book.book_tags.every((tag) => !this.settings.filteredTags.includes(tag.name))) {
             this.logger.debug(`Removing book not matching filter tags: ${book.title} (${book.user_book_id})`);
             delete library.books[bookId];
@@ -495,7 +495,7 @@ export default class ReadwiseMirror extends Plugin {
         if (this.settings.logFile) this.writeLogToMarkdown(library);
 
         let message = `Readwise: Downloaded ${library.highlightCount} Highlights from ${Object.keys(library.books).length} Sources`;
-        if (this.settings.filterByTag && this.settings.filteredTags) {
+        if (this.settings.filterNotesByTag && this.settings.filteredTags) {
           message += ` (filtered by tags: ${this.settings.filteredTags})`;
         }
         this.notify.notice(message);

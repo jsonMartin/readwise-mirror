@@ -538,8 +538,8 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setName('Filter by tag')
       .setDesc('Only sync readwise items with specific document tags')
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.filterByTag).onChange(async (value) => {
-          this.plugin.settings.filterByTag = value;
+        toggle.setValue(this.plugin.settings.filterNotesByTag).onChange(async (value) => {
+          this.plugin.settings.filterNotesByTag = value;
           // Trigger a refresh of the settings display to show/hide the tags input
           await this.plugin.saveSettings();
           this.display();
@@ -547,7 +547,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       );
 
     // Add tags input field (only visible when filterByTag is enabled)
-    if (this.plugin.settings.filterByTag) {
+    if (this.plugin.settings.filterNotesByTag) {
       new Setting(containerEl)
         .setName('Tags to include')
         .setDesc(

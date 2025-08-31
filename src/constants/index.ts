@@ -89,7 +89,7 @@ Tags: {{ tags }}
   debugMode: false,
   useCustomFilename: false,
   filenameTemplate: '{{title}}',
-  filterByTag: false,
+  filterNotesByTag: false,
   filteredTags: [],
 };
 

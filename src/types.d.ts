@@ -133,7 +133,7 @@ export interface PluginSettings {
   debugMode: boolean; // Enable debug mode for detailed logging
   useCustomFilename: boolean; // Use custom filename template
   filenameTemplate: string; // Template for generating filenames
-  filterByTag: boolean; // Whether to filter books by tag
+  filterNotesByTag: boolean; // Whether to filter books by tag
   filteredTags: string[]; // list of tags to include/exclude
 }
 
