@@ -38,5 +38,26 @@ export class ReadwiseEnvironment extends Environment {
       const moment = window.moment;
       return moment(date).format(format);
     });
+
+    // Add a filter to normalize author names by removing titles like dr. prof. etc.
+    this.addFilter('normalize_author', (author: string | string[]) => {
+      const authorArray = [];
+      if (typeof author === 'string') {
+        // create an array with the single string element
+        authorArray.push(author);
+      } else if (Array.isArray(author)) {
+        // use the array as is
+        authorArray.push(...author);
+      } else {
+        // if it's neither a string nor an array, return as is
+        return author;
+      }
+      return authorArray.map((a) =>
+        a
+          .replace(/\b(dr|drs|prof|professor|sir|lord|lady|dame|ms|miss|mrs|mr|mx)\b\.?/gi, '')
+          .replace(/\s+/g, ' ')
+          .trim()
+      );
+    });
   }
 }
