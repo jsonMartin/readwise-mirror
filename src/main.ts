@@ -460,11 +460,13 @@ export default class ReadwiseMirror extends Plugin {
       const lastUpdated = this.settings.lastUpdated;
 
       if (!lastUpdated) {
-        this.notify.notice('Readwise: Previous sync not detected...\nDownloading full Readwise library');
+        if (this.settings.syncNotifications)
+          this.notify.notice('Readwise: Previous sync not detected...\nDownloading full Readwise library');
         library = await this._readwiseApi.downloadFullLibrary();
       } else {
-        // Load Upadtes and cache
-        this.notify.notice(`Readwise: Checking for new updates since ${this.lastUpdatedHumanReadableFormat()}`);
+        // Load Updates and cache
+        if (this.settings.syncNotifications)
+          this.notify.notice(`Readwise: Checking for new updates since ${this.lastUpdatedHumanReadableFormat()}`);
         library = await this._readwiseApi.downloadUpdates(lastUpdated);
       }
 
@@ -502,9 +504,9 @@ export default class ReadwiseMirror extends Plugin {
         if (this.settings.filterNotesByTag && this.settings.filteredTags?.length > 0) {
           message += ` (filtered by tags: ${this.settings.filteredTags.join(', ')})`;
         }
-        this.notify.notice(message);
+        if (this.settings.syncNotifications) this.notify.notice(message);
       } else {
-        this.notify.notice('Readwise: No new content available');
+        if (this.settings.syncNotifications) this.notify.notice('Readwise: No new content available');
       }
 
       this.settings.lastUpdated = new Date().toISOString();
@@ -513,6 +515,7 @@ export default class ReadwiseMirror extends Plugin {
     } catch (error) {
       this.logger.error('Error during sync:', error);
       this.notify.notice(`Readwise: Sync failed. ${error}`);
+      this.notify.setStatusBarText(`Readwise: Sync error ${error}`);
     } finally {
       // Make sure we reset the sync status in case of error
       this.isSyncing = false;
@@ -531,9 +534,9 @@ export default class ReadwiseMirror extends Plugin {
     await this.saveSettings();
 
     if (await this.deleteLibraryFolder()) {
-      this.notify.notice('Readwise: library folder deleted');
+      if (this.settings.syncNotifications) this.notify.notice('Readwise: library folder deleted');
     } else {
-      this.notify.notice('Readwise: Error deleting library folder');
+      if (this.settings.syncNotifications) this.notify.notice('Readwise: Error deleting library folder');
     }
 
     this.notify.setStatusBarText('Readwise: Click to Sync');
@@ -930,7 +933,7 @@ export default class ReadwiseMirror extends Plugin {
 
           if (this.settings.logFile) await this.writeLogToMarkdown(library);
 
-          this.notify.notice('Readwise: Book update complete.');
+          if (this.settings.syncNotifications) this.notify.notice('Readwise: Book update complete.');
         } else {
           this.notify.notice(`Readwise: Note with id ${id} not found on Readwise.`);
           this.logger.warn(`Readwise: Note with id ${id} not found on Readwise.`);

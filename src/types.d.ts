@@ -112,6 +112,7 @@ export interface PluginSettings {
   colonSubstitute: string; // String to replace colons in filenames
   logFile: boolean; // Whether to save sync logs to a file
   logFileName: string; // Name of the sync log file
+  syncNotifications: boolean; // Show Obsidian notifications during sync
   frontMatter: boolean; // Whether to include YAML frontmatter in notes
   frontMatterTemplate: string; // Template for YAML frontmatter content
   headerTemplate: string; // Template for document header content

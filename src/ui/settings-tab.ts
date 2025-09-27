@@ -916,7 +916,17 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
   }
 
   private renderSyncLogging(containerEl: HTMLElement): void {
-    new Setting(containerEl).setName('Sync logging').setHeading();
+    new Setting(containerEl).setName('Sync notifications and logging').setHeading();
+
+    new Setting(containerEl)
+      .setName('Display sync notifications')
+      .setDesc('Display Obsidian notifications during sync operations')
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.syncNotifications).onChange(async (value) => {
+          this.plugin.settings.syncNotifications = value;
+          await this.plugin.saveSettings();
+        })
+      );
 
     new Setting(containerEl)
       .setName('Sync log')

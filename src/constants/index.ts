@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   colonSubstitute: '-',
   logFile: true,
   logFileName: 'Sync.md',
+  syncNotifications: true,
   frontMatter: false,
   frontMatterTemplate: `---
 id: {{ id }}
