@@ -20,7 +20,7 @@ export function validateFrontmatterTemplate(template: string): {
   error?: string;
   preview?: string;
 } {
-  const renderedTemplate = new Template(template, new ReadwiseEnvironment(), null, true).render(
+  const renderedTemplate = new Template(template, ReadwiseEnvironment.Instance, null, true).render(
     escapeMetadata(sampleMetadata, FRONTMATTER_TO_ESCAPE)
   );
   const yamlContent = renderedTemplate.replace(Frontmatter.REGEX, '$2');

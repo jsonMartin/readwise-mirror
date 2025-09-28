@@ -54,7 +54,7 @@ export default class ReadwiseMirror extends Plugin {
 
   set headerTemplate(template: string) {
     try {
-      this._headerTemplate = new Template(template, new ReadwiseEnvironment(), null, true);
+      this._headerTemplate = new Template(template, ReadwiseEnvironment.Instance, null, true);
     } catch (error) {
       this.logger.error('Error setting header template:', error);
       this.notify.notice('Readwise: Error setting header template. Check console for details.');
@@ -63,7 +63,7 @@ export default class ReadwiseMirror extends Plugin {
 
   set highlightTemplate(template: string) {
     try {
-      this._highlightTemplate = new Template(template, new ReadwiseEnvironment(), null, true);
+      this._highlightTemplate = new Template(template, ReadwiseEnvironment.Instance, null, true);
     } catch (error) {
       this.logger.error('Error setting highlight template:', error);
       this.notify.notice('Readwise: Error setting highlight template. Check console for details.');
@@ -389,7 +389,7 @@ export default class ReadwiseMirror extends Plugin {
         created: createdDate(book.highlights),
         updated: updatedDate(book.highlights),
       };
-      filename = new Template(template, new ReadwiseEnvironment(), null, true).render(context);
+      filename = new Template(template, ReadwiseEnvironment.Instance, null, true).render(context);
     } else {
       filename = book.title;
     }

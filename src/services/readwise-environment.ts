@@ -6,6 +6,16 @@ import { type ConfigureOptions, Environment, type ILoaderAny } from 'nunjucks';
  * Extends the base Environment to add custom filters for formatting content
  */
 export class ReadwiseEnvironment extends Environment {
+  private static _instance: ReadwiseEnvironment;
+
+  public static get Instance() {
+    // Do you need arguments? Make it a regular static method instead.
+    if (!ReadwiseEnvironment._instance) {
+      ReadwiseEnvironment._instance = new ReadwiseEnvironment();
+    }
+    return ReadwiseEnvironment._instance;
+  }
+
   constructor(loader?: ILoaderAny | ILoaderAny[] | null, opts?: ConfigureOptions) {
     super(loader, { ...opts, autoescape: false });
     this.setupFilters();

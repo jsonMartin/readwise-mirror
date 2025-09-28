@@ -56,7 +56,7 @@ export class FrontmatterManager {
       this.logger.debug(`Processing merged frontmatter template\n${mergedTemplate}`);
 
       // Render and parse the template into YAML
-      const template = new Template(mergedTemplate, new ReadwiseEnvironment(), null, true);
+      const template = new Template(mergedTemplate, ReadwiseEnvironment.Instance, null, true);
       const renderedTemplate = template
         .render(escapeMetadata(metadata, FRONTMATTER_TO_ESCAPE))
         .replace(Frontmatter.REGEX, '$2');
