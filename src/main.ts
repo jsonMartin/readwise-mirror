@@ -670,7 +670,7 @@ export default class ReadwiseMirror extends Plugin {
         .validateToken()
         .then((isValid) => {
           if (isValid && this.settings.autoSync) {
-            this.notify.notice('Readwise: Run auto sync on startup');
+            if (this.settings.syncNotifications) this.notify.notice('Readwise: Run auto sync on startup');
             this.sync();
           }
         })
