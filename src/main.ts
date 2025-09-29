@@ -185,7 +185,8 @@ export default class ReadwiseMirror extends Plugin {
       location_type,
     } = highlight;
 
-    const locationUrl = `https://readwise.io/to_kindle?action=open&asin=${book.asin}&location=${location}`;
+    const locationUrl =
+      book.asin && location ? `https://readwise.io/to_kindle?action=open&asin=${book.asin}&location=${location}` : null;
 
     const formattedTags = tags.filter((tag) => tag.name !== color);
     const formattedTagStr = this.formatTags(formattedTags);
