@@ -94,56 +94,6 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   /**
-   * Initialize custom filters for the Readwise environment
-   */
-  private setupFilters(): void {
-    // Convert newlines to blockquotes
-    this._env.addFilter('bq', (str: string) => {
-      if (typeof str !== 'string') return str;
-      return str.replace(/\r|\n|\r\n/g, '\r\n> ');
-    });
-
-    // Test if string contains .qa
-    this._env.addFilter('is_qa', (str: string) => {
-      if (typeof str !== 'string') return false;
-      return str.includes('.qa');
-    });
-
-    // Convert .qa format to Q&A format
-    this._env.addFilter('qa', (str: string) => {
-      if (typeof str !== 'string') return str;
-      return str.replace(/\.qa(.*)\?(.*)/g, '**Q:**$1?\r\n\r\n**A:**$2');
-    });
-
-    // Add a date filter
-    this._env.addFilter('date', (date: Moment, format: string) => {
-      const moment = window.moment;
-      return moment(date).format(format);
-    });
-
-    // Add a filter to normalize author names by removing titles like dr. prof. etc.
-    this._env.addFilter('normalize_author', (author: string | string[]) => {
-      const authorArray = [];
-      if (typeof author === 'string') {
-        // create an array with the single string element
-        authorArray.push(author);
-      } else if (Array.isArray(author)) {
-        // use the array as is
-        authorArray.push(...author);
-      } else {
-        // if it's neither a string nor an array, return as is
-        return author;
-      }
-      return authorArray.map((a) =>
-        a
-          .replace(/\b(dr|drs|prof|professor|sir|lord|lady|dame|ms|miss|mrs|mr|mx)\b\.?/gi, '')
-          .replace(/\s+/g, ' ')
-          .trim()
-      );
-    });
-  }
-
-  /**
    * Formats tags for use in a template
    * @param tags - The tags to format
    * @param nohash - Whether to remove the hash from the tag name
