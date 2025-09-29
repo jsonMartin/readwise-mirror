@@ -3,9 +3,8 @@
  */
 
 import { FRONTMATTER_TO_ESCAPE } from 'constants/index';
-import { Template } from 'nunjucks';
+import type { Environment } from 'nunjucks';
 import { Frontmatter } from 'services/frontmatter';
-import { ReadwiseEnvironment } from 'services/readwise-environment';
 import { sampleMetadata } from 'test/sample-data';
 import type { ReadwiseDocument, YamlEscapeOptions, YamlStringState } from 'types';
 import * as YAML from 'yaml';
@@ -15,14 +14,15 @@ import * as YAML from 'yaml';
  * @param template - Frontmatter template to validate
  * @returns Validation result
  */
-export function validateFrontmatterTemplate(template: string): {
+export function validateFrontmatterTemplate(
+  env: Environment,
+  template: string
+): {
   isValidYaml: boolean;
   error?: string;
   preview?: string;
 } {
-  const renderedTemplate = new Template(template, ReadwiseEnvironment.Instance, null, true).render(
-    escapeMetadata(sampleMetadata, FRONTMATTER_TO_ESCAPE)
-  );
+  const renderedTemplate = env.renderString(template, escapeMetadata(sampleMetadata, FRONTMATTER_TO_ESCAPE));
   const yamlContent = renderedTemplate.replace(Frontmatter.REGEX, '$2');
   try {
     YAML.parse(yamlContent);

@@ -1,21 +1,44 @@
 import type { Moment } from 'moment';
-import { type ConfigureOptions, Environment, type ILoaderAny } from 'nunjucks';
+import { type ConfigureOptions, Environment, type ILoader, type ILoaderAny, Loader, type LoaderSource } from 'nunjucks';
+
+/**
+ * Template name to source mapping for ReadwiseLoader
+ */
+interface ReadwiseTemplates {
+  [key: string]: string;
+}
+/**
+ * Custom Nunjucks Loader for Readwise templates
+ * Extends the base Loader to load templates from a provided mapping "in memory"
+ */
+export class ReadwiseLoader extends Loader implements ILoader {
+  constructor(private templates: ReadwiseTemplates = {}) {
+    super();
+  }
+
+  public setSource(name: string, src: string): void {
+    this.templates[name] = src;
+    this.emit('update', name);
+  }
+
+  public getSource(name: string): LoaderSource | null {
+    // Custom logic to retrieve the template source by name
+    if (this.templates[name]) {
+      return {
+        src: this.templates[name],
+        path: name,
+        noCache: true,
+      };
+    }
+    return null;
+  }
+}
 
 /**
  * Custom Nunjucks environment with Readwise-specific filters
  * Extends the base Environment to add custom filters for formatting content
  */
 export class ReadwiseEnvironment extends Environment {
-  private static _instance: ReadwiseEnvironment;
-
-  public static get Instance() {
-    // Do you need arguments? Make it a regular static method instead.
-    if (!ReadwiseEnvironment._instance) {
-      ReadwiseEnvironment._instance = new ReadwiseEnvironment();
-    }
-    return ReadwiseEnvironment._instance;
-  }
-
   constructor(loader?: ILoaderAny | ILoaderAny[] | null, opts?: ConfigureOptions) {
     super(loader, { ...opts, autoescape: false });
     this.setupFilters();

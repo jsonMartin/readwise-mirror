@@ -1002,7 +1002,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         toggle.setValue(this.plugin.settings.frontMatter).onChange(async (value) => {
           // Test template with sample data
           try {
-            const { isValidYaml, error } = validateFrontmatterTemplate(this.plugin.settings.frontMatterTemplate);
+            const { isValidYaml, error } = validateFrontmatterTemplate(
+              this.plugin.env,
+              this.plugin.settings.frontMatterTemplate
+            );
             if ((value && isValidYaml) || !value) {
               // Save settings and update the template
               this.plugin.settings.frontMatter = value;
@@ -1256,6 +1259,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         // Display rendered template on load
         try {
           const validationResult: TemplateValidationResult = validateFrontmatterTemplate(
+            this.plugin.env,
             this.plugin.settings.frontMatterTemplate
           );
           updatePreview(validationResult);
@@ -1272,7 +1276,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
           const noticeEl = containerEl.querySelector('#validation-notice');
           try {
-            const validationResult: TemplateValidationResult = validateFrontmatterTemplate(value);
+            const validationResult: TemplateValidationResult = validateFrontmatterTemplate(this.plugin.env, value);
 
             // Update validation notice
             if (noticeEl) {

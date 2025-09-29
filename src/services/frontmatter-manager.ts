@@ -1,9 +1,8 @@
 import { EMPTY_FRONTMATTER, FRONTMATTER_TO_ESCAPE } from 'constants/index';
-import { Template } from 'nunjucks';
+import { type Environment, Template } from 'nunjucks';
 import type { FrontMatterCache, TFile } from 'obsidian';
 import { Frontmatter, FrontmatterError } from 'services/frontmatter';
 import type Logger from 'services/logger';
-import { ReadwiseEnvironment } from 'services/readwise-environment';
 import type { PluginSettings, ReadwiseDocument } from 'types';
 import { escapeMetadata } from 'utils/frontmatter-utils';
 import * as YAML from 'yaml';
@@ -11,7 +10,8 @@ import * as YAML from 'yaml';
 export class FrontmatterManager {
   constructor(
     private readonly settings: PluginSettings,
-    private readonly logger: Logger
+    private readonly logger: Logger,
+    private readonly env: Environment
   ) {}
 
   /**
@@ -56,7 +56,7 @@ export class FrontmatterManager {
       this.logger.debug(`Processing merged frontmatter template\n${mergedTemplate}`);
 
       // Render and parse the template into YAML
-      const template = new Template(mergedTemplate, ReadwiseEnvironment.Instance, null, true);
+      const template = new Template(mergedTemplate, this.env, null, true);
       const renderedTemplate = template
         .render(escapeMetadata(metadata, FRONTMATTER_TO_ESCAPE))
         .replace(Frontmatter.REGEX, '$2');

@@ -1,15 +1,15 @@
 import slugify from '@sindresorhus/slugify';
 // Constants
-import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS, READWISE_REVIEW_URL_BASE } from 'constants/index';
+import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS, NUNJUCKS_CORE_TEMPLATE, READWISE_REVIEW_URL_BASE } from 'constants/index';
 import filenamify from 'filenamify';
-import { Template } from 'nunjucks';
-import { normalizePath, Plugin, TFile, TFolder } from 'obsidian';
+import type { Moment } from 'moment';
+import { type App, normalizePath, Plugin, type PluginManifest, TFile, TFolder } from 'obsidian';
 import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
 import { FrontmatterManager } from 'services/frontmatter-manager';
 // Plugin classes
 import Logger from 'services/logger';
 import ReadwiseApi from 'services/readwise-api';
-import { ReadwiseEnvironment } from 'services/readwise-environment';
+import { ReadwiseEnvironment, ReadwiseLoader } from 'services/readwise-environment';
 import spacetime from 'spacetime';
 // Types
 import type { Export, Highlight, Library, PluginSettings, ReadwiseDocument, ReadwiseFile, Tag } from 'types';
@@ -22,13 +22,32 @@ import { isInReadwiseLibrary, isTrackedReadwiseNote } from 'utils/tracking-utils
 export default class ReadwiseMirror extends Plugin {
   private _settings: PluginSettings;
   private _readwiseApi: ReadwiseApi;
-  private _headerTemplate: Template;
-  private _highlightTemplate: Template;
+  private _templates: { [key: string]: string } = {};
+  private _loader: ReadwiseLoader;
+  private _env: ReadwiseEnvironment;
   private _logger: Logger;
   private notify: Notify;
   private isSyncing = false;
   private frontmatterManager: FrontmatterManager;
   private deduplicatingVaultWriter: DeduplicatingVaultWriter;
+
+  constructor(app: App, manifest: PluginManifest) {
+    super(app, manifest);
+
+    // Set new custom Environment using our custom loader
+    this._loader = new ReadwiseLoader();
+    this._env = new ReadwiseEnvironment(this._loader, { autoescape: false });
+  }
+
+  // Add getter for environment
+  get env() {
+    return this._env;
+  }
+
+  // Add getter for loader
+  get loader() {
+    return this._loader;
+  }
 
   // Add logger getter
   get logger() {
@@ -54,7 +73,9 @@ export default class ReadwiseMirror extends Plugin {
 
   set headerTemplate(template: string) {
     try {
-      this._headerTemplate = new Template(template, ReadwiseEnvironment.Instance, null, true);
+      // Update and try to compile
+      this._loader.setSource('header', template);
+      this._env.getTemplate('header', true);
     } catch (error) {
       this.logger.error('Error setting header template:', error);
       this.notify.notice('Readwise: Error setting header template. Check console for details.');
@@ -63,11 +84,63 @@ export default class ReadwiseMirror extends Plugin {
 
   set highlightTemplate(template: string) {
     try {
-      this._highlightTemplate = new Template(template, ReadwiseEnvironment.Instance, null, true);
+      // Update and try to compile
+      this._loader.setSource('highlight', template);
+      this._env.getTemplate('highlight', true);
     } catch (error) {
       this.logger.error('Error setting highlight template:', error);
       this.notify.notice('Readwise: Error setting highlight template. Check console for details.');
     }
+  }
+
+  /**
+   * Initialize custom filters for the Readwise environment
+   */
+  private setupFilters(): void {
+    // Convert newlines to blockquotes
+    this._env.addFilter('bq', (str: string) => {
+      if (typeof str !== 'string') return str;
+      return str.replace(/\r|\n|\r\n/g, '\r\n> ');
+    });
+
+    // Test if string contains .qa
+    this._env.addFilter('is_qa', (str: string) => {
+      if (typeof str !== 'string') return false;
+      return str.includes('.qa');
+    });
+
+    // Convert .qa format to Q&A format
+    this._env.addFilter('qa', (str: string) => {
+      if (typeof str !== 'string') return str;
+      return str.replace(/\.qa(.*)\?(.*)/g, '**Q:**$1?\r\n\r\n**A:**$2');
+    });
+
+    // Add a date filter
+    this._env.addFilter('date', (date: Moment, format: string) => {
+      const moment = window.moment;
+      return moment(date).format(format);
+    });
+
+    // Add a filter to normalize author names by removing titles like dr. prof. etc.
+    this._env.addFilter('normalize_author', (author: string | string[]) => {
+      const authorArray = [];
+      if (typeof author === 'string') {
+        // create an array with the single string element
+        authorArray.push(author);
+      } else if (Array.isArray(author)) {
+        // use the array as is
+        authorArray.push(...author);
+      } else {
+        // if it's neither a string nor an array, return as is
+        return author;
+      }
+      return authorArray.map((a) =>
+        a
+          .replace(/\b(dr|drs|prof|professor|sir|lord|lady|dame|ms|miss|mrs|mr|mx)\b\.?/gi, '')
+          .replace(/\s+/g, ' ')
+          .trim()
+      );
+    });
   }
 
   /**
@@ -92,7 +165,7 @@ export default class ReadwiseMirror extends Plugin {
    * Formats a highlight for use in a template
    * @param highlight - The highlight to format
    * @param book - The book the highlight belongs to
-   * @returns The formatted highlight
+   * @returns The highlight object for the template
    */
   private formatHighlight(highlight: Highlight, book: Export) {
     const { id, text, note, location, color, url, tags, highlighted_at, created_at, updated_at } = highlight;
@@ -102,7 +175,7 @@ export default class ReadwiseMirror extends Plugin {
     const formattedTags = tags.filter((tag) => tag.name !== color);
     const formattedTagStr = this.formatTags(formattedTags);
 
-    return this._highlightTemplate.render({
+    return this._env.render('highlight', {
       // Highlight fields
       id,
       text,
@@ -354,13 +427,16 @@ export default class ReadwiseMirror extends Plugin {
         hl_tags_nohash: this.formatTags(highlightTags, true, "'"),
       };
 
-      // Render header, and highlights
-      const headerContents = this._headerTemplate.render(doc);
-      const formattedHighlights = this.sortHighlights(filteredHighlights)
-        .map((highlight: Highlight) => this.formatHighlight(highlight, book))
-        .join('\n');
-
-      const contents = `${headerContents}${formattedHighlights}`;
+      // Render header, and highlights by rendering the core template
+      this._loader.setSource('file', NUNJUCKS_CORE_TEMPLATE);
+      const contents = this._env.render('file', {
+        // We pass the doc (current Readwise document) and book (Export) for access to all fields
+        doc,
+        book,
+        highlights: this.sortHighlights(filteredHighlights),
+        headerTemplate: 'header',
+        highlightTemplate: 'highlight',
+      });
 
       readwiseFiles.push({
         basename,
@@ -389,7 +465,8 @@ export default class ReadwiseMirror extends Plugin {
         created: createdDate(book.highlights),
         updated: updatedDate(book.highlights),
       };
-      filename = new Template(template, ReadwiseEnvironment.Instance, null, true).render(context);
+      this._loader.setSource('filename', template);
+      filename = this._env.render('filename', context);
     } else {
       filename = book.title;
     }
@@ -645,7 +722,7 @@ export default class ReadwiseMirror extends Plugin {
 
     this.notify = new Notify(statusBarItem);
 
-    this.frontmatterManager = new FrontmatterManager(this.settings, this.logger);
+    this.frontmatterManager = new FrontmatterManager(this.settings, this.logger, this._env);
 
     this.headerTemplate = this.settings.headerTemplate;
     this.highlightTemplate = this.settings.highlightTemplate;
