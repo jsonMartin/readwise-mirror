@@ -168,20 +168,40 @@ export default class ReadwiseMirror extends Plugin {
    * @returns The highlight object for the template
    */
   private formatHighlight(highlight: Highlight, book: Export) {
-    const { id, text, note, location, color, url, tags, highlighted_at, created_at, updated_at } = highlight;
+    const {
+      id,
+      text,
+      note,
+      location,
+      color,
+      url,
+      tags,
+      highlighted_at,
+      created_at,
+      updated_at,
+      is_deleted,
+      is_discard,
+      is_favorite,
+      location_type,
+    } = highlight;
 
     const locationUrl = `https://readwise.io/to_kindle?action=open&asin=${book.asin}&location=${location}`;
 
     const formattedTags = tags.filter((tag) => tag.name !== color);
     const formattedTagStr = this.formatTags(formattedTags);
 
-    return this._env.render('highlight', {
+    return {
       // Highlight fields
+      book_id: book.user_book_id,
       id,
       text,
       note,
       location,
-      location_url: locationUrl,
+      location_type,
+      locationUrl,
+      is_deleted,
+      is_discard,
+      is_favorite,
       url, // URL is set for source of highlight (webpage, tweet, etc). null for books
       color,
       created_at: created_at ? this.formatDate(created_at) : '',
@@ -191,7 +211,7 @@ export default class ReadwiseMirror extends Plugin {
 
       // Book fields
       category: book.category,
-    });
+    };
   }
 
   private filterHighlights(highlights: Highlight[]) {
@@ -433,7 +453,7 @@ export default class ReadwiseMirror extends Plugin {
         // We pass the doc (current Readwise document) and book (Export) for access to all fields
         doc,
         book,
-        highlights: this.sortHighlights(filteredHighlights),
+        highlights: this.sortHighlights(filteredHighlights).map((hl) => this.formatHighlight(hl, book)),
         headerTemplate: 'header',
         highlightTemplate: 'highlight',
       });

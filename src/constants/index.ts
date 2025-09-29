@@ -129,14 +129,11 @@ export const NUNJUCKS_CORE_TEMPLATE = `
   {#- Render each highlight using the highlight template #}
   {#- The parent context (book) is available in the highlight template #}
   {#- We have to set the variables here as context for the highlight template #}
-    {%- macro locationUrl(book, highlight) %}
-      https://readwise.io/to_kindle?action=open&asin={{ book.asin }}&location={{ highlight.id }}
-    {% endmacro %}
     {%- set id = highlight.id %}
     {%- set text = highlight.text %}
     {%- set note = highlight.note %}
     {%- set location = highlight.location %}
-    {%- set location_url = locationUrl(book, highlight) %}
+    {%- set locationUrl = highlight.locationUrl %}
     {%- set url = highlight.url %}
     {%- set color = highlight.color %}
     {%- set created_at = highlight.created_at | date("YYYY-MM-DD") %}
