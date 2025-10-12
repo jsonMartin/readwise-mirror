@@ -1,9 +1,9 @@
-import { EMPTY_FRONTMATTER, FRONTMATTER_TO_ESCAPE } from 'constants/index';
+import { EMPTY_FRONTMATTER, FRONTMATTER_TO_ESCAPE, READWISE_URI_FIELD } from 'constants/index';
 import { type Environment, Template } from 'nunjucks';
 import type { FrontMatterCache, TFile } from 'obsidian';
 import { Frontmatter, FrontmatterError } from 'services/frontmatter';
 import type Logger from 'services/logger';
-import type { PluginSettings, ReadwiseDocument } from 'types';
+import type { AtomicFile, BaseFile, PluginSettings, ReadwiseDocument } from 'types';
 import { escapeMetadata } from 'utils/frontmatter-utils';
 import * as YAML from 'yaml';
 
@@ -16,23 +16,55 @@ export class FrontmatterManager {
 
   /**
    * Get updated and merged frontmatter based on a document's existing frontmatter
-   * @param doc - Document to process
+   * @param file - Document to process
    * @param frontmatterCache? - Existing frontmatter cache (optional)
    * @returns
    */
-  public getFrontmatter(doc: ReadwiseDocument, frontmatterCache?: FrontMatterCache): Frontmatter {
+  public getFrontmatter(file: BaseFile | AtomicFile, frontmatterCache?: FrontMatterCache): Frontmatter {
     try {
-      const currentFrontmatter = new Frontmatter(frontmatterCache);
-      const updates = this.getRawFrontmatter(doc);
+      /**
+       * We treat this differently by type
+       * - The BaseFile *updates* existing frontmatter from the Cache
+       * - The AtomicFile *updates* the parent frontmatter with its own template
+       **/
 
-      if (currentFrontmatter.keys().length > 0) {
-        const filteredUpdates = this.settings.protectFrontmatter ? this.filterProtectedFrontmatter(updates) : updates;
-        currentFrontmatter.merge(filteredUpdates);
-      } else {
-        currentFrontmatter.merge(updates);
+      switch (file.type) {
+        case 'base': {
+          const currentFrontmatter = new Frontmatter(frontmatterCache);
+          const updatedFrontmatter = this.getBaseFrontmatter(file.doc);
+
+          // Add tracking property
+          if (this.settings.trackFiles)
+            updatedFrontmatter.set(this.settings.trackingProperty, file.doc[READWISE_URI_FIELD]);
+          if (currentFrontmatter.keys().length > 0) {
+            const filteredUpdates = this.settings.protectFrontmatter
+              ? this.filterProtectedFrontmatter(updatedFrontmatter)
+              : updatedFrontmatter;
+            return currentFrontmatter.merge(filteredUpdates);
+          }
+
+          return currentFrontmatter.merge(updatedFrontmatter);
+        }
+        case 'atom': {
+          let atomicFrontmatter = this.getBaseFrontmatter(file.doc);
+          const currentFrontmatter = Frontmatter.fromString(file.frontmatter);
+          const highlight = file.doc.highlights.find((highlight) => highlight.id === file.id);
+
+          if (currentFrontmatter.keys().length > 0) {
+            const filteredUpdates = this.settings.protectFrontmatter
+              ? this.filterProtectedFrontmatter(currentFrontmatter)
+              : currentFrontmatter;
+
+            atomicFrontmatter = atomicFrontmatter.merge(filteredUpdates);
+          }
+
+          // Get readwise_url by finding the highlight with the corresponding ID
+          atomicFrontmatter.set(this.settings.trackingProperty, highlight[READWISE_URI_FIELD]);
+          atomicFrontmatter.set('parent', file.doc[READWISE_URI_FIELD]);
+
+          return atomicFrontmatter;
+        }
       }
-
-      return currentFrontmatter;
     } catch (error) {
       throw new FrontmatterError('Failed to update frontmatter', error);
     }
@@ -43,20 +75,19 @@ export class FrontmatterManager {
    * @param metadata - The metadata to process
    * @returns The frontmatter record
    */
-  public getRawFrontmatter(metadata: ReadwiseDocument): Frontmatter {
+  public getBaseFrontmatter(metadata: ReadwiseDocument): Frontmatter {
     // Render a template if frontmatter is managed or file tracking is set
     if (!this.settings.frontMatter && !this.settings.trackFiles) {
       return new Frontmatter();
     }
     try {
       // Get frontmatter template string
-      const frontMatterTemplate = this.settings.frontMatter ? this.settings.frontMatterTemplate : EMPTY_FRONTMATTER;
       // Add Sync properties
-      const mergedTemplate = this.addSyncPropertiesToTemplate(frontMatterTemplate);
-      this.logger.debug(`Processing merged frontmatter template\n${mergedTemplate}`);
+      const frontmatterTemplate = this.settings.frontMatter ? this.settings.frontMatterTemplate : EMPTY_FRONTMATTER;
+      this.logger.debug(`Processing merged frontmatter template\n${frontmatterTemplate}`);
 
       // Render and parse the template into YAML
-      const template = new Template(mergedTemplate, this.env, null, true);
+      const template = new Template(frontmatterTemplate, this.env, null, true);
       const renderedTemplate = template
         .render(escapeMetadata(metadata, FRONTMATTER_TO_ESCAPE))
         .replace(Frontmatter.REGEX, '$2');
@@ -86,6 +117,9 @@ export class FrontmatterManager {
       .split('\n')
       .map((f) => f.trim())
       .filter(Boolean);
+
+    // Push the tracking property as well
+    if (this.settings.trackFiles) protectedFields.push(this.settings.trackingProperty);
 
     // Using static methods from Frontmatter class
     return Frontmatter.fromEntries(updates.entries().filter(([key]) => !protectedFields.includes(key)));
@@ -121,7 +155,7 @@ export class FrontmatterManager {
 
       if (!this.isValidFrontmatter(start, end)) return template;
 
-      const trackingProperty = `${this.settings.trackingProperty}: {{ highlights_url }}`;
+      const trackingProperty = `${this.settings.trackingProperty}: {{ ${READWISE_URI_FIELD} }}`;
       return this.insertTrackingProperty(lines, end, trackingProperty);
     } catch (error) {
       throw new FrontmatterError('Failed to add sync properties', error);

@@ -12,7 +12,7 @@
  */
 
 import * as nunjucks from 'nunjucks';
-import type { Atom, AtomizeOptions, ReadwiseFile } from 'types';
+import type { Atom, AtomizeOptions, BaseFile } from 'types';
 import type { CallExtension, Context, Parser } from '../nunjucks-parser';
 
 /**
@@ -43,11 +43,12 @@ export class Atomizer {
    */
 
   // biome-ignore lint/suspicious/noExplicitAny: Context can be any object
-  atomize(_contents: string, ctx: Record<string, any>): ReadwiseFile {
+  atomize(_contents: string, ctx: Record<string, any>): BaseFile {
     // Create a new ReadwiseDocument from the atomized content
 
     const contents = this._env.renderString(_contents, ctx);
     return {
+      type: 'base',
       basename: ctx.basename,
       doc: ctx.doc,
       contents,
@@ -116,15 +117,12 @@ export class AtomizeExtension implements nunjucks.Extension {
     args: AtomizeOptions,
     body: () => string
   ): nunjucks.runtime.SafeString {
-    const { id, parent, basename, embed } = args;
+    const { id, basename, embed } = args;
 
     // Validate the arguments as follows:
     // - id and parent are required and must be non-empty numbers
     if (Number.isNaN(id) || id <= 0) {
       throw new Error(`Invalid parameter in atomizer template, 'id' must be a positive number. ${id}`);
-    }
-    if (Number.isNaN(parent) || parent <= 0) {
-      throw new Error(`Invalid parameter in atomizer template, 'parent' must be a positive number. ${parent}`);
     }
 
     // Extract frontmatter (if present)
@@ -138,7 +136,6 @@ export class AtomizeExtension implements nunjucks.Extension {
 
     const atom: Atom = {
       id,
-      parent,
       basename,
       content,
       frontmatter,
@@ -158,6 +155,6 @@ export class AtomizeExtension implements nunjucks.Extension {
    */
   runFrontmatter(_context: Context, frontmatter: () => string): nunjucks.runtime.SafeString {
     // Simply wrap the frontmatter body in identifiable tags
-    return new nunjucks.runtime.SafeString(`FRONTMATTER:START\n${frontmatter().trim()}\nFRONTMATTER:END`);
+    return new nunjucks.runtime.SafeString(`FRONTMATTER:START\n---\n${frontmatter().trim()}\n---\nFRONTMATTER:END`);
   }
 }

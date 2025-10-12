@@ -598,6 +598,73 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
   private renderHighlightSettings(containerEl: HTMLElement): void {
     new Setting(containerEl).setName('Highlight organization').setHeading();
 
+    // Add atomic highlights setting with tracking dependency
+    new Setting(containerEl)
+      .setName('Enable atomic highlights')
+      .setDesc(
+        createFragment((fragment) => {
+          fragment.appendText('Allows creation of atomic highlights & notes. Please check the documentation on the ');
+          fragment
+            .createEl('a', {
+              text: 'Wiki',
+              href: 'https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-Atomic-highlights',
+            })
+            .setAttr('target', '_blank');
+          fragment.appendText(' for details.');
+
+          if (!this.plugin.settings.trackFiles) {
+            fragment.createEl('br');
+            fragment.createEl('br');
+            fragment.createSpan({
+              text: 'Requires file tracking to be enabled.',
+              attr: { style: 'color: var(--text-error);' },
+            });
+          }
+        })
+      )
+      .addToggle((toggle) => {
+        // Disable and turn off if tracking is disabled
+        if (!this.plugin.settings.trackFiles) {
+          toggle.setValue(false);
+          toggle.setDisabled(true);
+          this.plugin.settings.atomicHighlights = false;
+        } else {
+          toggle.setValue(this.plugin.settings.atomicHighlights).onChange(async (value) => {
+            if (value) {
+              new WarningDialog(
+                this.app,
+                'Enable atomic highlights',
+                createFragment((fragment) => {
+                  fragment.createDiv({
+                    text: 'Enabling atomic highlights will create individual note files for each highlight in your vault.',
+                  });
+                  fragment.createEl('br');
+                  fragment.createDiv({
+                    text: 'This can lead to the creation of many new files. Please make sure you understand how atomic highlights work before continuing.',
+                  });
+                  fragment.createEl('br');
+                  fragment.createDiv({
+                    text: 'Would you like to proceed?',
+                  });
+                }),
+                async (confirmed: boolean) => {
+                  if (confirmed) {
+                    this.plugin.settings.atomicHighlights = true;
+                    await this.plugin.saveSettings();
+                  } else {
+                    toggle.setValue(false);
+                  }
+                }
+              ).open();
+            } else {
+              this.plugin.settings.atomicHighlights = false;
+              await this.plugin.saveSettings();
+            }
+          });
+        }
+        return toggle;
+      });
+
     new Setting(containerEl)
       .setName('Sort highlights from oldest to newest')
       .setDesc(
@@ -1173,7 +1240,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               ['tags_nohash', 'Tags without # prefix (compatible with frontmatter)'],
               ['highlight_tags', 'Tags from highlights with # prefix'],
               ['hl_tags_nohash', 'Tags from highlights without # prefix (compatible with frontmatter)'],
-              ['highlights_url', 'Readwise URL (auto-injected if file tracking enabled)'],
+              ['highlights_url, readwise_url', 'Readwise URL (auto-injected if file tracking enabled)'],
               [
                 'Note:',
                 'If file tracking is enabled, the specified tracking property will be automatically added or updated in the frontmatter template, independent of the frontmatter settings.',
@@ -1342,7 +1409,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           ['summary', 'Document summary'],
           ['document_note', 'Additional notes'],
           ['num_highlights', 'Number of highlights'],
-          ['highlights_url', 'Readwise URL'],
+          ['highlights_url, readwise_url', 'Readwise URL'],
           ['source_url', 'Original content URL'],
           ['unique_url', 'Unique identifier URL'],
           ['created/updated/last_highlight_at', 'Timestamps'],

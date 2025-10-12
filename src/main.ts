@@ -3,6 +3,7 @@ import slugify from '@sindresorhus/slugify';
 import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS, NUNJUCKS_CORE_TEMPLATE, READWISE_REVIEW_URL_BASE } from 'constants/index';
 import filenamify from 'filenamify';
 import { type App, normalizePath, Plugin, type PluginManifest, TFile, TFolder } from 'obsidian';
+import { Atomizer } from 'services/atomizer';
 import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
 import { FrontmatterManager } from 'services/frontmatter-manager';
 // Plugin classes
@@ -11,7 +12,7 @@ import ReadwiseApi from 'services/readwise-api';
 import { ReadwiseEnvironment, ReadwiseLoader } from 'services/readwise-environment';
 import spacetime from 'spacetime';
 // Types
-import type { Export, Highlight, Library, PluginSettings, ReadwiseDocument, ReadwiseFile, Tag } from 'types';
+import type { BaseFile, Export, Highlight, Library, PluginSettings, ReadwiseDocument, Tag } from 'types';
 import { ConfirmDialog } from 'ui/dialog';
 import Notify from 'ui/notify';
 import ReadwiseMirrorSettingTab from 'ui/settings-tab';
@@ -123,6 +124,7 @@ export default class ReadwiseMirror extends Plugin {
       location,
       color,
       url,
+      readwise_url,
       tags,
       highlighted_at,
       created_at,
@@ -152,6 +154,7 @@ export default class ReadwiseMirror extends Plugin {
       is_discard,
       is_favorite,
       url, // URL is set for source of highlight (webpage, tweet, etc). null for books
+      readwise_url,
       color,
       created_at: created_at ? this.formatDate(created_at) : '',
       updated_at: updated_at ? this.formatDate(updated_at) : '',
@@ -272,6 +275,7 @@ export default class ReadwiseMirror extends Plugin {
     }
   }
 
+  // Write a library of Readwise books to markdown files
   async writeLibraryToMarkdown(library: Library) {
     this.logger.group('Write Library to Markdown');
     try {
@@ -285,7 +289,7 @@ export default class ReadwiseMirror extends Plugin {
     }
 
     // Prepare all files first
-    const readwiseFiles: ReadwiseFile[] = this.getReadwiseFilesFromLibrary(library);
+    const readwiseFiles: BaseFile[] = this.getReadwiseFilesFromLibrary(library);
 
     if (readwiseFiles.length === 0) {
       this.logger.info('No eligible Readwise files to process (all highlights filtered out). Skipping write.');
@@ -313,8 +317,8 @@ export default class ReadwiseMirror extends Plugin {
    * @param library - The Readwise library object containing books and their highlights.
    * @returns An array of `ReadwiseFile` objects, each containing the filename, document metadata, and file contents.
    */
-  private getReadwiseFilesFromLibrary(library: Library): ReadwiseFile[] {
-    const readwiseFiles: ReadwiseFile[] = [];
+  private getReadwiseFilesFromLibrary(library: Library): BaseFile[] {
+    const readwiseFiles: BaseFile[] = [];
 
     // Get total number of records
     const booksTotal = Object.keys(library.books).length;
@@ -374,7 +378,7 @@ export default class ReadwiseMirror extends Plugin {
 
       const doc: ReadwiseDocument = {
         id: user_book_id,
-        highlights_url: readwise_url,
+        readwise_url,
         unique_url,
         source_url,
         title,
@@ -407,13 +411,23 @@ export default class ReadwiseMirror extends Plugin {
         highlightTemplate: 'highlight',
       });
 
-      readwiseFiles.push({
-        basename,
-        doc,
-        contents,
-      });
+      // Atomize only when enabled and when trackFiles is enabled as well
+      if (this.settings.atomicHighlights && this.settings.trackFiles) {
+        // It is a bit "hacky" to use the atomizer for this
+        const atomizer = new Atomizer();
+        const atomized: BaseFile = atomizer.atomize(contents, { basename, doc, book });
+        this.logger.debug(`Atomized ${atomized.atoms.length} highlights for '${title}' (${source_url})`);
+        readwiseFiles.push(atomized);
+      } else {
+        readwiseFiles.push({
+          type: 'base',
+          basename,
+          doc,
+          contents,
+        });
+      }
+      return readwiseFiles;
     }
-    return readwiseFiles;
   }
 
   /**
@@ -542,6 +556,10 @@ export default class ReadwiseMirror extends Plugin {
       this.logger.groupEnd();
 
       if (Object.keys(library.books).length > 0) {
+        if (this.settings.atomicHighlights) {
+          library.categories.add('Highlight');
+        }
+
         await this.writeLibraryToMarkdown(library);
 
         if (this.settings.logFile) await this.writeLogToMarkdown(library);
@@ -901,7 +919,7 @@ export default class ReadwiseMirror extends Plugin {
         }
       }
 
-      const readwiseFiles: ReadwiseFile[] = this.getReadwiseFilesFromLibrary(library);
+      const readwiseFiles: BaseFile[] = this.getReadwiseFilesFromLibrary(library);
       this.logger.group('Frontmatter Update');
       await this.deduplicatingVaultWriter.processFrontmatter(readwiseFiles);
       this.logger.groupEnd();
@@ -975,6 +993,9 @@ export default class ReadwiseMirror extends Plugin {
         const library = await this._readwiseApi.downloadSingleBook(id);
 
         if (Object.keys(library.books).length > 0) {
+          if (this.settings.atomicHighlights) {
+            library.categories.add('Highlight');
+          }
           await this.writeLibraryToMarkdown(library);
 
           if (this.settings.logFile) await this.writeLogToMarkdown(library);

@@ -2,6 +2,7 @@ import type { PluginSettings } from 'types';
 import type { ToStringOptions } from 'yaml';
 
 export const DEFAULT_SETTINGS: PluginSettings = {
+  atomicHighlights: false,
   baseFolderName: 'Readwise',
   apiToken: null,
   lastUpdated: null,
@@ -102,7 +103,7 @@ export const NUNJUCKS_CORE_TEMPLATE = `
 {%- block header %}
 {#- Render the header using the header template #}
 {%- set id = doc.id %}
-{%- set highlights_url = doc.highlights_url %}
+{%- set highlights_url = doc.readwise_url %}
 {%- set unique_url = doc.unique_url %}
 {%- set source_url = doc.source_url %}
 {%- set title = doc.title %}
@@ -150,3 +151,4 @@ export const NUNJUCKS_CORE_TEMPLATE = `
 export const YAML_TOSTRING_OPTIONS: ToStringOptions = { lineWidth: -1 };
 export const AUTHOR_SEPARATORS = /(?:,\s*and\s*)|(?:\s+and\s+)|(?:,\s*)/;
 export const READWISE_REVIEW_URL_BASE = 'https://readwise.io/bookreview/';
+export const READWISE_URI_FIELD = 'readwise_url';
