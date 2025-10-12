@@ -63,6 +63,7 @@ export interface ReadwiseFile {
   path?: string; // The full path including category
   doc: ReadwiseDocument;
   contents: string; // Rendered contents of the file
+  atoms?: Atom[]; // Optional array of atoms if the file is atomized
 }
 /**
  *  is the metadata of a book from the Readwise API,
@@ -136,6 +137,7 @@ export interface PluginSettings {
   filenameTemplate: string; // Template for generating filenames
   filterNotesByTag: boolean; // Whether to filter books by tag
   filteredTags: string[]; // list of tags to include/exclude
+  atomicHighlights: boolean; // Whether to use atomic highlights
 }
 
 export interface YamlStringState {
@@ -153,4 +155,20 @@ export interface TemplateValidationResult {
   isValidtemplate?: boolean;
   error?: string;
   preview?: string;
+}
+
+export interface AtomizeOptions {
+  id: number;
+  parent: number;
+  basename: string;
+  embed: boolean;
+}
+
+export interface Atom {
+  id: number; // ID (of the highlight, if applicable, or whatever you want to use as ID)
+  parent: number;
+  content: string;
+  basename?: string;
+  frontmatter?: string;
+  isEmbedded?: boolean;
 }
