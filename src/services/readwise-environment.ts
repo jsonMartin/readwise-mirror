@@ -1,5 +1,6 @@
 import { type ConfigureOptions, Environment, type ILoader, type ILoaderAny, Loader, type LoaderSource } from 'nunjucks';
 import { moment } from 'obsidian';
+import { escapeValue } from 'utils/frontmatter-utils';
 
 /**
  * Template name to source mapping for ReadwiseLoader
@@ -90,6 +91,37 @@ export class ReadwiseEnvironment extends Environment {
           .replace(/\s+/g, ' ')
           .trim()
       );
+    });
+
+    this.addFilter('fme', (value: string | string[], multiline?: boolean) => {
+      // Escape frontmatter values
+      if (multiline) {
+        if (typeof value !== 'string') {
+          const ret: string[] = [];
+          value.forEach((v, index, ret) => {
+            // DSS
+            if (index === 0) {
+              // Add multiline indicator to YAML
+              ret.push(' |-\n');
+            }
+            ret.push(`  ${v}`);
+          });
+
+          return ret;
+        }
+
+        // Create multi-line YAML
+        return ` |-\n  ${value.replace(/\r|\n|\r\n/g, '\r\n  ')}`;
+      }
+
+      if (Array.isArray(value)) {
+        return value.map((item) => (typeof item === 'string' ? escapeValue(item) : item));
+      }
+
+      if (typeof value === 'string') {
+        return escapeValue(value);
+      }
+      return value;
     });
   }
 }

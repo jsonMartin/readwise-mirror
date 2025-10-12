@@ -87,7 +87,7 @@ function formatMultilineString(value: string): string {
  * @param value - Value to escape
  * @param options - Escape options
  */
-function escapeValue(value: string, { multiline = false }: YamlEscapeOptions = {}): string {
+export function escapeValue(value: string, { multiline = false }: YamlEscapeOptions = {}): string {
   if (!value) return '""';
   if (analyzeString(value).isValueEscapedAlready) return value;
 
