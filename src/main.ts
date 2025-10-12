@@ -2,7 +2,6 @@ import slugify from '@sindresorhus/slugify';
 // Constants
 import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS, NUNJUCKS_CORE_TEMPLATE, READWISE_REVIEW_URL_BASE } from 'constants/index';
 import filenamify from 'filenamify';
-import type { Moment } from 'moment';
 import { type App, normalizePath, Plugin, type PluginManifest, TFile, TFolder } from 'obsidian';
 import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
 import { FrontmatterManager } from 'services/frontmatter-manager';

@@ -1,5 +1,5 @@
-import type { Moment } from 'moment';
 import { type ConfigureOptions, Environment, type ILoader, type ILoaderAny, Loader, type LoaderSource } from 'nunjucks';
+import { moment } from 'obsidian';
 
 /**
  * Template name to source mapping for ReadwiseLoader
@@ -67,8 +67,7 @@ export class ReadwiseEnvironment extends Environment {
     });
 
     // Add a date filter
-    this.addFilter('date', (date: Moment, format: string) => {
-      const moment = window.moment;
+    this.addFilter('date', (date: moment.MomentInput, format: string) => {
       return moment(date).format(format);
     });
 
