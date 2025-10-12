@@ -28,6 +28,7 @@ export interface Highlight {
   created_at: string;
   updated_at: string;
   url: string | null;
+  readwise_url: string;
   color: string;
   book_id: number;
   tags: Tag[];
@@ -51,20 +52,32 @@ export interface Library {
 }
 
 /**
- * Represents a file that is pending to be written to the vault.
+ * Represents a base file that is pending to be written to the vault.
  *
  * @property basename - The basename of the file to write (consistent with TFile class)
  * @property doc - The Readwise document metadata
  * @property contents - The contents of the file to write
  * @property path - The full path including category
  */
-export interface ReadwiseFile {
-  basename: string; // The basename of the file to write (consistent with TFile class)
-  path?: string; // The full path including category
+interface ReadwiseFile {
+  type: 'base' | 'atom';
+  basename: string;
   doc: ReadwiseDocument;
-  contents: string; // Rendered contents of the file
+  contents: string;
+}
+
+export interface BaseFile extends ReadwiseFile {
+  type: 'base';
+  path?: string; // The full path including category
   atoms?: Atom[]; // Optional array of atoms if the file is atomized
 }
+
+export interface AtomicFile extends ReadwiseFile {
+  type: 'atom';
+  id: number; // ID of the atom (the highlight ID)
+  frontmatter?: string; // Rendered additional frontmatter of the atom file
+}
+
 /**
  *  is the metadata of a book from the Readwise API,
  * formatted for use in the nunjucks templates.
@@ -73,7 +86,7 @@ export interface ReadwiseFile {
  */
 export interface ReadwiseDocument {
   id: number; // book id from Readwise API
-  highlights_url: string; // Readwise URL for the highlights page (unique across readwise)
+  readwise_url: string; // Readwise URL for the highlights page (unique across readwise)
   unique_url: string; // Readwise URL for the book page (unique across readwise)
   source_url: string; // URL of the book on the source website
   title: string;
@@ -166,7 +179,6 @@ export interface AtomizeOptions {
 
 export interface Atom {
   id: number; // ID (of the highlight, if applicable, or whatever you want to use as ID)
-  parent: number;
   content: string;
   basename?: string;
   frontmatter?: string;
