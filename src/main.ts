@@ -21,7 +21,6 @@ import { isInReadwiseLibrary, isTrackedReadwiseNote } from 'utils/tracking-utils
 export default class ReadwiseMirror extends Plugin {
   private _settings: PluginSettings;
   private _readwiseApi: ReadwiseApi;
-  private _templates: { [key: string]: string } = {};
   private _loader: ReadwiseLoader;
   private _env: ReadwiseEnvironment;
   private _logger: Logger;
