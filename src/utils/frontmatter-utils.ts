@@ -136,14 +136,12 @@ export function escapeMetadata(metadata: ReadwiseDocument, fieldsToProcess: Arra
       const key = field as keyof ReadwiseDocument;
       const value = processedMetadata[key];
 
-      const escapeStringValue = (str: string) => escapeValue(str);
-
       if (Array.isArray(value)) {
         (processedMetadata[key] as unknown) = value.map((item) =>
-          typeof item === 'string' ? escapeStringValue(item) : item
+          typeof item === 'string' ? escapeValue(item) : item
         );
       } else if (typeof value === 'string') {
-        (processedMetadata[key] as unknown) = escapeStringValue(value);
+        (processedMetadata[key] as unknown) = escapeValue(value);
       }
     }
   }
