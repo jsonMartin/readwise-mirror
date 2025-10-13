@@ -425,8 +425,8 @@ export default class ReadwiseMirror extends Plugin {
           contents,
         });
       }
-      return readwiseFiles;
     }
+    return readwiseFiles;
   }
 
   /**
