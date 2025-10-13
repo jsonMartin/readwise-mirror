@@ -1,3 +1,4 @@
+import { YAML_INDENT } from 'constants/index';
 import { type ConfigureOptions, Environment, type ILoader, type ILoaderAny, Loader, type LoaderSource } from 'nunjucks';
 import { moment } from 'obsidian';
 import { escapeValue } from 'utils/frontmatter-utils';
@@ -95,6 +96,7 @@ export class ReadwiseEnvironment extends Environment {
 
     this.addFilter('fme', (value: string | string[], multiline?: boolean) => {
       // Escape frontmatter values
+      // FIXME: Automatically detect multiline, "escaleValue" can handle it
       if (multiline) {
         if (typeof value !== 'string') {
           const ret: string[] = [];
@@ -104,22 +106,22 @@ export class ReadwiseEnvironment extends Environment {
               // Add multiline indicator to YAML
               ret.push(' |-\n');
             }
-            ret.push(`  ${v}`);
+            ret.push(`${YAML_INDENT}${v}`);
           });
 
           return ret;
         }
 
         // Create multi-line YAML
-        return ` |-\n  ${value.replace(/\r|\n|\r\n/g, '\r\n  ')}`;
+        return ` ${escapeValue(value, { multiline: true })}`;
       }
 
       if (Array.isArray(value)) {
-        return value.map((item) => (typeof item === 'string' ? escapeValue(item) : item));
+        return value.map((item) => (typeof item === 'string' ? ` ${escapeValue(item)}` : item));
       }
 
       if (typeof value === 'string') {
-        return escapeValue(value);
+        return ` ${escapeValue(value)}`;
       }
       return value;
     });
