@@ -1,6 +1,7 @@
 import slugify from '@sindresorhus/slugify';
 import filenamify from 'filenamify';
 import { normalizePath } from 'obsidian';
+import type { PluginSettings } from 'types';
 
 /**
  *  Normalizes the filename by replacing critical characters
@@ -8,14 +9,15 @@ import { normalizePath } from 'obsidian';
  * @param filename - The filename to normalize
  * @returns The normalized filename
  */
-export function normalizeFilename(filename: string) {
-  const normalizedFilename = this.settings.useSlugify
-    ? slugify(filename.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
-        separator: this.settings.slugifySeparator,
-        lowercase: this.settings.slugifyLowercase,
+export function normalizeFilename(filename: string, settings: PluginSettings) {
+  const { useSlugify, colonSubstitute, slugifySeparator, slugifyLowercase } = settings;
+  const normalizedFilename = useSlugify
+    ? slugify(filename.replace(/:/g, colonSubstitute ?? '-'), {
+        separator: slugifySeparator,
+        lowercase: slugifyLowercase,
       })
     : // ... else filenamify the title and limit to 252 characters (to account for the `.md` which will be added)
-      filenamify(filename.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
+      filenamify(filename.replace(/:/g, colonSubstitute ?? '-'), {
         replacement: ' ',
         maxLength: 252,
       })

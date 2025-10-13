@@ -453,7 +453,7 @@ export default class ReadwiseMirror extends Plugin {
       filename = book.title;
     }
 
-    return normalizeFilename(filename);
+    return normalizeFilename(filename, this.settings);
   }
 
   async deleteLibraryFolder() {
@@ -593,7 +593,6 @@ export default class ReadwiseMirror extends Plugin {
     if (readwiseFolder && readwiseFolder instanceof TFolder) {
       this.notify.notice('Readwise: Filename adjustment started');
       // Iterate all files in the Readwise folder and "fix" their names according to the current settings using
-      // this.normalizeFilename()
       const renamedFiles = await this.iterativeReadwiseRenamer(readwiseFolder);
       if (renamedFiles > 0) {
         this.notify.notice(`Readwise: Renamed ${renamedFiles} files. Check console for renaming errors.`);
@@ -633,7 +632,7 @@ export default class ReadwiseMirror extends Plugin {
    * @param file The file to format.
    */
   private async renameReadwiseNote(file: TFile): Promise<boolean> {
-    const newFilename = normalizeFilename(file.basename);
+    const newFilename = normalizeFilename(file.basename, this.settings);
 
     // Only rename if there's a difference
     if (newFilename !== file.basename) {
