@@ -3,6 +3,7 @@ import type { ToStringOptions } from 'yaml';
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   atomicHighlights: false,
+  atomicParentProperty: 'parent',
   baseFolderName: 'Readwise',
   apiToken: null,
   lastUpdated: null,

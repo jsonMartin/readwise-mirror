@@ -665,6 +665,22 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         return toggle;
       });
 
+    // Add atomic highlights parent property setting
+
+    new Setting(containerEl)
+      .setClass('indent')
+      .setName('Atomic parent property')
+      .setDesc('Frontmatter property used to link atomic notes back to their parent document (default: parent).')
+      .addText((text) =>
+        text
+          .setPlaceholder('parent')
+          .setValue(this.plugin.settings.atomicParentProperty || 'parent')
+          .onChange(async (value) => {
+            this.plugin.settings.atomicParentProperty = value || 'parent';
+            await this.plugin.saveSettings();
+          })
+      );
+
     new Setting(containerEl)
       .setName('Sort highlights from oldest to newest')
       .setDesc(

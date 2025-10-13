@@ -151,6 +151,7 @@ export interface PluginSettings {
   filterNotesByTag: boolean; // Whether to filter books by tag
   filteredTags: string[]; // list of tags to include/exclude
   atomicHighlights: boolean; // Whether to use atomic highlights
+  atomicParentProperty: string; // `Parent`property
 }
 
 export interface YamlStringState {

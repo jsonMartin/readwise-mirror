@@ -59,8 +59,8 @@ export class FrontmatterManager {
           }
 
           // Get readwise_url by finding the highlight with the corresponding ID
+          atomicFrontmatter.set(this.settings.atomicParentProperty, file.doc[READWISE_URI_FIELD]);
           atomicFrontmatter.set(this.settings.trackingProperty, highlight[READWISE_URI_FIELD]);
-          atomicFrontmatter.set('parent', file.doc[READWISE_URI_FIELD]);
 
           return atomicFrontmatter;
         }
