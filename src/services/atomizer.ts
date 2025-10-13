@@ -135,12 +135,18 @@ export class AtomizeExtension implements nunjucks.Extension {
       content = content.replace(frontmatterMatch[0], '').trim();
     }
 
+    // Sanitize filename
+    const _basename = filenamify(basename.trim() ?? id.toString(), {
+      replacement: '-',
+      maxLength: 252,
+    })
+      .replace(/[#]+/g, ' ')
+      .replace(/ +/g, ' ')
+      .trim();
+
     const atom: Atom = {
       id,
-      basename: filenamify(basename.replace(/:/g, '-'), {
-        replacement: ' ',
-        maxLength: 252,
-      }),
+      basename: _basename,
       content,
       frontmatter,
       isEmbedded: embed,
@@ -148,7 +154,7 @@ export class AtomizeExtension implements nunjucks.Extension {
     // Get the content, add to the list of atoms, and return the embed, if enabled
     this.atoms.push(atom);
     // Return embed link
-    return new nunjucks.runtime.SafeString(embed ? `![[${basename}]]` : '');
+    return new nunjucks.runtime.SafeString(embed ? `![[${_basename}]]` : '');
   }
 
   /**
