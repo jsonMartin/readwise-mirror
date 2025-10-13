@@ -96,7 +96,6 @@ export class ReadwiseEnvironment extends Environment {
 
     this.addFilter('fme', (value: string | string[], multiline?: boolean) => {
       // Escape frontmatter values
-      // FIXME: Automatically detect multiline, "escaleValue" can handle it
       if (multiline) {
         if (typeof value !== 'string') {
           const ret: string[] = [];
