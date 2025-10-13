@@ -1,8 +1,6 @@
-import slugify from '@sindresorhus/slugify';
 // Constants
 import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS, NUNJUCKS_CORE_TEMPLATE, READWISE_REVIEW_URL_BASE } from 'constants/index';
-import filenamify from 'filenamify';
-import { type App, normalizePath, Plugin, type PluginManifest, TFile, TFolder } from 'obsidian';
+import { type App, Plugin, type PluginManifest, TFile, TFolder } from 'obsidian';
 import { Atomizer } from 'services/atomizer';
 import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
 import { FrontmatterManager } from 'services/frontmatter-manager';
@@ -16,6 +14,7 @@ import type { BaseFile, Export, Highlight, Library, PluginSettings, ReadwiseDocu
 import { ConfirmDialog } from 'ui/dialog';
 import Notify from 'ui/notify';
 import ReadwiseMirrorSettingTab from 'ui/settings-tab';
+import { normalizeFilename } from 'utils/filename-utils';
 import { createdDate, lastHighlightedDate, updatedDate } from 'utils/highlight-date-utils';
 import { isInReadwiseLibrary, isTrackedReadwiseNote } from 'utils/tracking-utils';
 
@@ -454,33 +453,7 @@ export default class ReadwiseMirror extends Plugin {
       filename = book.title;
     }
 
-    return this.normalizeFilename(filename);
-  }
-
-  /**
-   *  Normalizes the filename by replacing critical characters
-   *  and ensuring it is a valid filename
-   * @param filename - The filename to normalize
-   * @returns The normalized filename
-   */
-  private normalizeFilename(filename: string) {
-    const normalizedFilename = this.settings.useSlugify
-      ? slugify(filename.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
-          separator: this.settings.slugifySeparator,
-          lowercase: this.settings.slugifyLowercase,
-        })
-      : // ... else filenamify the title and limit to 252 characters (to account for the `.md` which will be added)
-        filenamify(filename.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
-          replacement: ' ',
-          maxLength: 252,
-        })
-          // Ensure we remove additional critical characters, replace multiple spaces with one, and trim
-          // Replace # as this inrerferes with WikiLinks (other characters are taken care of in "filenamify")
-          .replace(/[#]+/g, ' ')
-          .replace(/ +/g, ' ')
-          .trim();
-
-    return normalizePath(normalizedFilename);
+    return normalizeFilename(filename);
   }
 
   async deleteLibraryFolder() {
@@ -660,7 +633,7 @@ export default class ReadwiseMirror extends Plugin {
    * @param file The file to format.
    */
   private async renameReadwiseNote(file: TFile): Promise<boolean> {
-    const newFilename = this.normalizeFilename(file.basename);
+    const newFilename = normalizeFilename(file.basename);
 
     // Only rename if there's a difference
     if (newFilename !== file.basename) {
