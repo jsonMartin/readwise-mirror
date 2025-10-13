@@ -11,6 +11,7 @@
  * in a way that extracts the atomizer blocks, writes the individual files, and links them together by adding an embed block in the "parent" file.
  */
 
+import filenamify from 'filenamify';
 import * as nunjucks from 'nunjucks';
 import type { Atom, AtomizeOptions, BaseFile } from 'types';
 import type { CallExtension, Context, Parser } from '../nunjucks-parser';
@@ -136,7 +137,10 @@ export class AtomizeExtension implements nunjucks.Extension {
 
     const atom: Atom = {
       id,
-      basename,
+      basename: filenamify(basename.replace(/:/g, '-'), {
+        replacement: ' ',
+        maxLength: 252,
+      }),
       content,
       frontmatter,
       isEmbedded: embed,
