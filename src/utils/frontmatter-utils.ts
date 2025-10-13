@@ -2,7 +2,7 @@
  * FrontmatterUtils.ts
  */
 
-import { FRONTMATTER_TO_ESCAPE } from 'constants/index';
+import { FRONTMATTER_TO_ESCAPE, YAML_INDENT } from 'constants/index';
 import type { Environment } from 'nunjucks';
 import { Frontmatter } from 'services/frontmatter';
 import { sampleMetadata } from 'test/sample-data';
@@ -78,8 +78,7 @@ function isStringEscaped(value: string): boolean {
  * @returns Formatted multiline string
  */
 function formatMultilineString(value: string): string {
-  const indent = '  ';
-  return `>-\n${indent}${value.replace(/\n/g, `\n${indent}`)}`;
+  return `>-\n${YAML_INDENT}${value.replace(/\n/g, `\n${YAML_INDENT}`)}`;
 }
 
 /**
