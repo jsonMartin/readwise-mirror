@@ -385,10 +385,11 @@ export class DeduplicatingVaultWriter {
     // through a special field based on `_primaryFile`
 
     for (const atom of readwiseFile.atoms) {
+      const basename = atom.basename || `${readwiseFile.basename}-${atom.id}`;
       const atomicFile: AtomicFile = {
         type: 'atom',
         id: atom.id,
-        basename: atom.basename || `${readwiseFile.basename}-${atom.id}`,
+        basename, // Sanitize the basename
         doc: readwiseFile.doc,
         contents: atom.content,
         frontmatter: atom.frontmatter,
