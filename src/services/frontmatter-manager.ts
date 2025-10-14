@@ -48,7 +48,7 @@ export class FrontmatterManager {
         case 'atom': {
           let atomicFrontmatter = this.getBaseFrontmatter(file.doc);
           const currentFrontmatter = Frontmatter.fromString(file.frontmatter);
-          const highlight = file.doc.highlights.find((highlight) => highlight.id === file.id);
+          const highlight = file.doc.highlights.find((h) => h.id === file.id);
 
           if (currentFrontmatter.keys().length > 0) {
             const filteredUpdates = this.settings.protectFrontmatter

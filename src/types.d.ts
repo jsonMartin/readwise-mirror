@@ -172,7 +172,7 @@ export interface TemplateValidationResult {
 }
 
 export interface AtomizeOptions {
-  id: number;
+  id: number | string;
   parent: number;
   basename: string;
   embed: boolean;

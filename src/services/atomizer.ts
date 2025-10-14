@@ -122,7 +122,7 @@ export class AtomizeExtension implements nunjucks.Extension {
 
     // Validate the arguments as follows:
     // - id and parent are required and must be non-empty numbers
-    if (Number.isNaN(id) || id <= 0) {
+    if (Number.isNaN(id) || Number(id) <= 0) {
       throw new Error(`Invalid parameter in atomizer template, 'id' must be a positive number. ${id}`);
     }
 
@@ -145,7 +145,7 @@ export class AtomizeExtension implements nunjucks.Extension {
       .trim();
 
     const atom: Atom = {
-      id,
+      id: Number(id),
       basename: _basename,
       content,
       frontmatter,
