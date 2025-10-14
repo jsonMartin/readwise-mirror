@@ -1,6 +1,7 @@
 import { YAML_INDENT } from 'constants/index';
+import md5 from 'md5';
 import { type ConfigureOptions, Environment, type ILoader, type ILoaderAny, Loader, type LoaderSource } from 'nunjucks';
-import { moment } from 'obsidian';
+import { moment, stringifyYaml } from 'obsidian';
 import { escapeValue } from 'utils/frontmatter-utils';
 
 /**
@@ -94,7 +95,19 @@ export class ReadwiseEnvironment extends Environment {
       );
     });
 
-    this.addFilter('fme', (value: string | string[], multiline?: boolean) => {
+    // biome-ignore lint/suspicious/noExplicitAny: stringifyYaml is accepting `any`
+    this.addFilter('fme', (value: any ) => {
+      // This is a bit of a hack, but a realiable way to get multi-line yaml right
+      const _key = md5(value);
+      const _value = stringifyYaml({[_key]: value}).replace(`${_key}: `, '');
+      if(_value.contains('\n') && !_value.contains('|-')) {
+        return `|-\n${YAML_INDENT}${_value}\n`;
+      }
+
+      return _value;
+    });
+ 
+    this.addFilter('_fme', (value: string | string[], multiline?: boolean) => {
       // Escape frontmatter values
       if (multiline) {
         if (typeof value !== 'string') {
