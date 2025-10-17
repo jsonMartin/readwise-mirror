@@ -108,36 +108,5 @@ export class ReadwiseEnvironment extends Environment {
 
       return _value;
     });
-
-    this.addFilter('_fme', (value: string | string[], multiline?: boolean) => {
-      // Escape frontmatter values
-      if (multiline) {
-        if (typeof value !== 'string') {
-          const ret: string[] = [];
-          value.forEach((v, index, ret) => {
-            // DSS
-            if (index === 0) {
-              // Add multiline indicator to YAML
-              ret.push(' |-\n');
-            }
-            ret.push(`${YAML_INDENT}${v}`);
-          });
-
-          return ret;
-        }
-
-        // Create multi-line YAML
-        return ` ${escapeValue(value, { multiline: true })}`;
-      }
-
-      if (Array.isArray(value)) {
-        return value.map((item) => (typeof item === 'string' ? ` ${escapeValue(item)}` : item));
-      }
-
-      if (typeof value === 'string') {
-        return ` ${escapeValue(value)}`;
-      }
-      return value;
-    });
   }
 }
