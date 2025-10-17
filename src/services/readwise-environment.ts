@@ -89,7 +89,7 @@ export class ReadwiseEnvironment extends Environment {
       }
       return authorArray.map((a) =>
         a
-          .replace(/\b(dr|drs|prof|professor|sir|lord|lady|dame|ms|miss|mrs|mr|mx)\b\.?/gi, '')
+          .replace(/\b(dr|drs|prof|professor|sir|lord|lady|dame|ms|miss|mrs|mr|mx|lt|col)\b\.?/gi, '')
           .replace(/\s+/g, ' ')
           .trim()
       );
