@@ -34,7 +34,7 @@ export class Atomizer {
     },
   });
   constructor() {
-    this._env.addExtension('AtomizeExtension', new AtomizeExtension(this.atoms));
+    this._env.addExtension('AtomizeExtension', new AtomizeExtension(this.atoms, 'SECOND'));
   }
 
   /**
@@ -77,7 +77,10 @@ export class AtomizeExtension implements nunjucks.Extension {
   tags: string[] = ['atomize', 'frontmatter'];
 
   // Initialize atoms
-  constructor(private atoms: Atom[]) {}
+  constructor(
+    private atoms: Atom[],
+    private pass: 'FIRST' | 'SECOND'
+  ) {}
 
   // biome-ignore lint/suspicious/noExplicitAny: Context can be any object
   parse(parser: Parser, nodes: any): Promise<CallExtension> {
@@ -118,43 +121,60 @@ export class AtomizeExtension implements nunjucks.Extension {
     args: AtomizeOptions,
     body: () => string
   ): nunjucks.runtime.SafeString {
+    // Get highlight-id from the context
+    let _id: string | number;
+    let _basename: string;
     const { id, basename, embed } = args;
 
-    // Validate the arguments as follows:
-    // - id and parent are required and must be non-empty numbers
-    if (Number.isNaN(id) || Number(id) <= 0) {
-      throw new Error(`Invalid parameter in atomizer template, 'id' must be a positive number. ${id}`);
-    }
+    // We parse the id into a number.
+    _id = Number(id);
 
     // Extract frontmatter (if present)
+    let frontmatter = '';
     let content = body().trim();
     const frontmatterMatch = content.match(/FRONTMATTER:START(.*?)FRONTMATTER:END/s);
-    let frontmatter = '';
     if (frontmatterMatch) {
       frontmatter = frontmatterMatch[1].trim();
       content = content.replace(frontmatterMatch[0], '').trim();
     }
 
-    // Sanitize filename
-    const _basename = filenamify(basename.trim() ?? id.toString(), {
-      replacement: '-',
-      maxLength: 252,
-    })
-      .replace(/[#]+/g, ' ')
-      .replace(/ +/g, ' ')
-      .trim();
+    switch (this.pass) {
+      case 'FIRST': {
+        return new nunjucks.runtime.SafeString(`%%! atomize id=${_id}, basename="${basename.replace(/^\n+|\n+$/g, '').trim()}", embed=${embed} !%%
+%%! frontmatter !%%
+${frontmatter}
+%%! endfrontmatter !%%
+${content}        
+%%! endatomize !%%`);
+      }
+      case 'SECOND': {
+        // Validate the arguments as follows: id is required and must be a non-empty number
+        if (Number.isNaN(_id) || Number(_id) <= 0) {
+          throw new Error(`Invalid parameter in atomizer template, 'id' must be set and a positive number. ${_id}`);
+        }
 
-    const atom: Atom = {
-      id: Number(id),
-      basename: _basename,
-      content,
-      frontmatter,
-      isEmbedded: embed,
-    };
-    // Get the content, add to the list of atoms, and return the embed, if enabled
-    this.atoms.push(atom);
-    // Return embed link
-    return new nunjucks.runtime.SafeString(embed ? `![[${_basename}]]` : '');
+        // Sanitize filename
+        const _basename = filenamify(basename.replace(/^\n+|\n+$/g, '').trim() ?? _id.toString(), {
+          replacement: '-',
+          maxLength: 252,
+        })
+          .replace(/[#]+/g, ' ')
+          .replace(/ +/g, ' ')
+          .trim();
+
+        const atom: Atom = {
+          id: _id,
+          basename: _basename,
+          content,
+          frontmatter,
+          isEmbedded: embed,
+        };
+        // Get the content, add to the list of atoms, and return the embed, if enabled
+        this.atoms.push(atom);
+        // Return embed link
+        return new nunjucks.runtime.SafeString(embed ? `![[${_basename}]]` : '');
+      }
+    }
   }
 
   /**
