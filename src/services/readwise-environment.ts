@@ -2,7 +2,8 @@ import { YAML_INDENT } from 'constants/index';
 import md5 from 'md5';
 import { type ConfigureOptions, Environment, type ILoader, type ILoaderAny, Loader, type LoaderSource } from 'nunjucks';
 import { moment, stringifyYaml } from 'obsidian';
-import { escapeValue } from 'utils/frontmatter-utils';
+import type { Atom } from 'types';
+import { AtomizeExtension } from './atomizer';
 
 /**
  * Template name to source mapping for ReadwiseLoader
@@ -42,9 +43,11 @@ export class ReadwiseLoader extends Loader implements ILoader {
  * Extends the base Environment to add custom filters for formatting content
  */
 export class ReadwiseEnvironment extends Environment {
+  private atoms: Atom[] = [];
   constructor(loader?: ILoaderAny | ILoaderAny[] | null, opts?: ConfigureOptions) {
     super(loader, { ...opts, autoescape: false });
     this.setupFilters();
+    this.addExtension('AtomizeExtension', new AtomizeExtension(this.atoms, 'FIRST'));
   }
 
   /**
@@ -106,7 +109,8 @@ export class ReadwiseEnvironment extends Environment {
         return `|-\n${YAML_INDENT}${_value}\n`;
       }
 
-      return _value;
+      // Ensure we properly return the value with a leading space
+      return ` ${_value}`;
     });
   }
 }
