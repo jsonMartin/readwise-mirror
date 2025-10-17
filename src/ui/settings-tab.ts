@@ -236,7 +236,12 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         href: 'https://mozilla.github.io/nunjucks/templating.html#builtin-filters',
       });
       link.setAttr('target', '_blank');
-      syntaxNote.appendText('.');
+      syntaxNote.appendText(' and the ');
+      syntaxNote.createEl('a', {
+        text: 'documentation in the Wiki',
+        href: 'https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-Templating',
+      });
+      syntaxNote.append(' for more details.');
     });
   }
 
@@ -1474,6 +1479,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setDesc(
         this.createTemplateDocumentation([
+          [
+            'doc',
+            'Parent document (Check-out Header template for details, individual fields can be accessed as doc.<field>: doc.id would return the id of the parent document.)',
+          ],
           ['text', 'Highlight content (supports bq filter for blockquotes)'],
           ['note', 'Associated notes (supports qa filter for Q&A format)'],
           ['color', 'Highlight color'],
