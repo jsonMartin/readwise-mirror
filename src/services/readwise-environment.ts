@@ -105,7 +105,9 @@ export class ReadwiseEnvironment extends Environment {
       const _value = stringifyYaml({ [_key]: value })
         .replace(`${_key}: `, '')
         .trim();
-      if (_value.contains('\n') && !_value.contains('|-')) {
+
+      // If `stringifyYaml` doesn't return a multi-line YAML line, we return it as one
+      if (_value.contains('\n') && _value.indexOf('|') !== 0) {
         return `|-\n${YAML_INDENT}${_value}\n`;
       }
 
