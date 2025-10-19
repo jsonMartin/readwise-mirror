@@ -46,7 +46,10 @@ export class FrontmatterManager {
           return currentFrontmatter.merge(updatedFrontmatter);
         }
         case 'atom': {
-          let atomicFrontmatter = this.getBaseFrontmatter(file.doc);
+          // Only add "parent frontmatter" if enabled
+          let atomicFrontmatter = this.settings.atomicInheritParentFrontmatter
+            ? this.getBaseFrontmatter(file.doc)
+            : new Frontmatter();
           const currentFrontmatter = Frontmatter.fromString(file.frontmatter);
           const highlight = file.doc.highlights.find((h) => h.id === file.id);
 

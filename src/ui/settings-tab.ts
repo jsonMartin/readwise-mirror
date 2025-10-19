@@ -686,6 +686,20 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           })
       );
 
+    // Add atomic highlights frontmatter setting
+    new Setting(containerEl)
+      .setClass('indent')
+      .setName('Inherit parent note frontmatter')
+      .setDesc(
+        "Inherit the frontmatter from the parent note in atomic highlights. Frontmatter properties defined in atomize blocks will overwrite the parent note's frontmatter."
+      )
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.atomicInheritParentFrontmatter).onChange(async (value) => {
+          this.plugin.settings.atomicInheritParentFrontmatter = value;
+          await this.plugin.saveSettings();
+        })
+      );
+
     new Setting(containerEl)
       .setName('Sort highlights from oldest to newest')
       .setDesc(

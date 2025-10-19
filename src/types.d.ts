@@ -152,6 +152,8 @@ export interface PluginSettings {
   filteredTags: string[]; // list of tags to include/exclude
   atomicHighlights: boolean; // Whether to use atomic highlights
   atomicParentProperty: string; // `Parent`property
+  atomicInheritParentFrontmatter: boolean; // Inherit parent frontmatter
+  atomicConditionalAtomize: boolean; // Only atomize notes with a specific property set
 }
 
 export interface YamlStringState {

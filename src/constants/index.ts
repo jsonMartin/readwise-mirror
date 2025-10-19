@@ -4,6 +4,8 @@ import type { ToStringOptions } from 'yaml';
 export const DEFAULT_SETTINGS: PluginSettings = {
   atomicHighlights: false,
   atomicParentProperty: 'parent',
+  atomicInheritParentFrontmatter: false,
+  atomicConditionalAtomize: false,
   baseFolderName: 'Readwise',
   apiToken: null,
   lastUpdated: null,
