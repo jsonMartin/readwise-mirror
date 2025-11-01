@@ -10,6 +10,23 @@ import type { ReadwiseDocument, YamlEscapeOptions, YamlStringState } from 'types
 import * as YAML from 'yaml';
 
 /**
+ * Sanitizes the frontmatter template by removing delimiters and trimming whitespace
+ * @param template - Frontmatter template to sanitize
+ * @returns Sanitized frontmatter template
+ */
+export function sanitizeFrontmatterTemplate(template: string): string {
+  let sanitizedTemplate: string = template;
+
+  // Ensure frontmatter delimiters are removed
+  sanitizedTemplate = sanitizedTemplate.replaceAll(`${Frontmatter.DELIMITER}`, '');
+
+  // Trim leading/trailing whitespace
+  sanitizedTemplate = sanitizedTemplate.trim();
+
+  return sanitizedTemplate;
+}
+
+/**
  * Validates the frontmatter template
  * @param template - Frontmatter template to validate
  * @returns Validation result
@@ -22,17 +39,19 @@ export function validateFrontmatterTemplate(
   error?: string;
   preview?: string;
 } {
-  const renderedTemplate = env.renderString(template, escapeMetadata(sampleMetadata, FRONTMATTER_TO_ESCAPE));
-  const yamlContent = renderedTemplate.replace(Frontmatter.REGEX, '$2');
+  const renderedTemplate = env.renderString(
+    sanitizeFrontmatterTemplate(template),
+    escapeMetadata(sampleMetadata, FRONTMATTER_TO_ESCAPE)
+  );
   try {
-    YAML.parse(yamlContent);
+    YAML.parse(renderedTemplate);
     return { isValidYaml: true };
   } catch (error) {
     if (error instanceof YAML.YAMLParseError) {
       return {
         isValidYaml: false,
         error: `Invalid YAML: ${error.message}`,
-        preview: yamlContent,
+        preview: renderedTemplate,
       };
     }
     return {

@@ -14,7 +14,7 @@ import ReadwiseApi, { TokenValidationError } from 'services/readwise-api';
 import type { TemplateValidationResult } from 'types';
 import { WarningDialog } from 'ui/dialog';
 import type Notify from 'ui/notify';
-import { validateFrontmatterTemplate } from 'utils/frontmatter-utils';
+import { sanitizeFrontmatterTemplate, validateFrontmatterTemplate } from 'utils/frontmatter-utils';
 
 interface SettingsTab {
   id: string;
@@ -671,6 +671,23 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       });
 
     // Add atomic highlights parent property setting
+
+    new Setting(containerEl)
+      .setClass('indent')
+      .setName('Conditional atomization (rw-atomize)')
+      .setDesc(
+        createFragment((fragment) => {
+          fragment.appendText('Only create atomic notes for Readwise notes where ');
+          fragment.createEl('code', { text: 'rw-atomize: true' });
+          fragment.appendText(" is set in the highlight's frontmatter. ");
+        })
+      )
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.atomicConditionalAtomize).onChange(async (value) => {
+          this.plugin.settings.atomicConditionalAtomize = value;
+          await this.plugin.saveSettings();
+        })
+      );
 
     new Setting(containerEl)
       .setClass('indent')
@@ -1375,7 +1392,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             preview: this.plugin.settings.frontMatterTemplate,
           });
         }
-        text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
+        text.setValue(sanitizeFrontmatterTemplate(this.plugin.settings.frontMatterTemplate)).onChange(async (value) => {
           const noticeEl = containerEl.querySelector('#validation-notice');
           try {
             const validationResult: TemplateValidationResult = validateFrontmatterTemplate(this.plugin.env, value);
@@ -1385,11 +1402,11 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               noticeEl.setText(validationResult.isValidYaml ? '' : validationResult.error);
             }
 
-            // Set the frontmatter in settings
-            if (!value) {
+            // Set the frontmatter in settings, but only if enabled
+            if (!value && this.plugin.settings.frontMatter) {
               this.plugin.settings.frontMatterTemplate = DEFAULT_SETTINGS.frontMatterTemplate;
             } else {
-              this.plugin.settings.frontMatterTemplate = value.replace(/\n*$/, '\n');
+              this.plugin.settings.frontMatterTemplate = sanitizeFrontmatterTemplate(value);
             }
 
             updatePreview(validationResult);
