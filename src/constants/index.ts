@@ -18,7 +18,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   logFile: true,
   logFileName: 'Sync.md',
   syncNotifications: true,
-  frontMatter: false,
+  frontMatter: true,
   frontMatterTemplate: `---
 id: {{ id }}
 created: {{ created }}
