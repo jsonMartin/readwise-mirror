@@ -19,13 +19,13 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   logFileName: 'Sync.md',
   syncNotifications: true,
   frontMatter: true,
-  frontMatterTemplate: `---
+  frontMatterTemplate: `{#- Frontmatter Template - also called *Properties* in Obsidian -#} 
 id: {{ id }}
 created: {{ created }}
 updated: {{ updated }}
-title: {{ title }}
-author: [ {{ author | join(', ') }} ]
----
+title: {{ title | fme }}
+{# The \`normalize_author\` filter will remove prefixes like 'Dr.', 'Prof.' and others from the author field, for more consistent author names across your library. Remove it if you want to keep this and consult the Wiki for more information. #}
+author: [ {{ author | normalize_author | join(', ') }} ]
 `,
   headerTemplate: `
 %%
@@ -153,6 +153,8 @@ export const NUNJUCKS_CORE_TEMPLATE = `
 // Don't line-break (mainly for compatiblity with platers/obsidian-linter#1227)
 export const YAML_TOSTRING_OPTIONS: ToStringOptions = { lineWidth: -1 };
 export const YAML_INDENT: string = '  ';
+
+// Other options
 export const AUTHOR_SEPARATORS = /(?:,\s*and\s*)|(?:\s+and\s+)|(?:,\s*)/;
 export const READWISE_REVIEW_URL_BASE = 'https://readwise.io/bookreview/';
 export const READWISE_URI_FIELD = 'readwise_url';
