@@ -1,6 +1,6 @@
 import { EMPTY_FRONTMATTER, FRONTMATTER_TO_ESCAPE, READWISE_URI_FIELD } from 'constants/index';
 import { type Environment, Template } from 'nunjucks';
-import { parseYaml, type TFile, type FileManager } from 'obsidian';
+import { type FileManager, parseYaml, type TFile } from 'obsidian';
 import { Frontmatter, FrontmatterError } from 'services/frontmatter';
 import type Logger from 'services/logger';
 import type { AtomicFile, BaseFile, PluginSettings, ReadwiseDocument } from 'types';
