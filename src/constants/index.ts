@@ -1,5 +1,4 @@
 import type { PluginSettings } from 'types';
-import type { ToStringOptions } from 'yaml';
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   atomicHighlights: false,
@@ -150,8 +149,6 @@ export const NUNJUCKS_CORE_TEMPLATE = `
   {%- endfor %}
 {%- endblock highlights %}`;
 // YAML options
-// Don't line-break (mainly for compatiblity with platers/obsidian-linter#1227)
-export const YAML_TOSTRING_OPTIONS: ToStringOptions = { lineWidth: -1 };
 export const YAML_INDENT: string = '  ';
 
 // Other options

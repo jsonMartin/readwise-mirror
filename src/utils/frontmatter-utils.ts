@@ -4,10 +4,10 @@
 
 import { FRONTMATTER_TO_ESCAPE, YAML_INDENT } from 'constants/index';
 import type { Environment } from 'nunjucks';
+import { parseYaml } from 'obsidian';
 import { Frontmatter } from 'services/frontmatter';
 import { sampleMetadata } from 'test/sample-data';
 import type { ReadwiseDocument, YamlEscapeOptions, YamlStringState } from 'types';
-import * as YAML from 'yaml';
 
 /**
  * Sanitizes the frontmatter template by removing delimiters and trimming whitespace
@@ -44,19 +44,13 @@ export function validateFrontmatterTemplate(
     escapeMetadata(sampleMetadata, FRONTMATTER_TO_ESCAPE)
   );
   try {
-    YAML.parse(renderedTemplate);
+    parseYaml(renderedTemplate);
     return { isValidYaml: true };
   } catch (error) {
-    if (error instanceof YAML.YAMLParseError) {
-      return {
-        isValidYaml: false,
-        error: `Invalid YAML: ${error.message}`,
-        preview: renderedTemplate,
-      };
-    }
     return {
       isValidYaml: false,
-      error: `Template error: ${error.message}`,
+      error: `Invalid YAML or Template: ${error.message}`,
+      preview: renderedTemplate,
     };
   }
 }

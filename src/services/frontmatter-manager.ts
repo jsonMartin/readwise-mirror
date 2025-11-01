@@ -1,11 +1,10 @@
 import { EMPTY_FRONTMATTER, FRONTMATTER_TO_ESCAPE, READWISE_URI_FIELD } from 'constants/index';
 import { type Environment, Template } from 'nunjucks';
-import type { FrontMatterCache, TFile } from 'obsidian';
+import { type FrontMatterCache, parseYaml, type TFile } from 'obsidian';
 import { Frontmatter, FrontmatterError } from 'services/frontmatter';
 import type Logger from 'services/logger';
 import type { AtomicFile, BaseFile, PluginSettings, ReadwiseDocument } from 'types';
 import { escapeMetadata } from 'utils/frontmatter-utils';
-import * as YAML from 'yaml';
 
 export class FrontmatterManager {
   constructor(
@@ -95,13 +94,9 @@ export class FrontmatterManager {
         .render(escapeMetadata(metadata, FRONTMATTER_TO_ESCAPE))
         .replace(Frontmatter.REGEX, '$2');
 
-      const yaml = YAML.parse(renderedTemplate);
+      const yaml = parseYaml(renderedTemplate);
       return new Frontmatter(yaml);
     } catch (error) {
-      if (error instanceof YAML.YAMLParseError) {
-        this.logger.error('Failed to parse YAML frontmatter:', error.message);
-        throw new FrontmatterError(`Invalid YAML frontmatter: ${error.message}`, error);
-      }
       if (error instanceof Error) {
         this.logger.error('Error processing frontmatter template:', error.message);
         throw new FrontmatterError(`Failed to process frontmatter: ${error.message}`, error);
