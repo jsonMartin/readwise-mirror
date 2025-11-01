@@ -4,13 +4,13 @@
     "inlineSourceMap": true,
     "inlineSources": true,
     "module": "ESNext",
-    "target": "es2018",
+    "target": "es2021",
     "allowJs": true,
     "noImplicitAny": true,
     "moduleResolution": "node",
     "importHelpers": true,
     "allowSyntheticDefaultImports": true,
-    "lib": ["dom", "es2018", "scripthost"]
+    "lib": ["dom", "es2021", "scripthost"]
   },
   "include": ["src/**/*.ts"]
 }
