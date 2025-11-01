@@ -140,15 +140,7 @@ export class DeduplicatingVaultWriter {
         }
       });
 
-      await this.vault.process(file, (data) => {
-        // readwiseFile.contents
-        const fmi = getFrontMatterInfo(data);
-        if (fmi?.exists) {
-          // Return unchanged frontmatter + new contents
-          return `${data.slice(0, fmi.contentStart)}\n${readwiseFile.contents}`;
-        }
-        return data;
-      });
+      await this.fileWrite(file, readwiseFile.contents);
 
       // We only rename files if the respective settings are enabled and the filenames differ
       if (this.settings.trackFiles && this.settings.enableFileNameUpdates && readwiseFile.basename !== file.basename) {
@@ -430,9 +422,12 @@ export class DeduplicatingVaultWriter {
         if (overwrite) {
           const existingFile = await this.vault.getFileByPath(path);
           this.logger.debug('Overwriting existing file', { doc: file.doc, ...fileOptions });
-          await this.vault.process(existingFile, () => fileContents, fileOptions);
-          return existingFile;
+
+          // Update frontmatter and content atomically
+          await frontmatterWrite(existingFile);
+          return await this.fileWrite(existingFile, fileContents, fileOptions);
         }
+
         // Create new path with hash
         const hash = this.generateShortHash(file.doc);
         const newPath = this.getNormalizedPath(this.getCategoryPathFromFile(file), `${file.basename} ${hash}.md`);
@@ -440,9 +435,11 @@ export class DeduplicatingVaultWriter {
         if (newFileExists) {
           const existingNewFile = await this.vault.getFileByPath(newPath);
           this.logger.debug('Overwriting existing file (with hash)', { doc: file.doc, ...fileOptions });
-          await this.vault.process(existingNewFile, () => fileContents, fileOptions);
-          return existingNewFile;
+          // Update frontmatter and content atomically
+          await frontmatterWrite(existingNewFile);
+          return await this.fileWrite(existingNewFile, fileContents, fileOptions);
         }
+
         this.logger.debug('Creating new file (with hash)', { doc: file.doc, ...fileOptions });
         return await this.vault.create(newPath, fileContents, fileOptions);
       }
@@ -454,5 +451,38 @@ export class DeduplicatingVaultWriter {
       this.logger.error(`Failed to create file '${path}'`, err);
       throw new Error(`Failed to create file '${path}'. ${err}`);
     }
+
+    async function frontmatterWrite(existingFile: TFile) {
+      // biome-ignore lint/suspicious/noExplicitAny: Obsidian API exposes this as any
+      await this.app.fileManager.processFrontMatter(existingFile, (existingFrontmatter: any) => {
+        for (const key in frontmatter.toObject()) {
+          existingFrontmatter[key] = frontmatter.get(key);
+        }
+      });
+    }
+  }
+
+  /**
+   * Write contents atomically
+   * @param existingFile - The existing file to update
+   * @param fileContents - The new contents to write
+   * @param fileOptions - The file options (ctime, mtime)
+   * @returns The updated file
+   */
+  private async fileWrite(existingFile: TFile, fileContents: string, fileOptions?: { ctime: number; mtime: number }) {
+    await this.vault.process(
+      existingFile,
+      (data) => {
+        // readwiseFile.contents
+        const fmi = getFrontMatterInfo(data);
+        if (fmi?.exists) {
+          // Return unchanged frontmatter + new contents
+          return `${data.slice(0, fmi.contentStart)}\n${fileContents}`;
+        }
+        return data;
+      },
+      fileOptions
+    );
+    return existingFile;
   }
 }
