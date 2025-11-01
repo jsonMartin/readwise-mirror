@@ -1,6 +1,6 @@
 import { EMPTY_FRONTMATTER, FRONTMATTER_TO_ESCAPE, READWISE_URI_FIELD } from 'constants/index';
 import { type Environment, Template } from 'nunjucks';
-import { type FrontMatterCache, parseYaml, type TFile } from 'obsidian';
+import { parseYaml, type TFile, type FileManager } from 'obsidian';
 import { Frontmatter, FrontmatterError } from 'services/frontmatter';
 import type Logger from 'services/logger';
 import type { AtomicFile, BaseFile, PluginSettings, ReadwiseDocument } from 'types';
@@ -10,16 +10,17 @@ export class FrontmatterManager {
   constructor(
     private readonly settings: PluginSettings,
     private readonly logger: Logger,
-    private readonly env: Environment
+    private readonly env: Environment,
+    private readonly fm: FileManager
   ) {}
 
   /**
    * Get updated and merged frontmatter based on a document's existing frontmatter
    * @param file - Document to process
-   * @param frontmatterCache? - Existing frontmatter cache (optional)
+   * @param existingFrontmatter? - Existing frontmatter cache (optional, default is none)
    * @returns
    */
-  public getFrontmatter(file: BaseFile | AtomicFile, frontmatterCache?: FrontMatterCache): Frontmatter {
+  public getFrontmatter(file: BaseFile | AtomicFile, existingFrontmatter = false): Frontmatter {
     try {
       /**
        * We treat this differently by type
@@ -29,20 +30,23 @@ export class FrontmatterManager {
 
       switch (file.type) {
         case 'base': {
-          const currentFrontmatter = new Frontmatter(frontmatterCache);
           const updatedFrontmatter = this.getBaseFrontmatter(file.doc);
 
-          // Add tracking property
+          // Add tracking property if enabled
           if (this.settings.trackFiles)
             updatedFrontmatter.set(this.settings.trackingProperty, file.doc[READWISE_URI_FIELD]);
-          if (currentFrontmatter.keys().length > 0) {
-            const filteredUpdates = this.settings.protectFrontmatter
-              ? this.filterProtectedFrontmatter(updatedFrontmatter)
-              : updatedFrontmatter;
-            return currentFrontmatter.merge(filteredUpdates);
+
+          // Only filter update if all conditions are fulfilled
+          if (
+            this.settings.frontMatter &&
+            this.settings.updateFrontmatter &&
+            this.settings.protectFrontmatter &&
+            existingFrontmatter
+          ) {
+            return this.filterProtectedFrontmatter(updatedFrontmatter);
           }
 
-          return currentFrontmatter.merge(updatedFrontmatter);
+          return updatedFrontmatter;
         }
         case 'atom': {
           // Only add "parent frontmatter" if enabled
@@ -92,7 +96,8 @@ export class FrontmatterManager {
       const template = new Template(frontmatterTemplate, this.env, null, true);
       const renderedTemplate = template
         .render(escapeMetadata(metadata, FRONTMATTER_TO_ESCAPE))
-        .replace(Frontmatter.REGEX, '$2');
+        .replaceAll(Frontmatter.DELIMITER, '')
+        .trim();
 
       const yaml = parseYaml(renderedTemplate);
       return new Frontmatter(yaml);
@@ -116,26 +121,20 @@ export class FrontmatterManager {
       .map((f) => f.trim())
       .filter(Boolean);
 
-    // Push the tracking property as well
-    if (this.settings.trackFiles) protectedFields.push(this.settings.trackingProperty);
-
     // Using static methods from Frontmatter class
     return Frontmatter.fromEntries(updates.entries().filter(([key]) => !protectedFields.includes(key)));
   }
 
   public async writeUpdatedFrontmatter(file: TFile, updates: Frontmatter): Promise<void> {
     // File carries a reference to the vault
-    const vault = file.vault;
     try {
-      const content = await vault.read(file);
-      const frontmatter = Frontmatter.fromString(content);
-      frontmatter.merge(updates);
-
-      const match = content.match(Frontmatter.REGEX);
-      const frontmatterStr = match?.[1] || '';
-      const body = content.slice(frontmatterStr.length);
-
-      await vault.modify(file, `${frontmatter.toString()}\n${body}`);
+      this.fm.processFrontMatter(file, (frontmatter) => {
+        // Biome doesn't like assing via { ... frontmatter, ...updates }
+        // Iterate over keys in updates and set them in frontmatter
+        for (const key in updates.toObject()) {
+          frontmatter[key] = updates.get(key);
+        }
+      });
     } catch (error) {
       throw new FrontmatterError('Failed to write frontmatter', error);
     }

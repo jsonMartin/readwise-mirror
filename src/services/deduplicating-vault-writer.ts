@@ -1,5 +1,5 @@
 import md5 from 'md5'; // Fix imports
-import { type App, normalizePath, type TFile, type Vault } from 'obsidian';
+import { type App, getFrontMatterInfo, normalizePath, type TFile, type Vault } from 'obsidian';
 import type { FrontmatterManager } from 'services/frontmatter-manager';
 import type Logger from 'services/logger';
 import type { AtomicFile, BaseFile, PluginSettings, ReadwiseDocument } from 'types';
@@ -121,19 +121,34 @@ export class DeduplicatingVaultWriter {
   private async updateExistingFile(file: TFile, readwiseFile: BaseFile): Promise<void> {
     this.notifyFileCount();
     try {
-      // Only update frontmatter if frontmatter is enabled
-      if (this.settings.frontMatter && this.settings.updateFrontmatter) {
-        const updatedFrontmatter = this.frontmatterManager.getFrontmatter(
-          readwiseFile,
-          this.app.metadataCache.getFileCache(file)?.frontmatter
-        );
+      // Process frontmatter atomically
+      await this.app.fileManager.processFrontMatter(file, (existingFrontmatter) => {
+        // Only update frontmatter if frontmatter is enabled
+        const hasFrontmatter = Object.keys(existingFrontmatter).length > 0;
+        const updatedFrontmatter = this.frontmatterManager.getFrontmatter(readwiseFile, hasFrontmatter);
+
+        // Clean up existing frontmatter if updateFrontmatter is disabled
+        if (!this.settings.updateFrontmatter) {
+          for (const key in existingFrontmatter) {
+            delete existingFrontmatter[key];
+          }
+        }
+
         this.logger.debug(`Updating file ${file.path} with new frontmatter`, updatedFrontmatter);
-        await this.vault.process(file, () => `${updatedFrontmatter.toString()}\n${readwiseFile.contents}`);
-      } else {
-        const frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile);
-        this.logger.debug(`Not updating frontmatter for file ${file.path}`, frontmatter);
-        await this.vault.process(file, () => `${frontmatter.toString()}\n${readwiseFile.contents}`);
-      }
+        for (const key in updatedFrontmatter.toObject()) {
+          existingFrontmatter[key] = updatedFrontmatter.get(key);
+        }
+      });
+
+      await this.vault.process(file, (data) => {
+        // readwiseFile.contents
+        const fmi = getFrontMatterInfo(data);
+        if (fmi?.exists) {
+          // Return unchanged frontmatter + new contents
+          return `${data.slice(0, fmi.contentStart)}\n${readwiseFile.contents}`;
+        }
+        return data;
+      });
 
       // We only rename files if the respective settings are enabled and the filenames differ
       if (this.settings.trackFiles && this.settings.enableFileNameUpdates && readwiseFile.basename !== file.basename) {
@@ -305,7 +320,8 @@ export class DeduplicatingVaultWriter {
       }
     }
 
-    if (this.settings.atomicHighlights && processedPrimary && baseFile.atoms.length > 0) {
+    // If we have any atoms, process them (atoms will be empty of conditional atomizer leads to no atoms)
+    if (this.settings.atomicHighlights && processedPrimary && baseFile.atoms?.length > 0) {
       await this.processAtomicHighlights(processedPrimary, baseFile);
     }
   }
@@ -383,7 +399,6 @@ export class DeduplicatingVaultWriter {
     // FIXME: Implement this for Backlinks
     // Make sure we keep track of the "parent" file we've written
     // through a special field based on `_primaryFile`
-
     for (const atom of readwiseFile.atoms) {
       const basename = atom.basename || `${readwiseFile.basename}-${atom.id}`;
       const atomicFile: AtomicFile = {
