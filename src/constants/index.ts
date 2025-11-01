@@ -22,7 +22,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 id: {{ id }}
 created: {{ created }}
 updated: {{ updated }}
-title: {{ title | fme }}
+title: {{ title }}
 {# The \`normalize_author\` filter will remove prefixes like 'Dr.', 'Prof.' and others from the author field, for more consistent author names across your library. Remove it if you want to keep this and consult the Wiki for more information. #}
 author: [ {{ author | normalize_author | join(', ') }} ]
 `,
