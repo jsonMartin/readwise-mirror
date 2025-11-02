@@ -1282,6 +1282,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           fragment.append(
             this.createTemplateDocumentation([
               ['id', 'Document ID'],
+              ['linktext', 'Obsidian note linktext for the document (without Wikilink syntax)'],
               ['created', 'Creation timestamp'],
               ['updated', 'Last update timestamp'],
               ['last_highlight_at', 'Last highlight timestamp'],
@@ -1517,7 +1518,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         this.createTemplateDocumentation([
           [
             'doc',
-            'Parent document (Check-out Header template for details, individual fields can be accessed as doc.<field>: doc.id would return the id of the parent document.)',
+            'Parent document (Check-out Header template for details). Individual fields can be accessed as doc.<field>: doc.id would return the id of the parent document, doc.linktext the parent document link (without Wikilink syntax).)',
           ],
           ['text', 'Highlight content (supports bq filter for blockquotes)'],
           ['note', 'Associated notes (supports qa filter for Q&A format)'],
