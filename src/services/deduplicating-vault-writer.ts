@@ -274,10 +274,10 @@ export class DeduplicatingVaultWriter {
       // All files are untracked - append hash to all but the first,
       this.logger.debug('Files are untracked - appending hash to all but the first', { files: readwiseFiles });
       const [primary, ...duplicates] = readwiseFiles;
-      await this.writeFile(primary, true);
+      await this.writeFileToVault(primary, true);
 
       for (const duplicate of duplicates) {
-        await this.writeFile(duplicate);
+        await this.writeFileToVault(duplicate);
       }
     }
   }
@@ -301,15 +301,8 @@ export class DeduplicatingVaultWriter {
         await this.handleDuplicate(duplicate, baseFile);
       }
 
-      processedPrimary = primary;
-    }
-    // If the file already exists, create a new file with a hash
-    else {
-      if (await this.app.vault.adapter.exists(baseFile.path, false)) {
-        processedPrimary = await this.writeFile(baseFile);
-      } else {
-        processedPrimary = await this.writeFile(baseFile, true);
-      }
+    } else {
+      processedPrimary = await this.writeFileToVault(baseFile);
     }
 
     // If we have any atoms, process them (atoms will be empty of conditional atomizer leads to no atoms)
@@ -324,7 +317,7 @@ export class DeduplicatingVaultWriter {
    * @param overwrite - Whether to overwrite an existing file or create with hash
    * @returns The created or updated file
    */
-  private async writeFile(file: BaseFile, overwrite?: boolean): Promise<TFile> {
+  private async writeFileToVault(file: BaseFile | AtomicFile, overwrite?: boolean): Promise<TFile> {
     /**
      * This method looks quite convoluted and complex, which is due to the fact that
      * the vault methods to get files are case-sensitive, but the filesystem is probably not.
@@ -334,13 +327,10 @@ export class DeduplicatingVaultWriter {
      * we're trying to write.
      */
 
+    if (file.type === 'base') this.notifyFileCount();
     const path = this.getNormalizedPath(this.getCategoryPathFromFile(file), `${file.basename}.md`);
-
-    this.notifyFileCount();
-
     try {
       const frontmatter = this.frontmatterManager.getFrontmatter(file);
-      const fileContents = `${frontmatter.toString()}\n${file.contents}`;
       const fileOptions = {
         ctime: new Date(file.doc.created).getTime(),
         mtime: new Date(file.doc.updated).getTime(),
@@ -349,9 +339,10 @@ export class DeduplicatingVaultWriter {
       const fileExists = await this.app.vault.adapter.exists(path, false);
       if (fileExists) {
         if (overwrite) {
-          const existingFile = await this.vault.getFileByPath(path);
+          const existingFile: TFile = await this.vault.getFileByPath(path);
           this.logger.debug('Overwriting existing file', { doc: file.doc, ...fileOptions });
-          await this.vault.process(existingFile, () => fileContents, fileOptions);
+          await this.frontmatterWrite(existingFile, frontmatter);
+          await this.fileWrite(existingFile, file.contents, fileOptions);
           return existingFile;
         }
         // Create new path with hash
@@ -359,18 +350,23 @@ export class DeduplicatingVaultWriter {
         const newPath = this.getNormalizedPath(this.getCategoryPathFromFile(file), `${file.basename} ${hash}.md`);
         const newFileExists = await this.app.vault.adapter.exists(newPath, false);
         if (newFileExists) {
-          const existingNewFile = await this.vault.getFileByPath(newPath);
+          const existingNewFile: TFile = await this.vault.getFileByPath(newPath);
           this.logger.debug('Overwriting existing file (with hash)', { doc: file.doc, ...fileOptions });
-          await this.vault.process(existingNewFile, () => fileContents, fileOptions);
+          await this.frontmatterWrite(existingNewFile, frontmatter);
+          await this.fileWrite(existingNewFile, file.contents, fileOptions);
           return existingNewFile;
         }
         this.logger.debug('Creating new file (with hash)', { doc: file.doc, ...fileOptions });
-        return await this.vault.create(newPath, fileContents, fileOptions);
+        const newFile: TFile = await this.vault.create(newPath, file.contents, fileOptions);
+        await this.frontmatterWrite(newFile, frontmatter);
+        return newFile;
       }
 
       // If the file doesn't exist, create it
       this.logger.debug('Creating new file', { doc: file.doc, ...fileOptions });
-      return await this.vault.create(path, fileContents, fileOptions);
+      const newFile: TFile = await this.vault.create(path, file.contents, fileOptions);
+      await this.frontmatterWrite(newFile, frontmatter);
+      return newFile;
     } catch (err) {
       this.logger.error(`Failed to create file '${path}'`, err);
       throw new Error(`Failed to create file '${path}'. ${err}`);
@@ -411,7 +407,6 @@ export class DeduplicatingVaultWriter {
     const frontmatter = this.frontmatterManager.getFrontmatter(file);
 
     try {
-      const fileContents = `${frontmatter.toString()}\n${file.contents}`;
       const fileOptions = {
         ctime: new Date(file.doc.created).getTime(),
         mtime: new Date(file.doc.updated).getTime(),
@@ -424,8 +419,8 @@ export class DeduplicatingVaultWriter {
           this.logger.debug('Overwriting existing file', { doc: file.doc, ...fileOptions });
 
           // Update frontmatter and content atomically
-          await frontmatterWrite(existingFile);
-          return await this.fileWrite(existingFile, fileContents, fileOptions);
+          await this.frontmatterWrite(existingFile, frontmatter);
+          return await this.fileWrite(existingFile, file.contents, fileOptions);
         }
 
         // Create new path with hash
@@ -436,30 +431,39 @@ export class DeduplicatingVaultWriter {
           const existingNewFile = await this.vault.getFileByPath(newPath);
           this.logger.debug('Overwriting existing file (with hash)', { doc: file.doc, ...fileOptions });
           // Update frontmatter and content atomically
-          await frontmatterWrite(existingNewFile);
-          return await this.fileWrite(existingNewFile, fileContents, fileOptions);
+          await this.frontmatterWrite(existingNewFile, frontmatter);
+          return await this.fileWrite(existingNewFile, file.contents, fileOptions);
         }
 
         this.logger.debug('Creating new file (with hash)', { doc: file.doc, ...fileOptions });
-        return await this.vault.create(newPath, fileContents, fileOptions);
+        const newFile: TFile = await this.vault.create(newPath, file.contents, fileOptions);
+        await this.frontmatterWrite(newFile, frontmatter);
+        return newFile;
       }
 
       // If the file doesn't exist, create it
       this.logger.debug('Creating new file', { doc: file.doc, ...fileOptions });
-      return await this.vault.create(path, fileContents, fileOptions);
+      const newFile: TFile = await this.vault.create(path, file.contents, fileOptions);
+      await this.frontmatterWrite(newFile, frontmatter);
+      return newFile;
     } catch (err) {
       this.logger.error(`Failed to create file '${path}'`, err);
       throw new Error(`Failed to create file '${path}'. ${err}`);
     }
+  }
 
-    async function frontmatterWrite(existingFile: TFile) {
-      // biome-ignore lint/suspicious/noExplicitAny: Obsidian API exposes this as any
-      await this.app.fileManager.processFrontMatter(existingFile, (existingFrontmatter: any) => {
-        for (const key in frontmatter.toObject()) {
-          existingFrontmatter[key] = frontmatter.get(key);
-        }
-      });
-    }
+  /**
+   *
+   * @param existingFile
+   * @param frontmatter
+   */
+  private async frontmatterWrite(existingFile: TFile, frontmatter: Frontmatter) {
+    // biome-ignore lint/suspicious/noExplicitAny: Obsidian API exposes this as any
+    await this.app.fileManager.processFrontMatter(existingFile, (existingFrontmatter: any) => {
+      for (const key in frontmatter.toObject()) {
+        existingFrontmatter[key] = frontmatter.get(key);
+      }
+    });
   }
 
   /**
