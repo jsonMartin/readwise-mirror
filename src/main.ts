@@ -707,7 +707,7 @@ export default class ReadwiseMirror extends Plugin {
 
     this.notify = new Notify(statusBarItem);
 
-    this.frontmatterManager = new FrontmatterManager(this.settings, this.logger, this._env);
+    this.frontmatterManager = new FrontmatterManager(this.settings, this.logger, this._env, this.app.fileManager);
 
     this.headerTemplate = this.settings.headerTemplate;
     this.highlightTemplate = this.settings.highlightTemplate;
