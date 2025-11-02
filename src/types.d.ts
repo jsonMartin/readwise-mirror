@@ -1,3 +1,5 @@
+import type { TFile } from 'obsidian';
+
 export interface Export {
   user_book_id: number;
   is_deleted: boolean;
@@ -63,19 +65,20 @@ interface ReadwiseFile {
   type: 'base' | 'atom';
   basename: string;
   doc: ReadwiseDocument;
-  contents: string;
+  frontmatter?: string;
+  contents: string | undefined;
 }
 
 export interface BaseFile extends ReadwiseFile {
   type: 'base';
-  path?: string; // The full path including category
+  primary?: TFile | string; // The primary TFile in case of duplicates
+  duplicates?: TFile[]; // Array of duplicate TFiles
   atoms?: Atom[]; // Optional array of atoms if the file is atomized
 }
 
 export interface AtomicFile extends ReadwiseFile {
   type: 'atom';
   id: number; // ID of the atom (the highlight ID)
-  frontmatter?: string; // Rendered additional frontmatter of the atom file
 }
 
 /**
