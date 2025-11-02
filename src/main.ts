@@ -92,6 +92,32 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   /**
+   * Checks whether a specific file should be atomized,
+   * based on the various settings that govern this step
+   *
+   * @param contents
+   * @returns boolean
+   */
+  private shouldAtomize(frontmatter: Frontmatter): boolean {
+    // Early return if atomic highlights or tracking is disabled
+    if (!this.settings.atomicHighlights || !this.settings.trackFiles) {
+      return false;
+    }
+
+    // If conditional atomization is disabled, always atomize
+    if (!this.settings.atomicConditionalAtomize) {
+      return true;
+    }
+
+    try {
+      return Boolean(frontmatter?.get('rw-atomize'));
+    } catch (error) {
+      this.logger.warn('Error parsing frontmatter for atomization check:', error);
+      return false;
+    }
+  }
+
+  /**
    * Formats tags for use in a template
    * @param tags - The tags to format
    * @param nohash - Whether to remove the hash from the tag name
