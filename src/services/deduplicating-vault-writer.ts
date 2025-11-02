@@ -92,7 +92,7 @@ export class DeduplicatingVaultWriter {
    * @param doc - The readwise document to generate a hash for
    * @returns A short hash
    */
-  private generateShortHash(doc: ReadwiseDocument): string {
+  public generateShortHash(doc: ReadwiseDocument): string {
     return md5(doc.id.toString()).substring(0, 4);
   }
 
