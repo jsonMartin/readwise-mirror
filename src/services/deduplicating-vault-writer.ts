@@ -398,7 +398,7 @@ export class DeduplicatingVaultWriter {
         frontmatter: atom.frontmatter,
       };
 
-      await this.writeAtomicFile(atomicFile, true); // We overwrite
+      await this.writeFileToVault(atomicFile, true); // We overwrite
     }
   }
 
