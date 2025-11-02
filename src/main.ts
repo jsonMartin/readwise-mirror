@@ -971,7 +971,7 @@ export default class ReadwiseMirror extends Plugin {
       const allowUpdate = this.settings.trackAcrossVault ? isReadwiseNote : isReadwiseNote && isInLibrary;
 
       if (allowUpdate) {
-        this.logger.debug('Readwise: Updating current note...'); // FIXME: Simplify. In theory, we only reach this point of trackingUrl is valid (due to isReadwiseNote checks above) so the following is not needed. The root problem is the double call to getFileCache (here and in isTrackedReadwiseNote()) which should be avoided.
+        this.logger.debug('Readwise: Updating current note...'); // FIXME: Simplify. In theory, we only reach this point if trackingUrl is valid (due to isReadwiseNote checks above) so the following is not needed. The root problem is the double call to getFileCache (here and in isTrackedReadwiseNote()) which should be avoided.
         const fileCache = this.app.metadataCache.getFileCache(file);
         const trackingUrl = fileCache?.frontmatter?.[this._settings.trackingProperty];
         if (typeof trackingUrl !== 'string' || !trackingUrl.startsWith(READWISE_REVIEW_URL_BASE)) {
