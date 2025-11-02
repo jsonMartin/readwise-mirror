@@ -439,11 +439,34 @@ export default class ReadwiseMirror extends Plugin {
         const existingFiles = await this.deduplicatingVaultWriter.findExistingByHighlightsUrl(doc);
         if (existingFiles.length > 0) {
           const [primary, ...duplicates] = existingFiles;
-          readwiseFile.primary = primary;
-          readwiseFile.duplicates = duplicates;
           this.logger.debug(
             `Found ${existingFiles.length} existing file(s) for '${title}' (${source_url}), using primary: ${primary.path}`
           );
+
+          // We only rename files if the respective settings are enabled and the filenames differ
+          if (this.settings.enableFileNameUpdates && readwiseFile.basename !== primary.basename) {
+            let newPath = this.deduplicatingVaultWriter.getNormalizedPath(
+              primary.parent.path,
+              `${readwiseFile.basename}.md`
+            );
+            const newFileExists = await this.app.vault.adapter.exists(newPath, false);
+            if (newFileExists) {
+              // Add hash to filename if there's a collision
+              const hash = this.deduplicatingVaultWriter.generateShortHash(readwiseFile.doc);
+              newPath = this.deduplicatingVaultWriter.getNormalizedPath(
+                primary.parent.path,
+                `${readwiseFile.basename} ${hash}.md`
+              );
+            }
+
+            if (newPath !== primary.path) {
+              this.logger.debug(`Renamed file from ${primary.path} to ${newPath}`);
+              await this.app.fileManager.renameFile(primary, newPath);
+            }
+          }
+
+          readwiseFile.primary = primary;
+          readwiseFile.duplicates = duplicates;
           doc.linktext = this.app.metadataCache.fileToLinktext(readwiseFile.primary, readwiseFile.primary.path, true);
         }
       } else {
@@ -486,6 +509,7 @@ export default class ReadwiseMirror extends Plugin {
       // Atomize only when enabled and when trackFiles is enabled as well
       const atomizer = new Atomizer();
       if (shouldAtomize) {
+        // FIXME: Handle basename changes of the parent file: we need to update all atomized files as well, or ensure we catch a differing basename vs. primary file
         const { contents, atoms } = atomizer.atomize(_contents, { basename, doc, book });
         this.logger.debug(`Atomized ${atoms?.length} highlights for '${title}' (${source_url})`);
         readwiseFile.contents = contents;

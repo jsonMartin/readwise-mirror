@@ -146,22 +146,6 @@ export class DeduplicatingVaultWriter {
       });
 
       await this.fileWrite(file, readwiseFile.contents);
-
-      // We only rename files if the respective settings are enabled and the filenames differ
-      if (this.settings.trackFiles && this.settings.enableFileNameUpdates && readwiseFile.basename !== file.basename) {
-        let newPath = this.getNormalizedPath(file.parent.path, `${readwiseFile.basename}.md`);
-        const newFileExists = await this.app.vault.adapter.exists(newPath, false);
-        if (newFileExists) {
-          // Add hash to filename if there's a collision
-          const hash = this.generateShortHash(readwiseFile.doc);
-          newPath = this.getNormalizedPath(file.parent.path, `${readwiseFile.basename} ${hash}.md`);
-        }
-
-        if (newPath !== file.path) {
-          this.logger.debug(`Renamed file from ${file.path} to ${newPath}`);
-          await this.app.fileManager.renameFile(file, newPath);
-        }
-      }
     } catch (err) {
       this.logger.error(`Readwise: Attempt to update file ${file.path} failed`, err);
       throw err;
