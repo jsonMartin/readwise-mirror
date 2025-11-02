@@ -287,8 +287,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         id: 'highlight-template',
         name: 'Highlights',
         render: (container) => {
-          this.renderHighlightSettings(container);
+          this.renderAtomicHighlightsSettings(container);
           this.renderHighlightTemplateSettings(container);
+          this.renderHighlightSettings(container);
         },
       },
     ];
@@ -600,8 +601,8 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       );
   }
 
-  private renderHighlightSettings(containerEl: HTMLElement): void {
-    new Setting(containerEl).setName('Highlight organization').setHeading();
+  private renderAtomicHighlightsSettings(containerEl: HTMLElement): void {
+    new Setting(containerEl).setName('Atomic highlights').setHeading();
 
     // Add atomic highlights setting with tracking dependency
     new Setting(containerEl)
@@ -728,6 +729,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
+  }
+
+  private renderHighlightSettings(containerEl: HTMLElement): void {
+    new Setting(containerEl).setName('Highlight organization').setHeading();
 
     new Setting(containerEl)
       .setName('Sort highlights by location')
