@@ -315,7 +315,7 @@ export default class ReadwiseMirror extends Plugin {
     }
 
     // Prepare all files first
-    const readwiseFiles: BaseFile[] = await this.getReadwiseFilesFromLibrary(library);
+    const readwiseFiles: BaseFile[] = await this.processReadwiseLibrary(library);
 
     if (readwiseFiles.length === 0) {
       this.logger.info('No eligible Readwise files to process (all highlights filtered out). Skipping write.');
@@ -343,7 +343,7 @@ export default class ReadwiseMirror extends Plugin {
    * @param library - The Readwise library object containing books and their highlights.
    * @returns An array of `ReadwiseFile` objects, each containing the filename, document metadata, and file contents.
    */
-  private async getReadwiseFilesFromLibrary(library: Library): Promise<BaseFile[]> {
+  private async processReadwiseLibrary(library: Library): Promise<BaseFile[]> {
     const readwiseFiles: BaseFile[] = [];
 
     // Get total number of records
@@ -963,7 +963,7 @@ export default class ReadwiseMirror extends Plugin {
         }
       }
 
-      const readwiseFiles: BaseFile[] = await this.getReadwiseFilesFromLibrary(library);
+      const readwiseFiles: BaseFile[] = await this.processReadwiseLibrary(library);
       this.logger.group('Frontmatter Update');
       await this.deduplicatingVaultWriter.processFrontmatter(readwiseFiles);
       this.logger.groupEnd();
