@@ -13,7 +13,7 @@
 
 import filenamify from 'filenamify';
 import * as nunjucks from 'nunjucks';
-import type { Atom, AtomizeOptions, BaseFile } from 'types';
+import type { Atom, AtomizeOptions } from 'types';
 import type { CallExtension, Context, Parser } from '../nunjucks-parser';
 
 /**
@@ -53,14 +53,11 @@ export class Atomizer {
    */
 
   // biome-ignore lint/suspicious/noExplicitAny: Context can be any object
-  atomize(_contents: string, ctx: Record<string, any>): BaseFile {
+  atomize(_contents: string, ctx: Record<string, any>): { contents: string; atoms: Atom[] } {
     // Create a new ReadwiseDocument from the atomized content
 
     const contents = this._env.renderString(_contents, ctx);
     return {
-      type: 'base',
-      basename: ctx.basename,
-      doc: ctx.doc,
       contents,
       atoms: this.atoms,
     };

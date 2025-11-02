@@ -1,8 +1,9 @@
 // Constants
 import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS, NUNJUCKS_CORE_TEMPLATE, READWISE_REVIEW_URL_BASE } from 'constants/index';
-import { type App, Plugin, type PluginManifest, TFile, TFolder } from 'obsidian';
+import { type App, type CachedMetadata, Plugin, type PluginManifest, TFile, TFolder } from 'obsidian';
 import { Atomizer } from 'services/atomizer';
 import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
+import { Frontmatter } from 'services/frontmatter';
 import { FrontmatterManager } from 'services/frontmatter-manager';
 // Plugin classes
 import Logger from 'services/logger';
@@ -425,9 +426,50 @@ export default class ReadwiseMirror extends Plugin {
         hl_tags_nohash: this.formatTags(highlightTags, true, "'"),
       };
 
+      // Prepare the readwise file object
+      const readwiseFile: BaseFile = {
+        type: 'base',
+        basename,
+        doc,
+        contents: undefined,
+      };
+
+      // Early deduplication check to find primary and duplicate files
+      if (this.settings.trackFiles && this.settings.trackingProperty) {
+        const existingFiles = await this.deduplicatingVaultWriter.findExistingByHighlightsUrl(doc);
+        if (existingFiles.length > 0) {
+          const [primary, ...duplicates] = existingFiles;
+          readwiseFile.primary = primary;
+          readwiseFile.duplicates = duplicates;
+          this.logger.debug(
+            `Found ${existingFiles.length} existing file(s) for '${title}' (${source_url}), using primary: ${primary.path}`
+          );
+          doc.linktext = this.app.metadataCache.fileToLinktext(readwiseFile.primary, readwiseFile.primary.path, true);
+        }
+      } else {
+        // Get the primary path for new file
+        readwiseFile.primary = this.deduplicatingVaultWriter.getNormalizedPath(
+          this.deduplicatingVaultWriter.getCategoryPath(category),
+          `${basename}.md`
+        );
+        // note_link is just the basename in this case
+        doc.linktext = basename;
+      }
+      // Assign frontmatter
+      let frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile, true);
+      if (readwiseFile.primary && readwiseFile.primary instanceof TFile) {
+        const fileMetadata: CachedMetadata = this.app.metadataCache.getFileCache(readwiseFile.primary);
+        if (fileMetadata?.frontmatter) {
+          const existingFrontmatter = new Frontmatter(fileMetadata.frontmatter);
+          frontmatter = existingFrontmatter.merge(frontmatter);
+        }
+      }
+
+      // Determine if we should atomize this file
+      const shouldAtomize = this.shouldAtomize(frontmatter);
       // Render header, and highlights by rendering the core template
       this._loader.setSource('file', NUNJUCKS_CORE_TEMPLATE);
-      const contents = this._env.render('file', {
+      const _contents = this._env.render('file', {
         // We pass the doc (current Readwise document) and book (Export) for access to all fields
         doc,
         book,
@@ -436,21 +478,25 @@ export default class ReadwiseMirror extends Plugin {
         highlightTemplate: 'highlight',
       });
 
+      _contents;
+
+      // Assign frontmatter to readwiseFile
+      readwiseFile.frontmatter = frontmatter?.toString();
+
       // Atomize only when enabled and when trackFiles is enabled as well
-      if (this.settings.atomicHighlights && this.settings.trackFiles) {
-        // It is a bit "hacky" to use the atomizer for this
-        const atomizer = new Atomizer();
-        const atomized: BaseFile = atomizer.atomize(contents, { basename, doc, book });
-        this.logger.debug(`Atomized ${atomized.atoms.length} highlights for '${title}' (${source_url})`);
-        readwiseFiles.push(atomized);
+      const atomizer = new Atomizer();
+      if (shouldAtomize) {
+        const { contents, atoms } = atomizer.atomize(_contents, { basename, doc, book });
+        this.logger.debug(`Atomized ${atoms?.length} highlights for '${title}' (${source_url})`);
+        readwiseFile.contents = contents;
+        readwiseFile.atoms = atoms;
       } else {
-        readwiseFiles.push({
-          type: 'base',
-          basename,
-          doc,
-          contents,
-        });
+        // Set atomizer to composite mode and remove frontmatter blocks
+        atomizer.setCompositeEnvironment();
+        const { contents } = atomizer.atomize(_contents, { basename, doc, book });
+        readwiseFile.contents = contents;
       }
+      readwiseFiles.push(readwiseFile);
     }
     return readwiseFiles;
   }

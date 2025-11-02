@@ -1,5 +1,5 @@
 import md5 from 'md5'; // Fix imports
-import { type App, getFrontMatterInfo, normalizePath, type TFile, type Vault } from 'obsidian';
+import { type App, getFrontMatterInfo, normalizePath, TFile, type Vault } from 'obsidian';
 import type { FrontmatterManager } from 'services/frontmatter-manager';
 import type Logger from 'services/logger';
 import type { AtomicFile, BaseFile, PluginSettings, ReadwiseDocument } from 'types';
@@ -115,10 +115,15 @@ export class DeduplicatingVaultWriter {
   /**
    * Updates an existing file with new contents and frontmatter
    *
-   * @param file - The file to update
    * @param readwiseFile - The readwise file containing doc and contents
    */
-  private async updateExistingFile(file: TFile, readwiseFile: BaseFile): Promise<void> {
+  private async updateExistingFile(readwiseFile: BaseFile): Promise<void> {
+    if (!(readwiseFile.primary instanceof TFile)) {
+      this.logger.error('Primary file is not a TFile instance', { primary: readwiseFile.primary });
+      throw new Error('Primary file is not a TFile instance. This should not happen');
+    }
+
+    const file: TFile = readwiseFile.primary;
     this.notifyFileCount();
     try {
       // Process frontmatter atomically
@@ -203,20 +208,23 @@ export class DeduplicatingVaultWriter {
 
     this.notify.setStatusBarText(`Readwise: ${this.totalFileCount} files to process`);
 
-    // First, compute paths for all files
-    const filesWithPaths: BaseFile[] = readwiseFiles.map((file) => ({
-      ...file,
-      path: this.getNormalizedPath(this.getCategoryPathFromFile(file), `${file.basename}.md`),
-    }));
     // Group by path (which includes category and filename)
     const groupedByPath = new Map<string, BaseFile[]>();
 
-    for (const file of filesWithPaths) {
-      // Use lowercase path for comparison as filesystems are (potentially) case-insensitive
-      if (!groupedByPath.has(file.path.toLowerCase())) {
-        groupedByPath.set(file.path.toLowerCase(), []);
+    for (const file of readwiseFiles) {
+      let path: string;
+      if (file.primary instanceof TFile) {
+        // If we have a primary TFile, use its path for grouping
+        path = file.primary.path;
+      } else if (typeof file.primary === 'string') {
+        // If we have a primary path string, use it for grouping
+        path = file.primary;
       }
-      groupedByPath.get(file.path.toLowerCase()).push(file);
+      // Use lowercase path for comparison as filesystems are (potentially) case-insensitive
+      if (!groupedByPath.has(path.toLowerCase())) {
+        groupedByPath.set(path.toLowerCase(), []);
+      }
+      groupedByPath.get(path.toLowerCase()).push(file);
     }
 
     // Process each path group (i.e. files with the same category and filename)
@@ -289,18 +297,16 @@ export class DeduplicatingVaultWriter {
    */
   private async processTrackedFile(baseFile: BaseFile): Promise<void> {
     let processedPrimary: TFile | null = null;
-    const existingFiles = await this.findExistingByHighlightsUrl(baseFile.doc);
-    if (existingFiles.length > 0) {
-      const [primary, ...duplicates] = existingFiles;
-
+    if (baseFile.primary instanceof TFile) {
       // TODO: Add an option to the plugin to link remote duplicates to the primary file
-      await this.updateExistingFile(primary, baseFile);
+      await this.updateExistingFile(baseFile);
 
-      for (const duplicate of duplicates) {
+      for (const duplicate of baseFile.duplicates) {
         this.logger.warn('Existing duplicate file found', { duplicate });
         await this.handleDuplicate(duplicate, baseFile);
       }
 
+      processedPrimary = baseFile.primary;
     } else {
       processedPrimary = await this.writeFileToVault(baseFile);
     }
