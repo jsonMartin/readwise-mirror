@@ -38,6 +38,15 @@ export class Atomizer {
   }
 
   /**
+   * Set the environment to COMPOSITE mode.
+   */
+  public setCompositeEnvironment(): void {
+    // Remove existing AtomizeExtension and re-add with COMPOSITE pass
+    this._env.removeExtension('AtomizeExtension');
+    this._env.addExtension('AtomizeExtension', new AtomizeExtension(this.atoms, 'COMPOSITE'));
+  }
+
+  /**
    * Render a template string with the atomizer environment.
    * @param _contents
    * @returns
@@ -78,8 +87,8 @@ export class AtomizeExtension implements nunjucks.Extension {
 
   // Initialize atoms
   constructor(
-    private atoms: Atom[],
-    private pass: 'FIRST' | 'SECOND'
+    private atoms: Atom[] | undefined,
+    private pass: 'FIRST' | 'SECOND' | 'COMPOSITE'
   ) {}
 
   // biome-ignore lint/suspicious/noExplicitAny: Context can be any object
@@ -170,9 +179,13 @@ ${content}
           isEmbedded: embed,
         };
         // Get the content, add to the list of atoms, and return the embed, if enabled
-        this.atoms.push(atom);
+        this.atoms?.push(atom);
         // Return embed link
         return new nunjucks.runtime.SafeString(embed ? `![[${_basename}]]` : '');
+      }
+      case 'COMPOSITE': {
+        // In this case, we do *not* atomize and do not return the frontmatter block
+        return new nunjucks.runtime.SafeString(`${content}`);
       }
     }
   }
