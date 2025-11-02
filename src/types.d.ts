@@ -106,6 +106,7 @@ export interface ReadwiseDocument {
   highlight_tags: string;
   tags_nohash: string;
   hl_tags_nohash: string;
+  linktext?: string; // Link to the note in obsidian, if tracked
 }
 
 export interface MetadataInput {
