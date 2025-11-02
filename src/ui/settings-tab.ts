@@ -692,13 +692,13 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setClass('indent')
       .setName('Atomic parent property')
-      .setDesc('Frontmatter property used to link atomic notes back to their parent document (default: parent).')
+      .setDesc('Frontmatter property used to link atomic notes back to their parent document (default: rw-parent).')
       .addText((text) =>
         text
-          .setPlaceholder('parent')
-          .setValue(this.plugin.settings.atomicParentProperty || 'parent')
+          .setPlaceholder('rw-parent')
+          .setValue(this.plugin.settings.atomicParentProperty || 'rw-parent')
           .onChange(async (value) => {
-            this.plugin.settings.atomicParentProperty = value || 'parent';
+            this.plugin.settings.atomicParentProperty = value || 'rw-parent';
             await this.plugin.saveSettings();
           })
       );

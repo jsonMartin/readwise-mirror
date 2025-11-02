@@ -2,7 +2,7 @@ import type { PluginSettings } from 'types';
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   atomicHighlights: false,
-  atomicParentProperty: 'parent',
+  atomicParentProperty: 'rw-parent',
   atomicInheritParentFrontmatter: false,
   atomicConditionalAtomize: false,
   baseFolderName: 'Readwise',
