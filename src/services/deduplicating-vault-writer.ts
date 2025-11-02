@@ -32,7 +32,7 @@ export class DeduplicatingVaultWriter {
    * @param segments - Path segments to join
    * @returns Normalized path string
    */
-  private getNormalizedPath(...segments: string[]): string {
+  public getNormalizedPath(...segments: string[]): string {
     return normalizePath(segments.join('/'));
   }
 
@@ -59,7 +59,7 @@ export class DeduplicatingVaultWriter {
    * @param doc The readwise document to find matches for
    * @returns An array of matching files
    */
-  private async findExistingByHighlightsUrl(doc: ReadwiseDocument): Promise<TFile[]> {
+  public async findExistingByHighlightsUrl(doc: ReadwiseDocument): Promise<TFile[]> {
     if (!this.settings.trackFiles || !this.settings.trackingProperty || !doc.readwise_url) {
       return []; // No tracking or no readwise_url
     }
