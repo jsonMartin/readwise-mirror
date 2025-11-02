@@ -402,56 +402,6 @@ export class DeduplicatingVaultWriter {
     }
   }
 
-  private async writeAtomicFile(file: AtomicFile, overwrite?: boolean): Promise<TFile> {
-    const path = this.getNormalizedPath(this.getCategoryPathFromFile(file), `${file.basename}.md`);
-    const frontmatter = this.frontmatterManager.getFrontmatter(file);
-
-    try {
-      const fileOptions = {
-        ctime: new Date(file.doc.created).getTime(),
-        mtime: new Date(file.doc.updated).getTime(),
-      };
-
-      const fileExists = await this.app.vault.adapter.exists(path, false);
-      if (fileExists) {
-        if (overwrite) {
-          const existingFile = await this.vault.getFileByPath(path);
-          this.logger.debug('Overwriting existing file', { doc: file.doc, ...fileOptions });
-
-          // Update frontmatter and content atomically
-          await this.frontmatterWrite(existingFile, frontmatter);
-          return await this.fileWrite(existingFile, file.contents, fileOptions);
-        }
-
-        // Create new path with hash
-        const hash = this.generateShortHash(file.doc);
-        const newPath = this.getNormalizedPath(this.getCategoryPathFromFile(file), `${file.basename} ${hash}.md`);
-        const newFileExists = await this.app.vault.adapter.exists(newPath, false);
-        if (newFileExists) {
-          const existingNewFile = await this.vault.getFileByPath(newPath);
-          this.logger.debug('Overwriting existing file (with hash)', { doc: file.doc, ...fileOptions });
-          // Update frontmatter and content atomically
-          await this.frontmatterWrite(existingNewFile, frontmatter);
-          return await this.fileWrite(existingNewFile, file.contents, fileOptions);
-        }
-
-        this.logger.debug('Creating new file (with hash)', { doc: file.doc, ...fileOptions });
-        const newFile: TFile = await this.vault.create(newPath, file.contents, fileOptions);
-        await this.frontmatterWrite(newFile, frontmatter);
-        return newFile;
-      }
-
-      // If the file doesn't exist, create it
-      this.logger.debug('Creating new file', { doc: file.doc, ...fileOptions });
-      const newFile: TFile = await this.vault.create(path, file.contents, fileOptions);
-      await this.frontmatterWrite(newFile, frontmatter);
-      return newFile;
-    } catch (err) {
-      this.logger.error(`Failed to create file '${path}'`, err);
-      throw new Error(`Failed to create file '${path}'. ${err}`);
-    }
-  }
-
   /**
    *
    * @param existingFile
