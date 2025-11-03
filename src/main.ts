@@ -434,6 +434,14 @@ export default class ReadwiseMirror extends Plugin {
         contents: undefined,
       };
 
+      // Get the primary path for new file before checking for duplicates
+      readwiseFile.primary = this.deduplicatingVaultWriter.getNormalizedPath(
+        this.deduplicatingVaultWriter.getCategoryPath(category),
+        `${basename}.md`
+      );
+      // note_link is just the basename in this case
+      doc.linktext = basename;
+
       // Early deduplication check to find primary and duplicate files
       if (this.settings.trackFiles && this.settings.trackingProperty) {
         const existingFiles = await this.deduplicatingVaultWriter.findExistingByHighlightsUrl(doc);
@@ -465,18 +473,11 @@ export default class ReadwiseMirror extends Plugin {
             }
           }
 
+          // Update readwiseFile and doc with existing file
           readwiseFile.primary = primary;
           readwiseFile.duplicates = duplicates;
           doc.linktext = this.app.metadataCache.fileToLinktext(readwiseFile.primary, readwiseFile.primary.path, true);
         }
-      } else {
-        // Get the primary path for new file
-        readwiseFile.primary = this.deduplicatingVaultWriter.getNormalizedPath(
-          this.deduplicatingVaultWriter.getCategoryPath(category),
-          `${basename}.md`
-        );
-        // note_link is just the basename in this case
-        doc.linktext = basename;
       }
       // Assign frontmatter
       let frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile, true);
