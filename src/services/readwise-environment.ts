@@ -107,7 +107,7 @@ export class ReadwiseEnvironment extends Environment {
         .trim();
 
       // If `stringifyYaml` doesn't return a multi-line YAML line, we return it as one
-      if (_value.contains('\n') && _value.indexOf('|') !== 0) {
+      if (_value.includes('\n') && _value.indexOf('|') !== 0) {
         return `|-\n${YAML_INDENT}${_value}\n`;
       }
 
