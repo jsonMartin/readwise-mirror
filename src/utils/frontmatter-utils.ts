@@ -39,11 +39,14 @@ export function validateFrontmatterTemplate(
   error?: string;
   preview?: string;
 } {
-  const renderedTemplate = env.renderString(
+  
+  let renderedTemplate = '';
+  try {
+  
+    renderedTemplate = env.renderString(
     sanitizeFrontmatterTemplate(template),
     escapeMetadata(sampleMetadata, FRONTMATTER_TO_ESCAPE)
   );
-  try {
     parseYaml(renderedTemplate);
     return { isValidYaml: true };
   } catch (error) {
