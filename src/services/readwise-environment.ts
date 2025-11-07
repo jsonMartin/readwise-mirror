@@ -57,7 +57,10 @@ export class ReadwiseEnvironment extends Environment {
     // Convert newlines to blockquotes
     this.addFilter('bq', (str: string) => {
       if (typeof str !== 'string') return str;
-      return str.replace(/\r|\n|\r\n/g, '\r\n> ');
+      return str
+        .split(/\r?\n/)
+        .map((line) => `> ${line}`)
+        .join('\r\n');
     });
 
     // Test if string contains .qa
