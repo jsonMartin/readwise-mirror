@@ -717,18 +717,6 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
-
-    new Setting(containerEl)
-      .setName('Sort highlights from oldest to newest')
-      .setDesc(
-        'If checked, highlights will be listed from oldest to newest. Unchecked, newest highlights will appear first.'
-      )
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.highlightSortOldestToNewest).onChange(async (value) => {
-          this.plugin.settings.highlightSortOldestToNewest = value;
-          await this.plugin.saveSettings();
-        })
-      );
   }
 
   private renderHighlightSettings(containerEl: HTMLElement): void {
@@ -742,6 +730,18 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.highlightSortByLocation).onChange(async (value) => {
           this.plugin.settings.highlightSortByLocation = value;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName('Sort highlights from oldest to newest')
+      .setDesc(
+        'If checked, highlights will be listed from oldest to newest. Unchecked, newest highlights will appear first.'
+      )
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.highlightSortOldestToNewest).onChange(async (value) => {
+          this.plugin.settings.highlightSortOldestToNewest = value;
           await this.plugin.saveSettings();
         })
       );
