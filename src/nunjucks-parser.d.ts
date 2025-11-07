@@ -28,7 +28,7 @@ export class Tokenizer {
   lineno: number;
   colno: number;
   in_code: boolean;
-  tags: Required<TokenizerOptions['tags']>;
+  tags: Required<NonNullable<TokenizerOptions['tags']>>;
 
   nextToken(): Token | null;
   forward(): void;
