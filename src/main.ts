@@ -480,9 +480,12 @@ export default class ReadwiseMirror extends Plugin {
         }
       }
       // Assign frontmatter
-      let frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile, true);
-      if (readwiseFile.primary && readwiseFile.primary instanceof TFile) {
-        const fileMetadata: CachedMetadata = this.app.metadataCache.getFileCache(readwiseFile.primary);
+
+      const hasExistingFrontmatter = readwiseFile.primary instanceof TFile;
+      let frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile, hasExistingFrontmatter);
+      if (hasExistingFrontmatter) {
+        const primaryFile = readwiseFile.primary as TFile;
+        const fileMetadata: CachedMetadata = this.app.metadataCache.getFileCache(primaryFile);
         if (fileMetadata?.frontmatter) {
           const existingFrontmatter = new Frontmatter(fileMetadata.frontmatter);
           frontmatter = existingFrontmatter.merge(frontmatter);
