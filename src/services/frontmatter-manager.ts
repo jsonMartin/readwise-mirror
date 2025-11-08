@@ -143,7 +143,7 @@ export class FrontmatterManager {
   public async writeUpdatedFrontmatter(file: TFile, updates: Frontmatter): Promise<void> {
     // File carries a reference to the vault
     try {
-      this.fm.processFrontMatter(file, (frontmatter) => {
+      await this.fm.processFrontMatter(file, (frontmatter) => {
         // Biome doesn't like assing via { ... frontmatter, ...updates }
         // Iterate over keys in updates and set them in frontmatter
         for (const key in updates.toObject()) {
