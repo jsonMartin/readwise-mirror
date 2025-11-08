@@ -101,6 +101,11 @@ export class ReadwiseEnvironment extends Environment {
 
     // biome-ignore lint/suspicious/noExplicitAny: stringifyYaml is accepting `any`
     this.addFilter('fme', (value: any) => {
+      // Return if null/undefined
+      if (value === null || value === undefined) {
+        return null;
+      }
+
       // This is a bit of a hack, but a realiable way to get multi-line yaml right
       const _key = md5(value);
       const _value = stringifyYaml({ [_key]: value })
