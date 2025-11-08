@@ -1,34 +1,52 @@
-import slugify from '@sindresorhus/slugify';
 // Constants
-import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS, READWISE_REVIEW_URL_BASE } from 'constants/index';
-import filenamify from 'filenamify';
-import { Template } from 'nunjucks';
-import { normalizePath, Plugin, TFile, TFolder } from 'obsidian';
+import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS, NUNJUCKS_CORE_TEMPLATE, READWISE_REVIEW_URL_BASE } from 'constants/index';
+import { type App, type CachedMetadata, Plugin, type PluginManifest, TFile, TFolder } from 'obsidian';
+import { Atomizer } from 'services/atomizer';
 import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
+import { Frontmatter } from 'services/frontmatter';
 import { FrontmatterManager } from 'services/frontmatter-manager';
 // Plugin classes
 import Logger from 'services/logger';
 import ReadwiseApi from 'services/readwise-api';
-import { ReadwiseEnvironment } from 'services/readwise-environment';
+import { ReadwiseEnvironment, ReadwiseLoader } from 'services/readwise-environment';
 import spacetime from 'spacetime';
 // Types
-import type { Export, Highlight, Library, PluginSettings, ReadwiseDocument, ReadwiseFile, Tag } from 'types';
+import type { BaseFile, Export, Highlight, Library, PluginSettings, ReadwiseDocument, Tag } from 'types';
 import { ConfirmDialog } from 'ui/dialog';
 import Notify from 'ui/notify';
 import ReadwiseMirrorSettingTab from 'ui/settings-tab';
+import { normalizeFilename } from 'utils/filename-utils';
 import { createdDate, lastHighlightedDate, updatedDate } from 'utils/highlight-date-utils';
 import { isInReadwiseLibrary, isTrackedReadwiseNote } from 'utils/tracking-utils';
 
 export default class ReadwiseMirror extends Plugin {
   private _settings: PluginSettings;
   private _readwiseApi: ReadwiseApi;
-  private _headerTemplate: Template;
-  private _highlightTemplate: Template;
+  private _loader: ReadwiseLoader;
+  private _env: ReadwiseEnvironment;
   private _logger: Logger;
   private notify: Notify;
   private isSyncing = false;
   private frontmatterManager: FrontmatterManager;
   private deduplicatingVaultWriter: DeduplicatingVaultWriter;
+
+  constructor(app: App, manifest: PluginManifest) {
+    super(app, manifest);
+
+    // Set new custom Environment using our custom loader
+    this._loader = new ReadwiseLoader();
+    this._env = new ReadwiseEnvironment(this._loader, { autoescape: false });
+  }
+
+  // Add getter for environment
+  get env() {
+    return this._env;
+  }
+
+  // Add getter for loader
+  get loader() {
+    return this._loader;
+  }
 
   // Add logger getter
   get logger() {
@@ -54,7 +72,9 @@ export default class ReadwiseMirror extends Plugin {
 
   set headerTemplate(template: string) {
     try {
-      this._headerTemplate = new Template(template, new ReadwiseEnvironment(), null, true);
+      // Update and try to compile
+      this._loader.setSource('header', template);
+      this._env.getTemplate('header', true);
     } catch (error) {
       this.logger.error('Error setting header template:', error);
       this.notify.notice('Readwise: Error setting header template. Check console for details.');
@@ -63,10 +83,38 @@ export default class ReadwiseMirror extends Plugin {
 
   set highlightTemplate(template: string) {
     try {
-      this._highlightTemplate = new Template(template, new ReadwiseEnvironment(), null, true);
+      // Update and try to compile
+      this._loader.setSource('highlight', template);
+      this._env.getTemplate('highlight', true);
     } catch (error) {
       this.logger.error('Error setting highlight template:', error);
       this.notify.notice('Readwise: Error setting highlight template. Check console for details.');
+    }
+  }
+
+  /**
+   * Checks whether a specific file should be atomized,
+   * based on the various settings that govern this step
+   *
+   * @param contents
+   * @returns boolean
+   */
+  private shouldAtomize(frontmatter: Frontmatter): boolean {
+    // Early return if atomic highlights or tracking is disabled
+    if (!this.settings.atomicHighlights || !this.settings.trackFiles) {
+      return false;
+    }
+
+    // If conditional atomization is disabled, always atomize
+    if (!this.settings.atomicConditionalAtomize) {
+      return true;
+    }
+
+    try {
+      return Boolean(frontmatter?.get('rw-atomize'));
+    } catch (error) {
+      this.logger.warn('Error parsing frontmatter for atomization check:', error);
+      return false;
     }
   }
 
@@ -92,24 +140,47 @@ export default class ReadwiseMirror extends Plugin {
    * Formats a highlight for use in a template
    * @param highlight - The highlight to format
    * @param book - The book the highlight belongs to
-   * @returns The formatted highlight
+   * @returns The highlight object for the template
    */
   private formatHighlight(highlight: Highlight, book: Export) {
-    const { id, text, note, location, color, url, tags, highlighted_at, created_at, updated_at } = highlight;
-
-    const locationUrl = `https://readwise.io/to_kindle?action=open&asin=${book.asin}&location=${location}`;
-
-    const formattedTags = tags.filter((tag) => tag.name !== color);
-    const formattedTagStr = this.formatTags(formattedTags);
-
-    return this._highlightTemplate.render({
-      // Highlight fields
+    const {
       id,
       text,
       note,
       location,
-      location_url: locationUrl,
+      color,
+      url,
+      readwise_url,
+      tags,
+      highlighted_at,
+      created_at,
+      updated_at,
+      is_deleted,
+      is_discard,
+      is_favorite,
+      location_type,
+    } = highlight;
+
+    const location_url =
+      book.asin && location ? `https://readwise.io/to_kindle?action=open&asin=${book.asin}&location=${location}` : null;
+
+    const formattedTags = tags.filter((tag) => tag.name !== color);
+    const formattedTagStr = this.formatTags(formattedTags);
+
+    return {
+      // Highlight fields
+      book_id: book.user_book_id,
+      id,
+      text,
+      note,
+      location,
+      location_type,
+      location_url,
+      is_deleted,
+      is_discard,
+      is_favorite,
       url, // URL is set for source of highlight (webpage, tweet, etc). null for books
+      readwise_url,
       color,
       created_at: created_at ? this.formatDate(created_at) : '',
       updated_at: updated_at ? this.formatDate(updated_at) : '',
@@ -118,7 +189,7 @@ export default class ReadwiseMirror extends Plugin {
 
       // Book fields
       category: book.category,
-    });
+    };
   }
 
   private filterHighlights(highlights: Highlight[]) {
@@ -230,6 +301,7 @@ export default class ReadwiseMirror extends Plugin {
     }
   }
 
+  // Write a library of Readwise books to markdown files
   async writeLibraryToMarkdown(library: Library) {
     this.logger.group('Write Library to Markdown');
     try {
@@ -243,7 +315,7 @@ export default class ReadwiseMirror extends Plugin {
     }
 
     // Prepare all files first
-    const readwiseFiles: ReadwiseFile[] = this.getReadwiseFilesFromLibrary(library);
+    const readwiseFiles: BaseFile[] = await this.processReadwiseLibrary(library);
 
     if (readwiseFiles.length === 0) {
       this.logger.info('No eligible Readwise files to process (all highlights filtered out). Skipping write.');
@@ -271,8 +343,8 @@ export default class ReadwiseMirror extends Plugin {
    * @param library - The Readwise library object containing books and their highlights.
    * @returns An array of `ReadwiseFile` objects, each containing the filename, document metadata, and file contents.
    */
-  private getReadwiseFilesFromLibrary(library: Library): ReadwiseFile[] {
-    const readwiseFiles: ReadwiseFile[] = [];
+  private async processReadwiseLibrary(library: Library): Promise<BaseFile[]> {
+    const readwiseFiles: BaseFile[] = [];
 
     // Get total number of records
     const booksTotal = Object.keys(library.books).length;
@@ -332,7 +404,7 @@ export default class ReadwiseMirror extends Plugin {
 
       const doc: ReadwiseDocument = {
         id: user_book_id,
-        highlights_url: readwise_url,
+        readwise_url,
         unique_url,
         source_url,
         title,
@@ -354,19 +426,105 @@ export default class ReadwiseMirror extends Plugin {
         hl_tags_nohash: this.formatTags(highlightTags, true, "'"),
       };
 
-      // Render header, and highlights
-      const headerContents = this._headerTemplate.render(doc);
-      const formattedHighlights = this.sortHighlights(filteredHighlights)
-        .map((highlight: Highlight) => this.formatHighlight(highlight, book))
-        .join('\n');
-
-      const contents = `${headerContents}${formattedHighlights}`;
-
-      readwiseFiles.push({
+      // Prepare the readwise file object
+      const readwiseFile: BaseFile = {
+        type: 'base',
         basename,
         doc,
-        contents,
+        contents: undefined,
+      };
+
+      // Get the primary path for new file before checking for duplicates
+      readwiseFile.primary = this.deduplicatingVaultWriter.getNormalizedPath(
+        this.deduplicatingVaultWriter.getCategoryPath(category),
+        `${basename}.md`
+      );
+      // note_link is just the basename in this case
+      doc.linktext = basename;
+
+      // Early deduplication check to find primary and duplicate files
+      if (this.settings.trackFiles && this.settings.trackingProperty) {
+        const existingFiles = await this.deduplicatingVaultWriter.findExistingByHighlightsUrl(doc);
+        if (existingFiles.length > 0) {
+          const [primary, ...duplicates] = existingFiles;
+          this.logger.debug(
+            `Found ${existingFiles.length} existing file(s) for '${title}' (${source_url}), using primary: ${primary.path}`
+          );
+
+          // We only rename files if the respective settings are enabled and the filenames differ
+          if (this.settings.enableFileNameUpdates && readwiseFile.basename !== primary.basename) {
+            let newPath = this.deduplicatingVaultWriter.getNormalizedPath(
+              primary.parent.path,
+              `${readwiseFile.basename}.md`
+            );
+            const newFileExists = await this.app.vault.adapter.exists(newPath, false);
+            if (newFileExists) {
+              // Add hash to filename if there's a collision
+              const hash = this.deduplicatingVaultWriter.generateShortHash(readwiseFile.doc);
+              newPath = this.deduplicatingVaultWriter.getNormalizedPath(
+                primary.parent.path,
+                `${readwiseFile.basename} ${hash}.md`
+              );
+            }
+
+            if (newPath !== primary.path) {
+              this.logger.debug(`Renamed file from ${primary.path} to ${newPath}`);
+              await this.app.fileManager.renameFile(primary, newPath);
+            }
+          }
+
+          // Update readwiseFile and doc with existing file
+          readwiseFile.primary = primary;
+          readwiseFile.duplicates = duplicates;
+          doc.linktext = this.app.metadataCache.fileToLinktext(readwiseFile.primary, readwiseFile.primary.path, true);
+        }
+      }
+      // Assign frontmatter
+
+      const hasExistingFrontmatter = readwiseFile.primary instanceof TFile;
+      let frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile, hasExistingFrontmatter);
+      if (hasExistingFrontmatter) {
+        const primaryFile = readwiseFile.primary as TFile;
+        const fileMetadata: CachedMetadata = this.app.metadataCache.getFileCache(primaryFile);
+        if (fileMetadata?.frontmatter) {
+          const existingFrontmatter = new Frontmatter(fileMetadata.frontmatter);
+          frontmatter = existingFrontmatter.merge(frontmatter);
+        }
+      }
+
+      // Determine if we should atomize this file
+      const shouldAtomize = this.shouldAtomize(frontmatter);
+      // Render header, and highlights by rendering the core template
+      this._loader.setSource('file', NUNJUCKS_CORE_TEMPLATE);
+      const _contents = this._env.render('file', {
+        // We pass the doc (current Readwise document) and book (Export) for access to all fields
+        doc,
+        book,
+        highlights: this.sortHighlights(filteredHighlights).map((hl) => this.formatHighlight(hl, book)),
+        headerTemplate: 'header',
+        highlightTemplate: 'highlight',
       });
+
+      _contents;
+
+      // Assign frontmatter to readwiseFile
+      readwiseFile.frontmatter = frontmatter?.toString();
+
+      // Atomize only when enabled and when trackFiles is enabled as well
+      const atomizer = new Atomizer();
+      if (shouldAtomize) {
+        // FIXME: Handle basename changes of the parent file: we need to update all atomized files as well, or ensure we catch a differing basename vs. primary file
+        const { contents, atoms } = atomizer.atomize(_contents, { basename, doc, book });
+        this.logger.debug(`Atomized ${atoms?.length} highlights for '${title}' (${source_url})`);
+        readwiseFile.contents = contents;
+        readwiseFile.atoms = atoms;
+      } else {
+        // Set atomizer to composite mode and remove frontmatter blocks
+        atomizer.setCompositeEnvironment();
+        const { contents } = atomizer.atomize(_contents, { basename, doc, book });
+        readwiseFile.contents = contents;
+      }
+      readwiseFiles.push(readwiseFile);
     }
     return readwiseFiles;
   }
@@ -389,38 +547,13 @@ export default class ReadwiseMirror extends Plugin {
         created: createdDate(book.highlights),
         updated: updatedDate(book.highlights),
       };
-      filename = new Template(template, new ReadwiseEnvironment(), null, true).render(context);
+      this._loader.setSource('filename', template);
+      filename = this._env.render('filename', context);
     } else {
       filename = book.title;
     }
 
-    return this.normalizeFilename(filename);
-  }
-
-  /**
-   *  Normalizes the filename by replacing critical characters
-   *  and ensuring it is a valid filename
-   * @param filename - The filename to normalize
-   * @returns The normalized filename
-   */
-  private normalizeFilename(filename: string) {
-    const normalizedFilename = this.settings.useSlugify
-      ? slugify(filename.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
-          separator: this.settings.slugifySeparator,
-          lowercase: this.settings.slugifyLowercase,
-        })
-      : // ... else filenamify the title and limit to 252 characters (to account for the `.md` which will be added)
-        filenamify(filename.replace(/:/g, this.settings.colonSubstitute ?? '-'), {
-          replacement: ' ',
-          maxLength: 252,
-        })
-          // Ensure we remove additional critical characters, replace multiple spaces with one, and trim
-          // Replace # as this inrerferes with WikiLinks (other characters are taken care of in "filenamify")
-          .replace(/[#]+/g, ' ')
-          .replace(/ +/g, ' ')
-          .trim();
-
-    return normalizePath(normalizedFilename);
+    return normalizeFilename(filename, this.settings);
   }
 
   async deleteLibraryFolder() {
@@ -460,11 +593,13 @@ export default class ReadwiseMirror extends Plugin {
       const lastUpdated = this.settings.lastUpdated;
 
       if (!lastUpdated) {
-        this.notify.notice('Readwise: Previous sync not detected...\nDownloading full Readwise library');
+        if (this.settings.syncNotifications)
+          this.notify.notice('Readwise: Previous sync not detected...\nDownloading full Readwise library');
         library = await this._readwiseApi.downloadFullLibrary();
       } else {
-        // Load Upadtes and cache
-        this.notify.notice(`Readwise: Checking for new updates since ${this.lastUpdatedHumanReadableFormat()}`);
+        // Load Updates and cache
+        if (this.settings.syncNotifications)
+          this.notify.notice(`Readwise: Checking for new updates since ${this.lastUpdatedHumanReadableFormat()}`);
         library = await this._readwiseApi.downloadUpdates(lastUpdated);
       }
 
@@ -494,6 +629,10 @@ export default class ReadwiseMirror extends Plugin {
       this.logger.groupEnd();
 
       if (Object.keys(library.books).length > 0) {
+        if (this.settings.atomicHighlights) {
+          library.categories.add('Highlight');
+        }
+
         await this.writeLibraryToMarkdown(library);
 
         if (this.settings.logFile) await this.writeLogToMarkdown(library);
@@ -502,9 +641,9 @@ export default class ReadwiseMirror extends Plugin {
         if (this.settings.filterNotesByTag && this.settings.filteredTags?.length > 0) {
           message += ` (filtered by tags: ${this.settings.filteredTags.join(', ')})`;
         }
-        this.notify.notice(message);
+        if (this.settings.syncNotifications) this.notify.notice(message);
       } else {
-        this.notify.notice('Readwise: No new content available');
+        if (this.settings.syncNotifications) this.notify.notice('Readwise: No new content available');
       }
 
       this.settings.lastUpdated = new Date().toISOString();
@@ -513,6 +652,7 @@ export default class ReadwiseMirror extends Plugin {
     } catch (error) {
       this.logger.error('Error during sync:', error);
       this.notify.notice(`Readwise: Sync failed. ${error}`);
+      this.notify.setStatusBarText(`Readwise: Sync error ${error}`);
     } finally {
       // Make sure we reset the sync status in case of error
       this.isSyncing = false;
@@ -531,9 +671,9 @@ export default class ReadwiseMirror extends Plugin {
     await this.saveSettings();
 
     if (await this.deleteLibraryFolder()) {
-      this.notify.notice('Readwise: library folder deleted');
+      if (this.settings.syncNotifications) this.notify.notice('Readwise: library folder deleted');
     } else {
-      this.notify.notice('Readwise: Error deleting library folder');
+      if (this.settings.syncNotifications) this.notify.notice('Readwise: Error deleting library folder');
     }
 
     this.notify.setStatusBarText('Readwise: Click to Sync');
@@ -553,7 +693,6 @@ export default class ReadwiseMirror extends Plugin {
     if (readwiseFolder && readwiseFolder instanceof TFolder) {
       this.notify.notice('Readwise: Filename adjustment started');
       // Iterate all files in the Readwise folder and "fix" their names according to the current settings using
-      // this.normalizeFilename()
       const renamedFiles = await this.iterativeReadwiseRenamer(readwiseFolder);
       if (renamedFiles > 0) {
         this.notify.notice(`Readwise: Renamed ${renamedFiles} files. Check console for renaming errors.`);
@@ -593,7 +732,7 @@ export default class ReadwiseMirror extends Plugin {
    * @param file The file to format.
    */
   private async renameReadwiseNote(file: TFile): Promise<boolean> {
-    const newFilename = this.normalizeFilename(file.basename);
+    const newFilename = normalizeFilename(file.basename, this.settings);
 
     // Only rename if there's a difference
     if (newFilename !== file.basename) {
@@ -642,7 +781,7 @@ export default class ReadwiseMirror extends Plugin {
 
     this.notify = new Notify(statusBarItem);
 
-    this.frontmatterManager = new FrontmatterManager(this.settings, this.logger);
+    this.frontmatterManager = new FrontmatterManager(this.settings, this.logger, this._env, this.app.fileManager);
 
     this.headerTemplate = this.settings.headerTemplate;
     this.highlightTemplate = this.settings.highlightTemplate;
@@ -667,7 +806,7 @@ export default class ReadwiseMirror extends Plugin {
         .validateToken()
         .then((isValid) => {
           if (isValid && this.settings.autoSync) {
-            this.notify.notice('Readwise: Run auto sync on startup');
+            if (this.settings.syncNotifications) this.notify.notice('Readwise: Run auto sync on startup');
             this.sync();
           }
         })
@@ -852,7 +991,7 @@ export default class ReadwiseMirror extends Plugin {
         }
       }
 
-      const readwiseFiles: ReadwiseFile[] = this.getReadwiseFilesFromLibrary(library);
+      const readwiseFiles: BaseFile[] = await this.processReadwiseLibrary(library);
       this.logger.group('Frontmatter Update');
       await this.deduplicatingVaultWriter.processFrontmatter(readwiseFiles);
       this.logger.groupEnd();
@@ -906,7 +1045,7 @@ export default class ReadwiseMirror extends Plugin {
       const allowUpdate = this.settings.trackAcrossVault ? isReadwiseNote : isReadwiseNote && isInLibrary;
 
       if (allowUpdate) {
-        this.logger.debug('Readwise: Updating current note...'); // FIXME: Simplify. In theory, we only reach this point of trackingUrl is valid (due to isReadwiseNote checks above) so the following is not needed. The root problem is the double call to getFileCache (here and in isTrackedReadwiseNote()) which should be avoided.
+        this.logger.debug('Readwise: Updating current note...'); // FIXME: Simplify. In theory, we only reach this point if trackingUrl is valid (due to isReadwiseNote checks above) so the following is not needed. The root problem is the double call to getFileCache (here and in isTrackedReadwiseNote()) which should be avoided.
         const fileCache = this.app.metadataCache.getFileCache(file);
         const trackingUrl = fileCache?.frontmatter?.[this._settings.trackingProperty];
         if (typeof trackingUrl !== 'string' || !trackingUrl.startsWith(READWISE_REVIEW_URL_BASE)) {
@@ -926,11 +1065,14 @@ export default class ReadwiseMirror extends Plugin {
         const library = await this._readwiseApi.downloadSingleBook(id);
 
         if (Object.keys(library.books).length > 0) {
+          if (this.settings.atomicHighlights) {
+            library.categories.add('Highlight');
+          }
           await this.writeLibraryToMarkdown(library);
 
           if (this.settings.logFile) await this.writeLogToMarkdown(library);
 
-          this.notify.notice('Readwise: Book update complete.');
+          if (this.settings.syncNotifications) this.notify.notice('Readwise: Book update complete.');
         } else {
           this.notify.notice(`Readwise: Note with id ${id} not found on Readwise.`);
           this.logger.warn(`Readwise: Note with id ${id} not found on Readwise.`);

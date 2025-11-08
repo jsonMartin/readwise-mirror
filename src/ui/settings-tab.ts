@@ -14,7 +14,7 @@ import ReadwiseApi, { TokenValidationError } from 'services/readwise-api';
 import type { TemplateValidationResult } from 'types';
 import { WarningDialog } from 'ui/dialog';
 import type Notify from 'ui/notify';
-import { validateFrontmatterTemplate } from 'utils/frontmatter-utils';
+import { sanitizeFrontmatterTemplate, validateFrontmatterTemplate } from 'utils/frontmatter-utils';
 
 interface SettingsTab {
   id: string;
@@ -236,7 +236,12 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         href: 'https://mozilla.github.io/nunjucks/templating.html#builtin-filters',
       });
       link.setAttr('target', '_blank');
-      syntaxNote.appendText('.');
+      syntaxNote.appendText(' and the ');
+      syntaxNote.createEl('a', {
+        text: 'documentation in the Wiki',
+        href: 'https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-Templating',
+      });
+      syntaxNote.append(' for more details.');
     });
   }
 
@@ -282,8 +287,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         id: 'highlight-template',
         name: 'Highlights',
         render: (container) => {
-          this.renderHighlightSettings(container);
+          this.renderAtomicHighlightsSettings(container);
           this.renderHighlightTemplateSettings(container);
+          this.renderHighlightSettings(container);
         },
       },
     ];
@@ -595,20 +601,126 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       );
   }
 
-  private renderHighlightSettings(containerEl: HTMLElement): void {
-    new Setting(containerEl).setName('Highlight organization').setHeading();
+  private renderAtomicHighlightsSettings(containerEl: HTMLElement): void {
+    new Setting(containerEl).setName('Atomic highlights').setHeading();
+
+    // Add atomic highlights setting with tracking dependency
+    new Setting(containerEl)
+      .setName('Enable atomic highlights')
+      .setDesc(
+        createFragment((fragment) => {
+          fragment.appendText('Allows creation of atomic highlights & notes. Please check the documentation on the ');
+          fragment
+            .createEl('a', {
+              text: 'Wiki',
+              href: 'https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-Atomic-highlights',
+            })
+            .setAttr('target', '_blank');
+          fragment.appendText(' for details.');
+
+          if (!this.plugin.settings.trackFiles) {
+            fragment.createEl('br');
+            fragment.createEl('br');
+            fragment.createSpan({
+              text: 'Requires file tracking to be enabled.',
+              attr: { style: 'color: var(--text-error);' },
+            });
+          }
+        })
+      )
+      .addToggle((toggle) => {
+        // Disable and turn off if tracking is disabled
+        if (!this.plugin.settings.trackFiles) {
+          toggle.setValue(false);
+          toggle.setDisabled(true);
+          this.plugin.settings.atomicHighlights = false;
+        } else {
+          toggle.setValue(this.plugin.settings.atomicHighlights).onChange(async (value) => {
+            if (value) {
+              new WarningDialog(
+                this.app,
+                'Enable atomic highlights',
+                createFragment((fragment) => {
+                  fragment.createDiv({
+                    text: 'Enabling atomic highlights will create individual note files for each highlight in your vault.',
+                  });
+                  fragment.createEl('br');
+                  fragment.createDiv({
+                    text: 'This can lead to the creation of many new files. Please make sure you understand how atomic highlights work before continuing.',
+                  });
+                  fragment.createEl('br');
+                  fragment.createDiv({
+                    text: 'Would you like to proceed?',
+                  });
+                }),
+                async (confirmed: boolean) => {
+                  if (confirmed) {
+                    this.plugin.settings.atomicHighlights = true;
+                    await this.plugin.saveSettings();
+                  } else {
+                    toggle.setValue(false);
+                  }
+                }
+              ).open();
+            } else {
+              this.plugin.settings.atomicHighlights = false;
+              await this.plugin.saveSettings();
+            }
+          });
+        }
+        return toggle;
+      });
+
+    // Add atomic highlights parent property setting
 
     new Setting(containerEl)
-      .setName('Sort highlights from oldest to newest')
+      .setClass('indent')
+      .setName('Conditional atomization (rw-atomize)')
       .setDesc(
-        'If checked, highlights will be listed from oldest to newest. Unchecked, newest highlights will appear first.'
+        createFragment((fragment) => {
+          fragment.appendText('Only create atomic notes for Readwise notes where ');
+          fragment.createEl('code', { text: 'rw-atomize: true' });
+          fragment.appendText(" is set in the highlight's frontmatter. ");
+        })
       )
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.highlightSortOldestToNewest).onChange(async (value) => {
-          this.plugin.settings.highlightSortOldestToNewest = value;
+        toggle.setValue(this.plugin.settings.atomicConditionalAtomize).onChange(async (value) => {
+          this.plugin.settings.atomicConditionalAtomize = value;
           await this.plugin.saveSettings();
         })
       );
+
+    new Setting(containerEl)
+      .setClass('indent')
+      .setName('Atomic parent property')
+      .setDesc('Frontmatter property used to link atomic notes back to their parent document (default: rw-parent).')
+      .addText((text) =>
+        text
+          .setPlaceholder('rw-parent')
+          .setValue(this.plugin.settings.atomicParentProperty || 'rw-parent')
+          .onChange(async (value) => {
+            this.plugin.settings.atomicParentProperty = value || 'rw-parent';
+            await this.plugin.saveSettings();
+          })
+      );
+
+    // Add atomic highlights frontmatter setting
+    new Setting(containerEl)
+      .setClass('indent')
+      .setName('Inherit parent note frontmatter')
+      .setDesc(
+        "Inherit the frontmatter from the parent note in atomic highlights. Frontmatter properties defined in atomize blocks will overwrite the parent note's frontmatter."
+      )
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.atomicInheritParentFrontmatter).onChange(async (value) => {
+          this.plugin.settings.atomicInheritParentFrontmatter = value;
+          await this.plugin.saveSettings();
+        })
+      );
+  }
+
+  private renderHighlightSettings(containerEl: HTMLElement): void {
+    new Setting(containerEl).setName('Highlight organization').setHeading();
 
     new Setting(containerEl)
       .setName('Sort highlights by location')
@@ -618,6 +730,18 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.highlightSortByLocation).onChange(async (value) => {
           this.plugin.settings.highlightSortByLocation = value;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName('Sort highlights from oldest to newest')
+      .setDesc(
+        'If checked, highlights will be listed from oldest to newest. Unchecked, newest highlights will appear first.'
+      )
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.highlightSortOldestToNewest).onChange(async (value) => {
+          this.plugin.settings.highlightSortOldestToNewest = value;
           await this.plugin.saveSettings();
         })
       );
@@ -916,7 +1040,17 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
   }
 
   private renderSyncLogging(containerEl: HTMLElement): void {
-    new Setting(containerEl).setName('Sync logging').setHeading();
+    new Setting(containerEl).setName('Sync notifications and logging').setHeading();
+
+    new Setting(containerEl)
+      .setName('Display sync notifications')
+      .setDesc('Display Obsidian notifications during sync operations')
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.syncNotifications).onChange(async (value) => {
+          this.plugin.settings.syncNotifications = value;
+          await this.plugin.saveSettings();
+        })
+      );
 
     new Setting(containerEl)
       .setName('Sync log')
@@ -992,7 +1126,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         toggle.setValue(this.plugin.settings.frontMatter).onChange(async (value) => {
           // Test template with sample data
           try {
-            const { isValidYaml, error } = validateFrontmatterTemplate(this.plugin.settings.frontMatterTemplate);
+            const { isValidYaml, error } = validateFrontmatterTemplate(
+              this.plugin.env,
+              this.plugin.settings.frontMatterTemplate
+            );
             if ((value && isValidYaml) || !value) {
               // Save settings and update the template
               this.plugin.settings.frontMatter = value;
@@ -1145,6 +1282,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           fragment.append(
             this.createTemplateDocumentation([
               ['id', 'Document ID'],
+              ['linktext', 'Obsidian note linktext for the document (without Wikilink syntax)'],
               ['created', 'Creation timestamp'],
               ['updated', 'Last update timestamp'],
               ['last_highlight_at', 'Last highlight timestamp'],
@@ -1160,7 +1298,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               ['tags_nohash', 'Tags without # prefix (compatible with frontmatter)'],
               ['highlight_tags', 'Tags from highlights with # prefix'],
               ['hl_tags_nohash', 'Tags from highlights without # prefix (compatible with frontmatter)'],
-              ['highlights_url', 'Readwise URL (auto-injected if file tracking enabled)'],
+              ['highlights_url, readwise_url', 'Readwise URL (auto-injected if file tracking enabled)'],
               [
                 'Note:',
                 'If file tracking is enabled, the specified tracking property will be automatically added or updated in the frontmatter template, independent of the frontmatter settings.',
@@ -1246,6 +1384,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         // Display rendered template on load
         try {
           const validationResult: TemplateValidationResult = validateFrontmatterTemplate(
+            this.plugin.env,
             this.plugin.settings.frontMatterTemplate
           );
           updatePreview(validationResult);
@@ -1259,21 +1398,21 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             preview: this.plugin.settings.frontMatterTemplate,
           });
         }
-        text.setValue(this.plugin.settings.frontMatterTemplate).onChange(async (value) => {
+        text.setValue(sanitizeFrontmatterTemplate(this.plugin.settings.frontMatterTemplate)).onChange(async (value) => {
           const noticeEl = containerEl.querySelector('#validation-notice');
           try {
-            const validationResult: TemplateValidationResult = validateFrontmatterTemplate(value);
+            const validationResult: TemplateValidationResult = validateFrontmatterTemplate(this.plugin.env, value);
 
             // Update validation notice
             if (noticeEl) {
               noticeEl.setText(validationResult.isValidYaml ? '' : validationResult.error);
             }
 
-            // Set the frontmatter in settings
-            if (!value) {
+            // Set the frontmatter in settings, but only if enabled
+            if (!value && this.plugin.settings.frontMatter) {
               this.plugin.settings.frontMatterTemplate = DEFAULT_SETTINGS.frontMatterTemplate;
             } else {
-              this.plugin.settings.frontMatterTemplate = value.replace(/\n*$/, '\n');
+              this.plugin.settings.frontMatterTemplate = sanitizeFrontmatterTemplate(value);
             }
 
             updatePreview(validationResult);
@@ -1328,7 +1467,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           ['summary', 'Document summary'],
           ['document_note', 'Additional notes'],
           ['num_highlights', 'Number of highlights'],
-          ['highlights_url', 'Readwise URL'],
+          ['highlights_url, readwise_url', 'Readwise URL'],
           ['source_url', 'Original content URL'],
           ['unique_url', 'Unique identifier URL'],
           ['created/updated/last_highlight_at', 'Timestamps'],
@@ -1377,11 +1516,16 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setDesc(
         this.createTemplateDocumentation([
+          [
+            'doc',
+            'Parent document (Check-out Header template for details). Individual fields can be accessed as doc.<field>: doc.id would return the id of the parent document, doc.linktext the parent document link (without Wikilink syntax).)',
+          ],
           ['text', 'Highlight content (supports bq filter for blockquotes)'],
           ['note', 'Associated notes (supports qa filter for Q&A format)'],
           ['color', 'Highlight color'],
           ['location', 'Book location'],
-          ['locationUrl', 'Direct link to highlight location'],
+          ['location_url', 'Direct link to highlight location'],
+          ['locationUrl', 'Direct link to highlight location (legacy variable)'],
           ['url', 'Source URL'],
           ['id', 'Highlight ID'],
           ['category', 'Content type (e.g., books)'],

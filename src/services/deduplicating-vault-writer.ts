@@ -1,8 +1,8 @@
 import md5 from 'md5'; // Fix imports
-import { type App, normalizePath, type TFile, type Vault } from 'obsidian';
+import { type App, getFrontMatterInfo, normalizePath, TFile, type Vault } from 'obsidian';
 import type { FrontmatterManager } from 'services/frontmatter-manager';
 import type Logger from 'services/logger';
-import type { PluginSettings, ReadwiseDocument, ReadwiseFile } from 'types';
+import type { AtomicFile, BaseFile, PluginSettings, ReadwiseDocument } from 'types';
 import type Notify from 'ui/notify';
 import { isInReadwiseLibrary, isTrackedReadwiseNote } from 'utils/tracking-utils';
 import type { Frontmatter } from './frontmatter';
@@ -32,7 +32,7 @@ export class DeduplicatingVaultWriter {
    * @param segments - Path segments to join
    * @returns Normalized path string
    */
-  private getNormalizedPath(...segments: string[]): string {
+  public getNormalizedPath(...segments: string[]): string {
     return normalizePath(segments.join('/'));
   }
 
@@ -54,14 +54,14 @@ export class DeduplicatingVaultWriter {
   }
 
   /**
-   * Finds files in the vault with matching highlights_url
+   * Finds files in the vault with matching readwise_url
    *
    * @param doc The readwise document to find matches for
    * @returns An array of matching files
    */
-  private async findExistingByHighlightsUrl(doc: ReadwiseDocument): Promise<TFile[]> {
-    if (!this.settings.trackFiles || !this.settings.trackingProperty || !doc.highlights_url) {
-      return []; // No tracking or no highlights_url
+  public async findExistingByHighlightsUrl(doc: ReadwiseDocument): Promise<TFile[]> {
+    if (!this.settings.trackFiles || !this.settings.trackingProperty || !doc.readwise_url) {
+      return []; // No tracking or no readwise_url
     }
 
     // Get all files in the vault
@@ -81,8 +81,8 @@ export class DeduplicatingVaultWriter {
         return false;
       }
 
-      // Compare the tracking property value to the highlights_url
-      return metadata?.frontmatter?.[this.settings.trackingProperty] === doc.highlights_url;
+      // Compare the tracking property value to the readwise_url
+      return metadata?.frontmatter?.[this.settings.trackingProperty] === doc.readwise_url;
     });
   }
 
@@ -92,16 +92,21 @@ export class DeduplicatingVaultWriter {
    * @param doc - The readwise document to generate a hash for
    * @returns A short hash
    */
-  private generateShortHash(doc: ReadwiseDocument): string {
+  public generateShortHash(doc: ReadwiseDocument): string {
     return md5(doc.id.toString()).substring(0, 4);
   }
 
   /**
    * Gets the category path for a given category
    *
-   * @param category - The category to get the path for
+   * @param file - The file to get the category for
    * @returns The normalized category path
    */
+  public getCategoryPathFromFile(file: BaseFile | AtomicFile): string {
+    const category = file.type === 'base' ? file.doc.category : 'Highlight';
+    return this.getCategoryPath(category);
+  }
+
   public getCategoryPath(category: string): string {
     const formattedCategory = category.charAt(0).toUpperCase() + category.slice(1);
     return this.getNormalizedPath(this.settings.baseFolderName, formattedCategory);
@@ -110,42 +115,37 @@ export class DeduplicatingVaultWriter {
   /**
    * Updates an existing file with new contents and frontmatter
    *
-   * @param file - The file to update
    * @param readwiseFile - The readwise file containing doc and contents
    */
-  private async updateExistingFile(file: TFile, readwiseFile: ReadwiseFile): Promise<void> {
+  private async updateExistingFile(readwiseFile: BaseFile): Promise<void> {
+    if (!(readwiseFile.primary instanceof TFile)) {
+      this.logger.error('Primary file is not a TFile instance', { primary: readwiseFile.primary });
+      throw new Error('Primary file is not a TFile instance. This should not happen');
+    }
+
+    const file: TFile = readwiseFile.primary;
     this.notifyFileCount();
-
     try {
-      // Only update frontmatter if frontmatter is enabled
-      if (this.settings.frontMatter && this.settings.updateFrontmatter) {
-        const updatedFrontmatter = this.frontmatterManager.getFrontmatter(
-          readwiseFile.doc,
-          this.app.metadataCache.getFileCache(file)?.frontmatter
-        );
+      // Process frontmatter atomically
+      await this.app.fileManager.processFrontMatter(file, (existingFrontmatter) => {
+        // Only update frontmatter if frontmatter is enabled
+        const hasFrontmatter = Object.keys(existingFrontmatter).length > 0;
+        const updatedFrontmatter = this.frontmatterManager.getFrontmatter(readwiseFile, hasFrontmatter);
+
+        // Clean up existing frontmatter if updateFrontmatter is disabled
+        if (!this.settings.updateFrontmatter) {
+          for (const key in existingFrontmatter) {
+            delete existingFrontmatter[key];
+          }
+        }
+
         this.logger.debug(`Updating file ${file.path} with new frontmatter`, updatedFrontmatter);
-        await this.vault.process(file, () => `${updatedFrontmatter.toString()}\n${readwiseFile.contents}`);
-      } else {
-        const frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile.doc);
-        this.logger.debug(`Not updating frontmatter for file ${file.path}`, frontmatter);
-        await this.vault.process(file, () => `${frontmatter.toString()}\n${readwiseFile.contents}`);
-      }
-
-      // We only rename files if the respective settings are enabled and the filenames differ
-      if (this.settings.trackFiles && this.settings.enableFileNameUpdates && readwiseFile.basename !== file.basename) {
-        let newPath = this.getNormalizedPath(file.parent.path, `${readwiseFile.basename}.md`);
-        const newFileExists = await this.app.vault.adapter.exists(newPath, false);
-        if (newFileExists) {
-          // Add hash to filename if there's a collision
-          const hash = this.generateShortHash(readwiseFile.doc);
-          newPath = this.getNormalizedPath(file.parent.path, `${readwiseFile.basename} ${hash}.md`);
+        for (const [key, value] of updatedFrontmatter.entries()) {
+          existingFrontmatter[key] = value;
         }
+      });
 
-        if (newPath !== file.path) {
-          this.logger.debug(`Renamed file from ${file.path} to ${newPath}`);
-          await this.app.fileManager.renameFile(file, newPath);
-        }
-      }
+      await this.fileWrite(file, readwiseFile.contents);
     } catch (err) {
       this.logger.error(`Readwise: Attempt to update file ${file.path} failed`, err);
       throw err;
@@ -158,10 +158,10 @@ export class DeduplicatingVaultWriter {
    * @param file - The duplicate file to handle
    * @param readwiseFile - The readwise file containing doc metadata
    */
-  private async handleDuplicate(file: TFile, readwiseFile: ReadwiseFile): Promise<void> {
+  private async handleDuplicate(file: TFile, readwiseFile: BaseFile): Promise<void> {
     this.notifyFileCount();
 
-    const frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile.doc);
+    const frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile);
     try {
       if (this.settings.deleteDuplicates) {
         this.logger.debug(`Trashing duplicate ${file.path}`);
@@ -185,27 +185,30 @@ export class DeduplicatingVaultWriter {
    * @param readwiseFiles - An array of ReadwiseFile objects to be processed.
    * @returns A Promise that resolves when all file groups have been processed.
    */
-  public async process(readwiseFiles: ReadwiseFile[]): Promise<void> {
+  public async process(readwiseFiles: BaseFile[]): Promise<void> {
     // Reset the file count
     this.totalFileCount = readwiseFiles.length;
     this.fileCount = 0;
 
     this.notify.setStatusBarText(`Readwise: ${this.totalFileCount} files to process`);
 
-    // First, compute paths for all files
-    const filesWithPaths: ReadwiseFile[] = readwiseFiles.map((file) => ({
-      ...file,
-      path: this.getNormalizedPath(this.getCategoryPath(file.doc.category), `${file.basename}.md`),
-    }));
     // Group by path (which includes category and filename)
-    const groupedByPath = new Map<string, ReadwiseFile[]>();
+    const groupedByPath = new Map<string, BaseFile[]>();
 
-    for (const file of filesWithPaths) {
-      // Use lowercase path for comparison as filesystems are (potentially) case-insensitive
-      if (!groupedByPath.has(file.path.toLowerCase())) {
-        groupedByPath.set(file.path.toLowerCase(), []);
+    for (const file of readwiseFiles) {
+      let path: string;
+      if (file.primary instanceof TFile) {
+        // If we have a primary TFile, use its path for grouping
+        path = file.primary.path;
+      } else if (typeof file.primary === 'string') {
+        // If we have a primary path string, use it for grouping
+        path = file.primary;
       }
-      groupedByPath.get(file.path.toLowerCase()).push(file);
+      // Use lowercase path for comparison as filesystems are (potentially) case-insensitive
+      if (!groupedByPath.has(path.toLowerCase())) {
+        groupedByPath.set(path.toLowerCase(), []);
+      }
+      groupedByPath.get(path.toLowerCase()).push(file);
     }
 
     // Process each path group (i.e. files with the same category and filename)
@@ -217,7 +220,7 @@ export class DeduplicatingVaultWriter {
     }
   }
 
-  public async processFrontmatter(readwiseFiles: ReadwiseFile[]): Promise<void> {
+  public async processFrontmatter(readwiseFiles: BaseFile[]): Promise<void> {
     this.logger.debug('Processing frontmatter for Readwise files', { readwiseFiles });
 
     // Reset the file count
@@ -232,7 +235,7 @@ export class DeduplicatingVaultWriter {
       for (const file of files) {
         // Since we are only updating frontmatter, for existing files, we can use the Obsidian file manager for atomic frontmatter updates
         this.app.fileManager.processFrontMatter(file, (existingFrontmatter) => {
-          const updates: Frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile.doc);
+          const updates: Frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile);
           const filteredFrontMatter = this.settings.protectFrontmatter
             ? this.frontmatterManager.filterProtectedFrontmatter(updates)
             : updates;
@@ -247,15 +250,15 @@ export class DeduplicatingVaultWriter {
    * the files to the vault according to the tracking settings
    * @param readwiseFiles - The files to process
    */
-  private async writePathGroup(readwiseFiles: ReadwiseFile[]): Promise<void> {
-    // First, check if files are tracked (and have highlights_url), sort by doc id
+  private async writePathGroup(readwiseFiles: BaseFile[]): Promise<void> {
+    // First, check if files are tracked (and have readwise_url), sort by doc id
     /*
      * Process tracked files by filename
      * Files that share the same filename are duplicates,
      * those with the tracking property will be treated first
      */
     if (this.settings.trackFiles && this.settings.trackingProperty) {
-      // Update or create primary file based on highlights_url
+      // Update or create primary file based on readwise_url
       for (const file of readwiseFiles) {
         await this.processTrackedFile(file);
       }
@@ -263,47 +266,48 @@ export class DeduplicatingVaultWriter {
       // All files are untracked - append hash to all but the first,
       this.logger.debug('Files are untracked - appending hash to all but the first', { files: readwiseFiles });
       const [primary, ...duplicates] = readwiseFiles;
-      await this.writeFile(primary, true);
+      await this.writeFileToVault(primary, true);
 
       for (const duplicate of duplicates) {
-        await this.writeFile(duplicate);
+        await this.writeFileToVault(duplicate);
       }
     }
   }
 
   /**
-   * Processes a tracked file, updating or creating it in the vault
-   * @param trackedPrimary - The primary file to process
+   * Processes a tracked file, updating or creating it in the vault, and handling its atomicity
+   * @param baseFile - The primary base file to process
+   * @returns The created or updated file
    */
-  private async processTrackedFile(trackedPrimary: ReadwiseFile) {
-    const existingFiles = await this.findExistingByHighlightsUrl(trackedPrimary.doc);
-    if (existingFiles.length > 0) {
-      const [primary, ...duplicates] = existingFiles;
-
+  private async processTrackedFile(baseFile: BaseFile): Promise<void> {
+    let processedPrimary: TFile | null = null;
+    if (baseFile.primary instanceof TFile) {
       // TODO: Add an option to the plugin to link remote duplicates to the primary file
-      await this.updateExistingFile(primary, trackedPrimary);
+      await this.updateExistingFile(baseFile);
 
-      for (const duplicate of duplicates) {
+      for (const duplicate of baseFile.duplicates) {
         this.logger.warn('Existing duplicate file found', { duplicate });
-        await this.handleDuplicate(duplicate, trackedPrimary);
+        await this.handleDuplicate(duplicate, baseFile);
       }
+
+      processedPrimary = baseFile.primary;
     } else {
-      // If the file already exists, create a new file with a hash
-      if (await this.app.vault.adapter.exists(trackedPrimary.path, false)) {
-        await this.writeFile(trackedPrimary);
-      } else {
-        await this.writeFile(trackedPrimary, true);
-      }
+      processedPrimary = await this.writeFileToVault(baseFile);
+    }
+
+    // If we have any atoms, process them (atoms will be empty of conditional atomizer leads to no atoms)
+    if (this.settings.atomicHighlights && processedPrimary && baseFile.atoms?.length > 0) {
+      await this.processAtomicHighlights(processedPrimary, baseFile);
     }
   }
 
   /**
    * Writes a file to the vault with frontmatter and contents
-   * @param readwiseFile - The readwise file to write
+   * @param file - The readwise or atomic file to write
    * @param overwrite - Whether to overwrite an existing file or create with hash
    * @returns The created or updated file
    */
-  private async writeFile(readwiseFile: ReadwiseFile, overwrite?: boolean): Promise<TFile> {
+  private async writeFileToVault(file: BaseFile | AtomicFile, overwrite?: boolean): Promise<TFile> {
     /**
      * This method looks quite convoluted and complex, which is due to the fact that
      * the vault methods to get files are case-sensitive, but the filesystem is probably not.
@@ -312,49 +316,117 @@ export class DeduplicatingVaultWriter {
      * via the DataAdapter, and if it does, we need to check if it's the same file as the one
      * we're trying to write.
      */
-    const path = this.getNormalizedPath(this.getCategoryPath(readwiseFile.doc.category), `${readwiseFile.basename}.md`);
 
-    this.notifyFileCount();
-
+    if (file.type === 'base') this.notifyFileCount();
+    const path = this.getNormalizedPath(this.getCategoryPathFromFile(file), `${file.basename}.md`);
     try {
-      const frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile.doc);
-      const fileContents = `${frontmatter.toString()}\n${readwiseFile.contents}`;
+      const frontmatter = this.frontmatterManager.getFrontmatter(file);
       const fileOptions = {
-        ctime: new Date(readwiseFile.doc.created).getTime(),
-        mtime: new Date(readwiseFile.doc.updated).getTime(),
+        ctime: new Date(file.doc.created).getTime(),
+        mtime: new Date(file.doc.updated).getTime(),
       };
 
       const fileExists = await this.app.vault.adapter.exists(path, false);
       if (fileExists) {
         if (overwrite) {
-          const existingFile = await this.vault.getFileByPath(path);
-          this.logger.debug('Overwriting existing file', { doc: readwiseFile.doc, ...fileOptions });
-          await this.vault.process(existingFile, () => fileContents, fileOptions);
+          const existingFile: TFile = await this.vault.getFileByPath(path);
+          this.logger.debug('Overwriting existing file', { doc: file.doc, ...fileOptions });
+          await this.frontmatterWrite(existingFile, frontmatter);
+          await this.fileWrite(existingFile, file.contents, fileOptions);
           return existingFile;
         }
         // Create new path with hash
-        const hash = this.generateShortHash(readwiseFile.doc);
-        const newPath = this.getNormalizedPath(
-          this.getCategoryPath(readwiseFile.doc.category),
-          `${readwiseFile.basename} ${hash}.md`
-        );
+        const hash = this.generateShortHash(file.doc);
+        const newPath = this.getNormalizedPath(this.getCategoryPathFromFile(file), `${file.basename} ${hash}.md`);
         const newFileExists = await this.app.vault.adapter.exists(newPath, false);
         if (newFileExists) {
-          const existingNewFile = await this.vault.getFileByPath(newPath);
-          this.logger.debug('Overwriting existing file (with hash)', { doc: readwiseFile.doc, ...fileOptions });
-          await this.vault.process(existingNewFile, () => fileContents, fileOptions);
+          const existingNewFile: TFile = await this.vault.getFileByPath(newPath);
+          this.logger.debug('Overwriting existing file (with hash)', { doc: file.doc, ...fileOptions });
+          await this.frontmatterWrite(existingNewFile, frontmatter);
+          await this.fileWrite(existingNewFile, file.contents, fileOptions);
           return existingNewFile;
         }
-        this.logger.debug('Creating new file (with hash)', { doc: readwiseFile.doc, ...fileOptions });
-        return await this.vault.create(newPath, fileContents, fileOptions);
+        this.logger.debug('Creating new file (with hash)', { doc: file.doc, ...fileOptions });
+        const newFile: TFile = await this.vault.create(newPath, file.contents, fileOptions);
+        await this.frontmatterWrite(newFile, frontmatter);
+        return newFile;
       }
 
       // If the file doesn't exist, create it
-      this.logger.debug('Creating new file', { doc: readwiseFile.doc, ...fileOptions });
-      return await this.vault.create(path, fileContents, fileOptions);
+      this.logger.debug('Creating new file', { doc: file.doc, ...fileOptions });
+      const newFile: TFile = await this.vault.create(path, file.contents, fileOptions);
+      await this.frontmatterWrite(newFile, frontmatter);
+      return newFile;
     } catch (err) {
       this.logger.error(`Failed to create file '${path}'`, err);
       throw new Error(`Failed to create file '${path}'. ${err}`);
     }
+  }
+
+  /**
+   * Processes atomic highlights for a given primary file and readwise file
+   * @param primaryFile
+   * @param readwiseFile
+   * @returns
+   */
+  private async processAtomicHighlights(_primaryFile: TFile, readwiseFile: BaseFile): Promise<void> {
+    if (readwiseFile.atoms.length === 0) {
+      return;
+    }
+
+    // FIXME: Implement this for Backlinks
+    // Make sure we keep track of the "parent" file we've written
+    // through a special field based on `_primaryFile`
+    for (const atom of readwiseFile.atoms) {
+      const basename = atom.basename || `${readwiseFile.basename}-${atom.id}`;
+      const atomicFile: AtomicFile = {
+        type: 'atom',
+        id: atom.id,
+        basename, // Sanitize the basename
+        doc: readwiseFile.doc,
+        contents: atom.content,
+        frontmatter: atom.frontmatter,
+      };
+
+      await this.writeFileToVault(atomicFile, true); // We overwrite
+    }
+  }
+
+  /**
+   *
+   * @param existingFile
+   * @param frontmatter
+   */
+  private async frontmatterWrite(existingFile: TFile, frontmatter: Frontmatter) {
+    // biome-ignore lint/suspicious/noExplicitAny: Obsidian API exposes this as any
+    await this.app.fileManager.processFrontMatter(existingFile, (existingFrontmatter: any) => {
+      for (const [key, value] of frontmatter.entries()) {
+        existingFrontmatter[key] = value;
+      }
+    });
+  }
+
+  /**
+   * Write contents atomically
+   * @param existingFile - The existing file to update
+   * @param fileContents - The new contents to write
+   * @param fileOptions - The file options (ctime, mtime)
+   * @returns The updated file
+   */
+  private async fileWrite(existingFile: TFile, fileContents: string, fileOptions?: { ctime: number; mtime: number }) {
+    await this.vault.process(
+      existingFile,
+      (data) => {
+        // readwiseFile.contents
+        const fmi = getFrontMatterInfo(data);
+        if (fmi?.exists) {
+          // Return unchanged frontmatter + new contents
+          return `${data.slice(0, fmi.contentStart)}\n${fileContents}`;
+        }
+        return data;
+      },
+      fileOptions
+    );
+    return existingFile;
   }
 }

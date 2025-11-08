@@ -1,3 +1,5 @@
+import type { TFile } from 'obsidian';
+
 export interface Export {
   user_book_id: number;
   is_deleted: boolean;
@@ -28,6 +30,7 @@ export interface Highlight {
   created_at: string;
   updated_at: string;
   url: string | null;
+  readwise_url: string;
   color: string;
   book_id: number;
   tags: Tag[];
@@ -51,19 +54,33 @@ export interface Library {
 }
 
 /**
- * Represents a file that is pending to be written to the vault.
+ * Represents a base file that is pending to be written to the vault.
  *
  * @property basename - The basename of the file to write (consistent with TFile class)
  * @property doc - The Readwise document metadata
  * @property contents - The contents of the file to write
  * @property path - The full path including category
  */
-export interface ReadwiseFile {
-  basename: string; // The basename of the file to write (consistent with TFile class)
-  path?: string; // The full path including category
+interface ReadwiseFile {
+  type: 'base' | 'atom';
+  basename: string;
   doc: ReadwiseDocument;
-  contents: string; // Rendered contents of the file
+  frontmatter?: string;
+  contents: string | undefined;
 }
+
+export interface BaseFile extends ReadwiseFile {
+  type: 'base';
+  primary?: TFile | string; // The primary TFile in case of duplicates
+  duplicates?: TFile[]; // Array of duplicate TFiles
+  atoms?: Atom[]; // Optional array of atoms if the file is atomized
+}
+
+export interface AtomicFile extends ReadwiseFile {
+  type: 'atom';
+  id: number; // ID of the atom (the highlight ID)
+}
+
 /**
  *  is the metadata of a book from the Readwise API,
  * formatted for use in the nunjucks templates.
@@ -72,7 +89,7 @@ export interface ReadwiseFile {
  */
 export interface ReadwiseDocument {
   id: number; // book id from Readwise API
-  highlights_url: string; // Readwise URL for the highlights page (unique across readwise)
+  readwise_url: string; // Readwise URL for the highlights page (unique across readwise)
   unique_url: string; // Readwise URL for the book page (unique across readwise)
   source_url: string; // URL of the book on the source website
   title: string;
@@ -92,6 +109,7 @@ export interface ReadwiseDocument {
   highlight_tags: string;
   tags_nohash: string;
   hl_tags_nohash: string;
+  linktext?: string; // Link to the note in obsidian, if tracked
 }
 
 export interface MetadataInput {
@@ -112,6 +130,7 @@ export interface PluginSettings {
   colonSubstitute: string; // String to replace colons in filenames
   logFile: boolean; // Whether to save sync logs to a file
   logFileName: string; // Name of the sync log file
+  syncNotifications: boolean; // Show Obsidian notifications during sync
   frontMatter: boolean; // Whether to include YAML frontmatter in notes
   frontMatterTemplate: string; // Template for YAML frontmatter content
   headerTemplate: string; // Template for document header content
@@ -135,6 +154,10 @@ export interface PluginSettings {
   filenameTemplate: string; // Template for generating filenames
   filterNotesByTag: boolean; // Whether to filter books by tag
   filteredTags: string[]; // list of tags to include/exclude
+  atomicHighlights: boolean; // Whether to use atomic highlights
+  atomicParentProperty: string; // `Parent`property
+  atomicInheritParentFrontmatter: boolean; // Inherit parent frontmatter
+  atomicConditionalAtomize: boolean; // Only atomize notes with a specific property set
 }
 
 export interface YamlStringState {
@@ -152,4 +175,19 @@ export interface TemplateValidationResult {
   isValidtemplate?: boolean;
   error?: string;
   preview?: string;
+}
+
+export interface AtomizeOptions {
+  id: number | string;
+  parent: number;
+  basename: string;
+  embed: boolean;
+}
+
+export interface Atom {
+  id: number; // ID (of the highlight, if applicable, or whatever you want to use as ID)
+  content: string;
+  basename?: string;
+  frontmatter?: string;
+  isEmbedded?: boolean;
 }

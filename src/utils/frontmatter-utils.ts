@@ -2,42 +2,58 @@
  * FrontmatterUtils.ts
  */
 
-import { FRONTMATTER_TO_ESCAPE } from 'constants/index';
-import { Template } from 'nunjucks';
+import { FRONTMATTER_TO_ESCAPE, YAML_INDENT } from 'constants/index';
+import type { Environment } from 'nunjucks';
+import { parseYaml } from 'obsidian';
 import { Frontmatter } from 'services/frontmatter';
-import { ReadwiseEnvironment } from 'services/readwise-environment';
 import { sampleMetadata } from 'test/sample-data';
 import type { ReadwiseDocument, YamlEscapeOptions, YamlStringState } from 'types';
-import * as YAML from 'yaml';
+
+/**
+ * Sanitizes the frontmatter template by removing delimiters and trimming whitespace
+ * @param template - Frontmatter template to sanitize
+ * @returns Sanitized frontmatter template
+ */
+export function sanitizeFrontmatterTemplate(template: string): string {
+  let sanitizedTemplate: string = template;
+
+  // Ensure frontmatter delimiters are removed
+  sanitizedTemplate = sanitizedTemplate.replaceAll(`${Frontmatter.DELIMITER}`, '');
+
+  // Trim leading/trailing whitespace
+  sanitizedTemplate = sanitizedTemplate.trim();
+
+  return sanitizedTemplate;
+}
 
 /**
  * Validates the frontmatter template
  * @param template - Frontmatter template to validate
  * @returns Validation result
  */
-export function validateFrontmatterTemplate(template: string): {
+export function validateFrontmatterTemplate(
+  env: Environment,
+  template: string
+): {
   isValidYaml: boolean;
   error?: string;
   preview?: string;
 } {
-  const renderedTemplate = new Template(template, new ReadwiseEnvironment(), null, true).render(
+  
+  let renderedTemplate = '';
+  try {
+  
+    renderedTemplate = env.renderString(
+    sanitizeFrontmatterTemplate(template),
     escapeMetadata(sampleMetadata, FRONTMATTER_TO_ESCAPE)
   );
-  const yamlContent = renderedTemplate.replace(Frontmatter.REGEX, '$2');
-  try {
-    YAML.parse(yamlContent);
+    parseYaml(renderedTemplate);
     return { isValidYaml: true };
   } catch (error) {
-    if (error instanceof YAML.YAMLParseError) {
-      return {
-        isValidYaml: false,
-        error: `Invalid YAML: ${error.message}`,
-        preview: yamlContent,
-      };
-    }
     return {
       isValidYaml: false,
-      error: `Template error: ${error.message}`,
+      error: `Invalid YAML or Template: ${error.message}`,
+      preview: renderedTemplate,
     };
   }
 }
@@ -78,8 +94,7 @@ function isStringEscaped(value: string): boolean {
  * @returns Formatted multiline string
  */
 function formatMultilineString(value: string): string {
-  const indent = '  ';
-  return `>-\n${indent}${value.replace(/\n/g, `\n${indent}`)}`;
+  return `>-\n${YAML_INDENT}${value.replace(/\n/g, `\n${YAML_INDENT}`)}`;
 }
 
 /**
@@ -87,7 +102,7 @@ function formatMultilineString(value: string): string {
  * @param value - Value to escape
  * @param options - Escape options
  */
-function escapeValue(value: string, { multiline = false }: YamlEscapeOptions = {}): string {
+export function escapeValue(value: string, { multiline = false }: YamlEscapeOptions = {}): string {
   if (!value) return '""';
   if (analyzeString(value).isValueEscapedAlready) return value;
 
@@ -136,14 +151,12 @@ export function escapeMetadata(metadata: ReadwiseDocument, fieldsToProcess: Arra
       const key = field as keyof ReadwiseDocument;
       const value = processedMetadata[key];
 
-      const escapeStringValue = (str: string) => escapeValue(str);
-
       if (Array.isArray(value)) {
         (processedMetadata[key] as unknown) = value.map((item) =>
-          typeof item === 'string' ? escapeStringValue(item) : item
+          typeof item === 'string' ? escapeValue(item) : item
         );
       } else if (typeof value === 'string') {
-        (processedMetadata[key] as unknown) = escapeStringValue(value);
+        (processedMetadata[key] as unknown) = escapeValue(value);
       }
     }
   }

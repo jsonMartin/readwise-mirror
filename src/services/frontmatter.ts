@@ -1,5 +1,4 @@
-import { YAML_TOSTRING_OPTIONS } from 'constants/index';
-import * as YAML from 'yaml';
+import { parseYaml, stringifyYaml } from 'obsidian';
 
 /**
  * Custom error class for Frontmatter-related errors
@@ -42,8 +41,8 @@ export class Frontmatter {
    */
   private validateData(data: FrontmatterData): FrontmatterData {
     try {
-      const yamlString = YAML.stringify(data, YAML_TOSTRING_OPTIONS);
-      const parsed = YAML.parse(yamlString);
+      const yamlString = stringifyYaml(data);
+      const parsed = parseYaml(yamlString);
 
       if (typeof parsed !== 'object' || parsed === null) {
         throw new Error('Frontmatter must be an object');
@@ -144,9 +143,7 @@ export class Frontmatter {
       return '';
     }
 
-    return [Frontmatter.DELIMITER, YAML.stringify(this.data, YAML_TOSTRING_OPTIONS).trim(), Frontmatter.DELIMITER].join(
-      '\n'
-    );
+    return [Frontmatter.DELIMITER, stringifyYaml(this.data).trim(), Frontmatter.DELIMITER].join('\n');
   }
 
   /**
@@ -178,7 +175,7 @@ export class Frontmatter {
 
     try {
       const yamlContent = match[2];
-      const data = YAML.parse(yamlContent);
+      const data = parseYaml(yamlContent);
 
       if (typeof data !== 'object' || data === null) {
         throw new Error('Frontmatter must be an object');
