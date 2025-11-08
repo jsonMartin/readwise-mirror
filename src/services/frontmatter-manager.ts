@@ -64,9 +64,24 @@ export class FrontmatterManager {
             atomicFrontmatter = atomicFrontmatter.merge(filteredUpdates);
           }
 
-          // Get readwise_url by finding the highlight with the corresponding ID
+          // Get readwise_url by finding the highlight with the corresponding ID – throw an error if not found
           atomicFrontmatter.set(this.settings.atomicParentProperty, file.doc[READWISE_URI_FIELD]);
-          atomicFrontmatter.set(this.settings.trackingProperty, highlight[READWISE_URI_FIELD]);
+
+          if (!highlight) {
+            throw new Error(
+              `Highlight with id ${file.id} not found while building atomic frontmatter; skipping tracking property assignment.`
+            );
+          }
+
+          const highlightUri = highlight[READWISE_URI_FIELD];
+
+          if (!highlightUri) {
+            throw new Error(
+              `Highlight with id ${file.id} is missing ${READWISE_URI_FIELD}; skipping tracking property assignment.`
+            );
+          }
+
+          atomicFrontmatter.set(this.settings.trackingProperty, highlightUri);
 
           return atomicFrontmatter;
         }
