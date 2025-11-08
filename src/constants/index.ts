@@ -79,7 +79,7 @@ Tags: {{ tags }}
   useSlugify: false,
   slugifySeparator: '-',
   slugifyLowercase: true,
-  trackFiles: false,
+  trackFiles: true,
   trackingProperty: 'uri',
   trackAcrossVault: false,
   deleteDuplicates: false,
