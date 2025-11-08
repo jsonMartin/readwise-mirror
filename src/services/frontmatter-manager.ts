@@ -142,8 +142,8 @@ export class FrontmatterManager {
       await this.fm.processFrontMatter(file, (frontmatter) => {
         // Biome doesn't like assing via { ... frontmatter, ...updates }
         // Iterate over keys in updates and set them in frontmatter
-        for (const key in updates.toObject()) {
-          frontmatter[key] = updates.get(key);
+        for (const [key, value] of updates.entries()) {
+          frontmatter[key] = value;
         }
       });
     } catch (error) {

@@ -140,8 +140,8 @@ export class DeduplicatingVaultWriter {
         }
 
         this.logger.debug(`Updating file ${file.path} with new frontmatter`, updatedFrontmatter);
-        for (const key in updatedFrontmatter.toObject()) {
-          existingFrontmatter[key] = updatedFrontmatter.get(key);
+        for (const [key, value] of updatedFrontmatter.entries()) {
+          existingFrontmatter[key] = value;
         }
       });
 
@@ -400,8 +400,8 @@ export class DeduplicatingVaultWriter {
   private async frontmatterWrite(existingFile: TFile, frontmatter: Frontmatter) {
     // biome-ignore lint/suspicious/noExplicitAny: Obsidian API exposes this as any
     await this.app.fileManager.processFrontMatter(existingFile, (existingFrontmatter: any) => {
-      for (const key in frontmatter.toObject()) {
-        existingFrontmatter[key] = frontmatter.get(key);
+      for (const [key, value] of frontmatter.entries()) {
+        existingFrontmatter[key] = value;
       }
     });
   }
