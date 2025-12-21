@@ -1,4 +1,6 @@
 // Constants
+
+import { Lock } from 'async-await-mutex-lock';
 import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS, NUNJUCKS_CORE_TEMPLATE, READWISE_REVIEW_URL_BASE } from 'constants/index';
 import { type App, type CachedMetadata, Plugin, type PluginManifest, TFile, TFolder } from 'obsidian';
 import { Atomizer } from 'services/atomizer';
@@ -27,6 +29,7 @@ export default class ReadwiseMirror extends Plugin {
   private _logger: Logger;
   private notify: Notify;
   private isSyncing = false;
+  private syncLock = new Lock<string>();
   private frontmatterManager: FrontmatterManager;
   private deduplicatingVaultWriter: DeduplicatingVaultWriter;
 
@@ -1028,9 +1031,8 @@ export default class ReadwiseMirror extends Plugin {
       return;
     }
 
+    let trackingUrl: string;
     try {
-      this.isSyncing = true;
-
       // Assuming 'this' is your plugin instance and you want to get metadata for the active file in the editor
       if (!file) {
         this.logger.warn('No active file selected in the editor.');
@@ -1047,36 +1049,46 @@ export default class ReadwiseMirror extends Plugin {
       if (allowUpdate) {
         this.logger.debug('Readwise: Updating current note...'); // FIXME: Simplify. In theory, we only reach this point if trackingUrl is valid (due to isReadwiseNote checks above) so the following is not needed. The root problem is the double call to getFileCache (here and in isTrackedReadwiseNote()) which should be avoided.
         const fileCache = this.app.metadataCache.getFileCache(file);
-        const trackingUrl = fileCache?.frontmatter?.[this._settings.trackingProperty];
+        trackingUrl = fileCache?.frontmatter?.[this._settings.trackingProperty];
         if (typeof trackingUrl !== 'string' || !trackingUrl.startsWith(READWISE_REVIEW_URL_BASE)) {
           this.notify.notice('Readwise: Tracking URL missing or invalid in current note.');
           this.logger.warn('Tracking URL missing/invalid for current note.');
           return;
         }
-        const idStr = trackingUrl.replace(READWISE_REVIEW_URL_BASE, ''); // Extract the ID from the URL
-        const id = Number.parseInt(idStr, 10);
 
-        if (Number.isNaN(id)) {
-          this.notify.notice(`Readwise: Tracking URL in current note is invalid (ID ${idStr} is not a valid number).`);
-          this.logger.warn(`Tracking URL in current note is invalid (ID ${idStr} is not a valid number).`);
-          return;
-        }
-        this.logger.debug(`Readwise: downloading current book with ID ${id}...`);
-        const library = await this._readwiseApi.downloadSingleBook(id);
+        // Acquire a lock for the specific note
+        await this.syncLock.acquire(trackingUrl);
 
-        if (Object.keys(library.books).length > 0) {
-          if (this.settings.atomicHighlights) {
-            library.categories.add('Highlight');
+        try {
+          const idStr = trackingUrl.replace(READWISE_REVIEW_URL_BASE, ''); // Extract the ID from the URL
+          const id = Number.parseInt(idStr, 10);
+
+          if (Number.isNaN(id)) {
+            this.notify.notice(
+              `Readwise: Tracking URL in current note is invalid (ID ${idStr} is not a valid number).`
+            );
+            this.logger.warn(`Tracking URL in current note is invalid (ID ${idStr} is not a valid number).`);
+            return;
           }
-          await this.writeLibraryToMarkdown(library);
+          this.logger.debug(`Readwise: downloading current book with ID ${id}...`);
+          const library = await this._readwiseApi.downloadSingleBook(id);
 
-          if (this.settings.logFile) await this.writeLogToMarkdown(library);
+          if (Object.keys(library.books).length > 0) {
+            if (this.settings.atomicHighlights) {
+              library.categories.add('Highlight');
+            }
+            await this.writeLibraryToMarkdown(library);
 
-          if (this.settings.syncNotifications) this.notify.notice('Readwise: Book update complete.');
-        } else {
-          this.notify.notice(`Readwise: Note with id ${id} not found on Readwise.`);
-          this.logger.warn(`Readwise: Note with id ${id} not found on Readwise.`);
-          return;
+            if (this.settings.logFile) await this.writeLogToMarkdown(library);
+
+            if (this.settings.syncNotifications) this.notify.notice('Readwise: Book update complete.');
+          } else {
+            this.notify.notice(`Readwise: Note with id ${id} not found on Readwise.`);
+            this.logger.warn(`Readwise: Note with id ${id} not found on Readwise.`);
+            return;
+          }
+        } finally {
+          this.syncLock.release(trackingUrl);
         }
       } else {
         this.notify.notice(
@@ -1089,9 +1101,6 @@ export default class ReadwiseMirror extends Plugin {
     } catch (error) {
       this.logger.error('Error during single-book update:', error);
       this.notify.notice(`Readwise: Sync failed. ${error}`);
-    } finally {
-      // Make sure we reset the sync status in case of error
-      this.isSyncing = false;
     }
   }
 }

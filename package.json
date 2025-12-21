@@ -35,6 +35,7 @@
     },
     "dependencies": {
         "@sindresorhus/slugify": "^2.2.1",
+        "async-await-mutex-lock": "^1.0.12",
         "filenamify": "^6.0.0",
         "md5": "^2.3.0",
         "nunjucks": "^3.2.4",
