@@ -4,6 +4,7 @@ import { Lock } from 'async-await-mutex-lock';
 import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS, NUNJUCKS_CORE_TEMPLATE, READWISE_REVIEW_URL_BASE } from 'constants/index';
 import { type App, type CachedMetadata, Plugin, type PluginManifest, TFile, TFolder } from 'obsidian';
 import { Atomizer } from 'services/atomizer';
+import { ReadwiseCommandManager } from 'services/command-manager';
 import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
 import { Frontmatter } from 'services/frontmatter';
 import { FrontmatterManager } from 'services/frontmatter-manager';
@@ -15,9 +16,9 @@ import { ReadwiseEnvironment, ReadwiseLoader } from 'services/readwise-environme
 import spacetime from 'spacetime';
 import type { BaseFile, ReadwiseDocument } from 'types/document';
 import type { Export, Highlight, Library, Tag } from 'types/library';
+import type { TTrackedFile } from 'types/readwise-note';
 import type { PluginSettings } from 'types/settings';
 // Types
-import { ConfirmDialog } from 'ui/dialog';
 import Notify from 'ui/notify';
 import ReadwiseMirrorSettingTab from 'ui/settings-tab';
 import { normalizeFilename } from 'utils/filename-utils';
@@ -830,112 +831,8 @@ export default class ReadwiseMirror extends Plugin {
 
     this.registerDomEvent(statusBarItem, 'click', this.sync.bind(this));
 
-    this.addCommand({
-      id: 'download',
-      name: 'Download entire Readwise library (force)',
-      callback: this.download.bind(this),
-    });
-
-    this.addCommand({
-      id: 'test',
-      name: 'Test Readwise API key',
-      callback: async () => {
-        const isTokenValid = this._readwiseApi.hasValidToken();
-        this.notify.notice(`Readwise: ${isTokenValid ? 'Token is valid' : 'INVALID TOKEN'}`);
-      },
-    });
-
-    this.addCommand({
-      id: 'delete',
-      name: 'Delete Readwise library',
-      callback: this.deleteLibrary.bind(this),
-    });
-
-    this.addCommand({
-      id: 'update',
-      name: 'Sync new highlights',
-      callback: this.sync.bind(this),
-    });
-
-    this.addCommand({
-      id: 'adjust-filenames',
-      name: 'Adjust Filenames to current settings',
-      checkCallback: (checking: boolean) => {
-        // Only enable if tracking files and filename updates are enabled
-        if (this.settings.trackFiles && this.settings.enableFileNameUpdates) {
-          if (!checking) {
-            this.handleFilenameAdjustment();
-          }
-          return true;
-        }
-        return false;
-      },
-    });
-
-    this.addCommand({
-      id: 'update-all-frontmatter',
-      name: 'Update all Readwise note frontmatter',
-      checkCallback: (checking: boolean) => {
-        if (this.settings.frontMatter && this.settings.trackFiles) {
-          if (!checking) {
-            this.updateAllFrontmatter();
-          }
-          return true;
-        }
-        return false;
-      },
-    });
-
-    // TODO: #73 We could even check if the current note is found on Readwise *before* enabling the command
-    this.addCommand({
-      id: 'update-current-note',
-      name: 'Update current note',
-      checkCallback: (checking: boolean) => {
-        const file = this.app.workspace.getActiveFile();
-        if (!file) return false;
-        const isReadwiseNote = isTrackedReadwiseNote(file, this.app, this.settings);
-        const isInLibrary = isInReadwiseLibrary(file, this.settings);
-
-        // If trackAcrossVault is enabled, only check if it's a Readwise note.
-        // Otherwise, check if it's a Readwise note AND in the Readwise library.
-        const shouldEnable = this.settings.trackAcrossVault ? isReadwiseNote : isReadwiseNote && isInLibrary;
-
-        if (shouldEnable && this.settings.trackFiles) {
-          if (!checking) {
-            this.updateCurrentNote(file);
-          }
-          return true;
-        }
-        return false;
-      },
-    });
-
-    // Special debug command, only enabled if debug mode is active
-    this.addCommand({
-      id: 'reset-last-updated',
-      name: 'Reset lastUpdated setting to 2 months ago (debug)',
-      checkCallback: (checking: boolean) => {
-        if (this.settings.debugMode) {
-          if (!checking) {
-            const d = spacetime.now().subtract(2, 'months');
-            new ConfirmDialog(
-              this.app,
-              'Are you sure?',
-              `Do you really want to reset 'last updated' date to ${spacetime.now().since(d).rounded}?`,
-              (result) => {
-                if (result) {
-                  this.settings.lastUpdated = d.iso();
-                  this.saveSettings();
-                  this.notify.setStatusBarText(`Readwise: lastUpdated reset to ${spacetime.now().since(d).rounded}`);
-                }
-              }
-            ).open();
-          }
-          return true;
-        }
-        return false;
-      },
-    });
+    // Register all commands
+    new ReadwiseCommandManager(context).registerCommands();
 
     // Update status bar every second if synced
     this.registerInterval(
@@ -1019,94 +916,84 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   /**
-   * Fetch single book by bookId via downloadSingleBook
+   * Return a tracked file if the given file is a Readwise note that can be updated.
+   *
+   * @param file - The file to check.
+   * @returns The tracked file or null if not updatable.
    */
-  async updateCurrentNote(file: TFile = this.app.workspace.getActiveFile()) {
-    if (this.isSyncing) {
-      this.notify.notice('Readwise: update already in progress');
-      return;
+  getUpdatableNote(file: TFile): TTrackedFile | null {
+    if (!file) return null;
+    if (!this.settings.trackFiles) return null;
+
+    const isReadwiseNote = isTrackedReadwiseNote(file, this.app, this.settings);
+    const isInLibrary = isInReadwiseLibrary(file, this.settings);
+
+    // If trackAcrossVault is enabled, only check if it's a Readwise note.
+    // Otherwise, check if it's a Readwise note AND in the Readwise library.
+    const isUpdatable = this.settings.trackAcrossVault ? isReadwiseNote : isReadwiseNote && isInLibrary;
+
+    const fileCache = this.app.metadataCache.getFileCache(file);
+    const trackingUrl = fileCache?.frontmatter?.[this._settings.trackingProperty];
+    if (typeof trackingUrl !== 'string' || !trackingUrl.startsWith(READWISE_REVIEW_URL_BASE)) {
+      this.logger.warn('Tracking URL missing/invalid for current note.');
+      return null;
     }
 
-    if (!this.settings.trackFiles) {
-      this.notify.notice('Current note can only be updated when tracking files');
-      return;
+    const idStr = trackingUrl.replace(READWISE_REVIEW_URL_BASE, ''); // Extract the ID from the URL
+    const readwiseId = Number.parseInt(idStr, 10);
+
+    if (Number.isNaN(readwiseId)) {
+      this.logger.warn(`Tracking URL in note is invalid (ID ${idStr} is not a valid number).`);
+      return null;
     }
 
+    // Construct tracked note
+    const trackedFile: TTrackedFile = {
+      ...file,
+      readwiseId,
+      isUpdatable,
+    };
+    return trackedFile;
+  }
+
+  async updateCurrentNote(file: TTrackedFile) {
     if (!this._readwiseApi?.hasValidToken()) {
       this.notify.notice('Readwise: Valid API Token Required');
       return;
     }
 
-    let trackingUrl: string;
+    if (!file.isUpdatable) {
+      this.notify.notice('Readwise: Current note is not a tracked Readwise note.');
+      return;
+    }
+
+    // Now that we are sure we can process the file, we acquire a lock for the specific note
+    await this.syncLock.acquire(file.readwiseId.toString());
+    this.logger.debug('Readwise: Updating current note...'); // FIXME: Simplify. In theory, we only reach this point if trackingUrl is valid (due to isReadwiseNote checks above) so the following is not needed. The root problem is the double call to getFileCache (here and in isTrackedReadwiseNote()) which should be avoided.
+
     try {
-      // Assuming 'this' is your plugin instance and you want to get metadata for the active file in the editor
-      if (!file) {
-        this.logger.warn('No active file selected in the editor.');
-        return;
-      }
-
-      const isReadwiseNote = isTrackedReadwiseNote(file, this.app, this.settings);
-      const isInLibrary = isInReadwiseLibrary(file, this.settings);
-
-      // If trackAcrossVault is enabled, only check if it's a Readwise note.
-      // Otherwise, check if it's a Readwise note AND in the Readwise library.
-      const allowUpdate = this.settings.trackAcrossVault ? isReadwiseNote : isReadwiseNote && isInLibrary;
-
-      if (allowUpdate) {
-        this.logger.debug('Readwise: Updating current note...'); // FIXME: Simplify. In theory, we only reach this point if trackingUrl is valid (due to isReadwiseNote checks above) so the following is not needed. The root problem is the double call to getFileCache (here and in isTrackedReadwiseNote()) which should be avoided.
-        const fileCache = this.app.metadataCache.getFileCache(file);
-        trackingUrl = fileCache?.frontmatter?.[this._settings.trackingProperty];
-        if (typeof trackingUrl !== 'string' || !trackingUrl.startsWith(READWISE_REVIEW_URL_BASE)) {
-          this.notify.notice('Readwise: Tracking URL missing or invalid in current note.');
-          this.logger.warn('Tracking URL missing/invalid for current note.');
-          return;
+      this.logger.debug(`Readwise: downloading current book with ID ${file.readwiseId}...`);
+      const library = await this._readwiseApi.downloadSingleBook(file.readwiseId);
+      if (Object.keys(library.books).length > 0) {
+        if (this.settings.atomicHighlights) {
+          library.categories.add('Highlight');
         }
+        await this.writeLibraryToMarkdown(library);
 
-        // Acquire a lock for the specific note
-        await this.syncLock.acquire(trackingUrl);
+        if (this.settings.logFile) await this.writeLogToMarkdown(library);
 
-        try {
-          const idStr = trackingUrl.replace(READWISE_REVIEW_URL_BASE, ''); // Extract the ID from the URL
-          const id = Number.parseInt(idStr, 10);
-
-          if (Number.isNaN(id)) {
-            this.notify.notice(
-              `Readwise: Tracking URL in current note is invalid (ID ${idStr} is not a valid number).`
-            );
-            this.logger.warn(`Tracking URL in current note is invalid (ID ${idStr} is not a valid number).`);
-            return;
-          }
-          this.logger.debug(`Readwise: downloading current book with ID ${id}...`);
-          const library = await this._readwiseApi.downloadSingleBook(id);
-
-          if (Object.keys(library.books).length > 0) {
-            if (this.settings.atomicHighlights) {
-              library.categories.add('Highlight');
-            }
-            await this.writeLibraryToMarkdown(library);
-
-            if (this.settings.logFile) await this.writeLogToMarkdown(library);
-
-            if (this.settings.syncNotifications) this.notify.notice('Readwise: Book update complete.');
-          } else {
-            this.notify.notice(`Readwise: Note with id ${id} not found on Readwise.`);
-            this.logger.warn(`Readwise: Note with id ${id} not found on Readwise.`);
-            return;
-          }
-        } finally {
-          this.syncLock.release(trackingUrl);
-        }
+        if (this.settings.syncNotifications) this.notify.notice('Readwise: Book update complete.');
       } else {
-        this.notify.notice(
-          this.settings.trackAcrossVault
-            ? 'Readwise: Current note is not a tracked Readwise note.'
-            : 'Readwise: Current note is not a tracked Readwise note in the Readwise library folder.'
-        );
+        this.notify.notice(`Readwise: Note with id ${file.readwiseId} not found on Readwise.`);
+        this.logger.warn(`Readwise: Note with id ${file.readwiseId} not found on Readwise.`);
         return;
       }
     } catch (error) {
       this.logger.error('Error during single-book update:', error);
       this.notify.notice(`Readwise: Sync failed. ${error}`);
+    } finally {
+      // Make sure we release tha lock even if the operation fails
+      this.syncLock.release(file.readwiseId.toString());
     }
   }
 }
