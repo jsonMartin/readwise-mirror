@@ -9,7 +9,7 @@ import type { Highlight } from './library';
  * @property contents - The contents of the file to write
  * @property path - The full path including category
  */
-interface ReadwiseFile {
+interface ReadwiseNote {
   type: 'base' | 'atom';
   basename: string;
   doc: ReadwiseDocument;
@@ -17,14 +17,14 @@ interface ReadwiseFile {
   contents: string | undefined;
 }
 
-export interface BaseFile extends ReadwiseFile {
+export interface BaseFile extends ReadwiseNote {
   type: 'base';
   primary?: TFile | string; // The primary TFile in case of duplicates
   duplicates?: TFile[]; // Array of duplicate TFiles
   atoms?: Atom[]; // Optional array of atoms if the file is atomized
 }
 
-export interface AtomicFile extends ReadwiseFile {
+export interface AtomicFile extends ReadwiseNote {
   type: 'atom';
   id: number; // ID of the atom (the highlight ID)
 }
