@@ -13,7 +13,8 @@
 
 import filenamify from 'filenamify';
 import * as nunjucks from 'nunjucks';
-import type { Atom, AtomizeOptions } from 'types';
+import type { Atom } from 'types/document';
+import type { AtomizeOptions } from 'types/utilities';
 import type { CallExtension, Context, Parser } from '../nunjucks-parser';
 
 /**

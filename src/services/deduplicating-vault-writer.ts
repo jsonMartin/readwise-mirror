@@ -1,9 +1,8 @@
 import md5 from 'md5'; // Fix imports
-import { type App, getFrontMatterInfo, normalizePath, TFile, type Vault } from 'obsidian';
+import { getFrontMatterInfo, normalizePath, TFile, type Vault } from 'obsidian';
 import type { FrontmatterManager } from 'services/frontmatter-manager';
-import type Logger from 'services/logger';
-import type { AtomicFile, BaseFile, PluginSettings, ReadwiseDocument } from 'types';
-import type Notify from 'ui/notify';
+import type { PluginContext } from 'services/plugin-context';
+import type { AtomicFile, BaseFile, ReadwiseDocument } from 'types/document';
 import { isInReadwiseLibrary, isTrackedReadwiseNote } from 'utils/tracking-utils';
 import type { Frontmatter } from './frontmatter';
 
@@ -11,15 +10,16 @@ export class DeduplicatingVaultWriter {
   readonly vault: Vault;
   private totalFileCount = 0;
   private fileCount = 0;
+  private readonly app = this.context.app;
+  private readonly settings = this.context.settings;
+  private readonly logger = this.context.logger;
+  private readonly notify = this.context.notify;
 
   constructor(
-    private app: App,
-    private settings: PluginSettings,
-    private frontmatterManager: FrontmatterManager,
-    private logger: Logger,
-    private notify: Notify
+    private context: PluginContext,
+    private frontmatterManager: FrontmatterManager
   ) {
-    this.vault = app.vault;
+    this.vault = context.app.vault;
   }
 
   private notifyFileCount() {

@@ -1,6 +1,6 @@
 import { READWISE_REVIEW_URL_BASE } from 'constants/index';
 import type { App, TFile } from 'obsidian';
-import type { PluginSettings } from 'types';
+import type { PluginSettings } from 'types/settings';
 
 /**
  * Determines whether a file is a Readwise-tracked note by checking a configured frontmatter property.

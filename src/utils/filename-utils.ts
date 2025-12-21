@@ -1,7 +1,7 @@
 import slugify from '@sindresorhus/slugify';
 import filenamify from 'filenamify';
 import { normalizePath } from 'obsidian';
-import type { PluginSettings } from 'types';
+import type { PluginSettings } from 'types/settings';
 
 /**
  *  Normalizes the filename by replacing critical characters

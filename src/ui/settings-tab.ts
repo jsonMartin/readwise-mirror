@@ -11,7 +11,7 @@ import {
   type TextComponent,
 } from 'obsidian';
 import ReadwiseApi, { TokenValidationError } from 'services/readwise-api';
-import type { TemplateValidationResult } from 'types';
+import type { TemplateValidationResult } from 'types/utilities';
 import { WarningDialog } from 'ui/dialog';
 import type Notify from 'ui/notify';
 import { sanitizeFrontmatterTemplate, validateFrontmatterTemplate } from 'utils/frontmatter-utils';

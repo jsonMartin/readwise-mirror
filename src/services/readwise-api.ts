@@ -1,6 +1,6 @@
 import { type RequestUrlResponse, requestUrl } from 'obsidian';
 import type Logger from 'services/logger';
-import type { Export, Library } from 'types';
+import type { Export, Library } from 'types/library';
 import type Notify from 'ui/notify';
 
 const API_ENDPOINT = 'https://readwise.io/api/v2';

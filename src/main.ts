@@ -9,11 +9,14 @@ import { Frontmatter } from 'services/frontmatter';
 import { FrontmatterManager } from 'services/frontmatter-manager';
 // Plugin classes
 import Logger from 'services/logger';
+import type { PluginContext } from 'services/plugin-context';
 import ReadwiseApi from 'services/readwise-api';
 import { ReadwiseEnvironment, ReadwiseLoader } from 'services/readwise-environment';
 import spacetime from 'spacetime';
+import type { BaseFile, ReadwiseDocument } from 'types/document';
+import type { Export, Highlight, Library, Tag } from 'types/library';
+import type { PluginSettings } from 'types/settings';
 // Types
-import type { BaseFile, Export, Highlight, Library, PluginSettings, ReadwiseDocument, Tag } from 'types';
 import { ConfirmDialog } from 'ui/dialog';
 import Notify from 'ui/notify';
 import ReadwiseMirrorSettingTab from 'ui/settings-tab';
@@ -167,7 +170,7 @@ export default class ReadwiseMirror extends Plugin {
     const location_url =
       book.asin && location ? `https://readwise.io/to_kindle?action=open&asin=${book.asin}&location=${location}` : null;
 
-    const formattedTags = tags.filter((tag) => tag.name !== color);
+    const formattedTags = tags.filter((tag: Tag) => tag.name !== color);
     const formattedTagStr = this.formatTags(formattedTags);
 
     return {
@@ -784,18 +787,21 @@ export default class ReadwiseMirror extends Plugin {
 
     this.notify = new Notify(statusBarItem);
 
-    this.frontmatterManager = new FrontmatterManager(this.settings, this.logger, this._env, this.app.fileManager);
+    // Create plugin context for dependency injection
+    const context: PluginContext = {
+      plugin: this,
+      notify: this.notify,
+      logger: this._logger,
+      app: this.app,
+      settings: this.settings,
+    };
+
+    this.frontmatterManager = new FrontmatterManager(context, this._env, this.app.fileManager);
 
     this.headerTemplate = this.settings.headerTemplate;
     this.highlightTemplate = this.settings.highlightTemplate;
 
-    this.deduplicatingVaultWriter = new DeduplicatingVaultWriter(
-      this.app,
-      this.settings,
-      this.frontmatterManager,
-      this.logger,
-      this.notify
-    );
+    this.deduplicatingVaultWriter = new DeduplicatingVaultWriter(context, this.frontmatterManager);
 
     if (!this.settings.apiToken) {
       this.notify.notice('Readwise: API Token not detected\nPlease enter in configuration page');
@@ -987,7 +993,7 @@ export default class ReadwiseMirror extends Plugin {
           Array.isArray(this.settings.filteredTags) &&
           this.settings.filteredTags.length > 0
         ) {
-          if (book.book_tags.every((tag) => !this.settings.filteredTags.includes(tag.name))) {
+          if (book.book_tags.every((tag: Tag) => !this.settings.filteredTags.includes(tag.name))) {
             this.logger.debug(`Removing book not matching filter tags: ${book.title} (${book.user_book_id})`);
             delete library.books[bookId];
           }

@@ -2,14 +2,16 @@ import { EMPTY_FRONTMATTER, FRONTMATTER_TO_ESCAPE, READWISE_URI_FIELD } from 'co
 import { type Environment, Template } from 'nunjucks';
 import { type FileManager, parseYaml, type TFile } from 'obsidian';
 import { Frontmatter, FrontmatterError } from 'services/frontmatter';
-import type Logger from 'services/logger';
-import type { AtomicFile, BaseFile, PluginSettings, ReadwiseDocument } from 'types';
+import type { PluginContext } from 'services/plugin-context';
+import type { AtomicFile, BaseFile, ReadwiseDocument } from 'types/document';
 import { escapeMetadata } from 'utils/frontmatter-utils';
 
 export class FrontmatterManager {
+  private readonly settings = this.context.settings;
+  private readonly logger = this.context.logger;
+
   constructor(
-    private readonly settings: PluginSettings,
-    private readonly logger: Logger,
+    private readonly context: PluginContext,
     private readonly env: Environment,
     private readonly fm: FileManager
   ) {}
@@ -114,6 +116,7 @@ export class FrontmatterManager {
       return new Frontmatter(yaml);
     } catch (error) {
       if (error instanceof Error) {
+        this.logger.debug('Rendered frontmatter template failed:', (error as Error).stack);
         this.logger.error('Error processing frontmatter template:', error.message);
         throw new FrontmatterError(`Failed to process frontmatter: ${error.message}`, error);
       }
@@ -129,7 +132,7 @@ export class FrontmatterManager {
   public filterProtectedFrontmatter(updates: Frontmatter): Frontmatter {
     const protectedFields = this.settings.protectedFields
       .split('\n')
-      .map((f) => f.trim())
+      .map((f: string) => f.trim())
       .filter(Boolean);
 
     // Using static methods from Frontmatter class

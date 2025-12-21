@@ -7,7 +7,8 @@ import type { Environment } from 'nunjucks';
 import { parseYaml } from 'obsidian';
 import { Frontmatter } from 'services/frontmatter';
 import { sampleMetadata } from 'test/sample-data';
-import type { ReadwiseDocument, YamlEscapeOptions, YamlStringState } from 'types';
+import type { ReadwiseDocument } from 'types/document';
+import type { YamlEscapeOptions, YamlStringState } from 'types/utilities';
 
 /**
  * Sanitizes the frontmatter template by removing delimiters and trimming whitespace
@@ -39,14 +40,12 @@ export function validateFrontmatterTemplate(
   error?: string;
   preview?: string;
 } {
-  
   let renderedTemplate = '';
   try {
-  
     renderedTemplate = env.renderString(
-    sanitizeFrontmatterTemplate(template),
-    escapeMetadata(sampleMetadata, FRONTMATTER_TO_ESCAPE)
-  );
+      sanitizeFrontmatterTemplate(template),
+      escapeMetadata(sampleMetadata, FRONTMATTER_TO_ESCAPE)
+    );
     parseYaml(renderedTemplate);
     return { isValidYaml: true };
   } catch (error) {
