@@ -1,5 +1,4 @@
 import md5 from 'md5'; // Fix imports
-import moment from 'moment';
 import { getFrontMatterInfo, normalizePath, TFile, type Vault } from 'obsidian';
 import type { FrontmatterManager } from 'services/frontmatter-manager';
 import type { PluginContext } from 'services/plugin-context';
@@ -101,7 +100,7 @@ export class DeduplicatingVaultWriter {
    * @returns A short hash
    */
   public generateShortHash(basename: string): string {
-    return md5(basename + moment.now()).substring(0, 4);
+    return md5(basename + Date.now()).substring(0, 4);
   }
 
   /**
