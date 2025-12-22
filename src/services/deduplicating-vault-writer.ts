@@ -1,4 +1,5 @@
 import md5 from 'md5'; // Fix imports
+import moment from 'moment';
 import { getFrontMatterInfo, normalizePath, TFile, type Vault } from 'obsidian';
 import type { FrontmatterManager } from 'services/frontmatter-manager';
 import type { PluginContext } from 'services/plugin-context';
@@ -99,8 +100,8 @@ export class DeduplicatingVaultWriter {
    * @param file - The readwise file to generate a hash for
    * @returns A short hash
    */
-  public generateShortHash(file: BaseFile | AtomicFile): string {
-    return md5(file.doc.id.toString() + file.basename).substring(0, 4);
+  public generateShortHash(basename: string): string {
+    return md5(basename + moment.now()).substring(0, 4);
   }
 
   /**
@@ -203,14 +204,7 @@ export class DeduplicatingVaultWriter {
     const groupedByPath = new Map<string, BaseFile[]>();
 
     for (const file of readwiseFiles) {
-      let path: string;
-      if (file.primary instanceof TFile) {
-        // If we have a primary TFile, use its path for grouping
-        path = file.primary.path;
-      } else if (typeof file.primary === 'string') {
-        // If we have a primary path string, use it for grouping
-        path = file.primary;
-      }
+      const path: string = file.primary instanceof TFile ? file.primary.path : file.primary;
       // Use lowercase path for comparison as filesystems are (potentially) case-insensitive
       if (!groupedByPath.has(path.toLowerCase())) {
         groupedByPath.set(path.toLowerCase(), []);
@@ -343,7 +337,7 @@ export class DeduplicatingVaultWriter {
           return existingFile;
         }
         // Create new path with hash
-        const hash = this.generateShortHash(file);
+        const hash = this.generateShortHash(file.basename);
         const newPath = normalizePath(`${this.getCategoryPathFromFile(file)}/${file.basename} ${hash}.md`);
         const newFileExists = await this.app.vault.adapter.exists(newPath, false);
         if (newFileExists) {

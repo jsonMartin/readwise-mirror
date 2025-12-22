@@ -432,19 +432,19 @@ export default class ReadwiseMirror extends Plugin {
         hl_tags_nohash: this.formatTags(highlightTags, true, "'"),
       };
 
-      // Prepare the readwise file object
-      const readwiseFile: BaseFile = {
-        type: 'base',
-        basename,
-        doc,
-        contents: undefined,
-      };
-
       // Get the primary path for new file before checking for duplicates
       const readwisePrimary = normalizePath(
         `${this.deduplicatingVaultWriter.getCategoryPath(category)}/${basename}.md`
       );
 
+      // Prepare the readwise file object
+      const readwiseFile: BaseFile = {
+        type: 'base',
+        primary: readwisePrimary,
+        basename,
+        doc,
+        contents: undefined,
+      };
       // note_link is just the basename in this case
       doc.linktext = basename;
 
@@ -458,19 +458,28 @@ export default class ReadwiseMirror extends Plugin {
           );
 
           if (this.settings.enableFileNameUpdates) {
-            const hash = this.deduplicatingVaultWriter.generateShortHash(readwiseFile);
+            const hash = this.deduplicatingVaultWriter.generateShortHash(basename);
 
             try {
               for (let i = 0; i < duplicates.length; i++) {
-                const newPath = normalizePath(`${duplicates[i].parent.path}/${basename} ${i + 1}.md`);
-                await this.app.fileManager.renameFile(duplicates[i], newPath);
+                let newPath = normalizePath(`${duplicates[i].parent.path}/${basename} ${i + 1}.md`);
+                // Avoid overwriting existing files
+                let suffix = i + 1;
+                while ((await this.app.vault.adapter.exists(newPath, false)) && newPath !== duplicates[i].path) {
+                  suffix++;
+                  newPath = normalizePath(`${duplicates[i].parent.path}/${basename} ${suffix}.md`);
+                }
+                if (newPath !== duplicates[i].path) {
+                  await this.app.fileManager.renameFile(duplicates[i], newPath);
+                }
               }
 
               const newFileExists = await this.app.vault.adapter.exists(readwisePrimary, false);
               // Add hash to filename if there's a collision (and the primary is not in the duplicates)
-              const newPath = newFileExists
-                ? normalizePath(`${primary.parent.path}/${basename} ${hash}.md`)
-                : normalizePath(`${primary.parent.path}/${basename}.md`);
+              const newPath =
+                newFileExists && readwisePrimary !== primary.path
+                  ? normalizePath(`${primary.parent.path}/${basename} ${hash}.md`)
+                  : normalizePath(`${primary.parent.path}/${basename}.md`);
               this.logger.debug(`Rename file from ${primary.path} to ${newPath}`);
               await this.app.fileManager.renameFile(primary, newPath);
             } catch (error) {
@@ -478,7 +487,6 @@ export default class ReadwiseMirror extends Plugin {
             }
           }
 
-          // Update readwiseFile and doc with existing file
           readwiseFile.primary = primary;
           readwiseFile.duplicates = duplicates;
           doc.linktext = this.app.metadataCache.fileToLinktext(readwiseFile.primary, readwiseFile.primary.path, true);
@@ -489,7 +497,7 @@ export default class ReadwiseMirror extends Plugin {
       const hasExistingFrontmatter = readwiseFile.primary instanceof TFile;
       let frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile, hasExistingFrontmatter);
       if (hasExistingFrontmatter) {
-        const primaryFile = readwiseFile.primary as TFile;
+        const primaryFile: TFile = readwiseFile.primary as TFile;
         const fileMetadata: CachedMetadata = this.app.metadataCache.getFileCache(primaryFile);
         if (fileMetadata?.frontmatter) {
           const existingFrontmatter = new Frontmatter(fileMetadata.frontmatter);
