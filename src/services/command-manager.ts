@@ -231,13 +231,14 @@ export class ReadwiseCommandManager {
 
     try {
       // Get all markdown files in the folder (recursively)
-      const updateableNotes = this.ctx.app.vault.getFiles().filter((f) => {
-        return (
-          f.extension === 'md' && f.parent && this.isFileInFolder(f, folder) && this.getUpdatableNote(f).isUpdatable
-        );
-      });
+      // Get all markdown files in the folder and their tracked metadata
+      const trackedNotes = this.ctx.app.vault
+        .getFiles()
+        .filter((f) => f.extension === 'md' && f.parent && this.isFileInFolder(f, folder))
+        .map((f) => this.getUpdatableNote(f))
+        .filter((tracked): tracked is TTrackedFile => tracked?.isUpdatable);
 
-      const bookIds = updateableNotes.map((file) => this.getUpdatableNote(file).readwiseId);
+      const bookIds = trackedNotes.map((tracked) => tracked.readwiseId);
 
       try {
         this.ctx.notify.notice(
@@ -397,7 +398,7 @@ export class ReadwiseCommandManager {
    */
   private async updateSingleNote(trackedFile: TTrackedFile): Promise<void> {
     if (this.syncLock.isAcquired(trackedFile.readwiseId.toString())) {
-      this.ctx.notify.notice('Readwise: Update for this note already in progress');
+      this.ctx.notify.notice('Readwise: Update already in progress');
       return;
     }
 
@@ -412,7 +413,7 @@ export class ReadwiseCommandManager {
     }
 
     // Now that we are sure we can process the file, we acquire a lock for the specific note
-    this.ctx.logger.debug('Readwise: Updating current note...');
+    this.ctx.logger.debug('Readwise: Updating multiple notes...');
 
     await this.syncLock.acquire(trackedFile.readwiseId.toString());
 
@@ -434,7 +435,7 @@ export class ReadwiseCommandManager {
         return;
       }
     } catch (error) {
-      this.ctx.logger.error('Error during single-book update:', error);
+      this.ctx.logger.error('Error during multiple-book update:', error);
       this.ctx.notify.notice(`Readwise: Sync failed. ${error}`);
     } finally {
       // Make sure we release the lock even if the operation fails
