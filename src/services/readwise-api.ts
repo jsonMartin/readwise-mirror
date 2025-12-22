@@ -238,8 +238,8 @@ export default class ReadwiseApi {
 
   /**
    * Fetches multiple books from Readwise API (in chunks, sequentially)
-   * @param bookIds
-   * @returns
+   * @param bookIds - Array of book IDs to fetch
+   * @returns {Promise<Library>} - Returns a promise that resolves to a Library object containing the fetched book
    */
   async downloadMultipleBooks(bookIds: number[]): Promise<Library> {
     // Fetch multiple books in chunks sequentially to avoid freezing
