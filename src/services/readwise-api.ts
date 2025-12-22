@@ -1,7 +1,6 @@
 import { type RequestUrlResponse, requestUrl } from 'obsidian';
-import type Logger from 'services/logger';
 import type { Export, Library } from 'types/library';
-import type Notify from 'ui/notify';
+import type { PluginContext } from './plugin-context';
 
 const API_ENDPOINT = 'https://readwise.io/api/v2';
 const API_PAGE_SIZE = 1000; // number of results per page, default 100 / max 1000
@@ -17,22 +16,22 @@ export class TokenValidationError extends Error {
  * Readwise API class
  */
 export default class ReadwiseApi {
-  private apiToken: string;
   private validToken: boolean | undefined;
-  private notify: Notify;
-  private logger: Logger;
 
-  constructor(apiToken: string, notify: Notify, logger: Logger) {
-    this.apiToken = apiToken;
-    this.notify = notify;
-    this.logger = logger;
-    this.validateToken().then((isValid) => {
-      this.validToken = isValid;
-    });
-
+  private constructor(
+    private apiToken: string,
+    private ctx: PluginContext
+  ) {
     if (!apiToken) {
       throw new Error('API Token Required!');
     }
+  }
+
+  // The only way to create an instance
+  static async create(apiToken: string, ctx: PluginContext): Promise<ReadwiseApi> {
+    const api = new ReadwiseApi(apiToken, ctx);
+    await api.validateToken(); // Await validation before returning
+    return api;
   }
 
   /**
@@ -46,7 +45,7 @@ export default class ReadwiseApi {
         this.validToken = isValid;
       })
       .catch((e) => {
-        this.logger.error(`Failed to set token: ${e.message}`);
+        this.ctx.logger.error(`Failed to set token: ${e.message}`);
         this.validToken = false;
       });
   }
@@ -112,8 +111,8 @@ export default class ReadwiseApi {
 
     const results = [];
 
-    this.logger.group(`Fetch Data: ${contentType}`);
-    this.logger.debug('Fetch parameters:', { lastUpdated, bookId, includeDeleted });
+    this.ctx.logger.group(`Fetch Data: ${contentType}`);
+    this.ctx.logger.debug('Fetch parameters:', { lastUpdated, bookId, includeDeleted });
     try {
       while (true) {
         const queryParams = new URLSearchParams();
@@ -132,18 +131,18 @@ export default class ReadwiseApi {
         }
 
         // Notify user of progress
-        if (lastUpdated) this.logger.info(`Checking for new content since ${lastUpdated}`);
-        if (bookId) this.logger.debug(`Checking for all highlights on book ID: ${bookId}`);
+        if (lastUpdated) this.ctx.logger.info(`Checking for new content since ${lastUpdated}`);
+        if (bookId) this.ctx.logger.debug(`Checking for all highlights on book ID: ${bookId}`);
         let statusBarText = `Readwise: Fetching ${contentType}`;
         if (data?.count) statusBarText += ` (${results.length})`;
-        this.notify.setStatusBarText(statusBarText);
+        this.ctx.notify.setStatusBarText(statusBarText);
 
         // FIXME: When fetching very long period of data, the request might fail due to an URL which is too long (Error 414)
         const response: RequestUrlResponse = await requestUrl({ url: url + queryParams.toString(), ...this.options });
         data = response.json;
 
-        if (!response && response.status !== 429) {
-          this.logger.error(`Failed to fetch data. Status: ${response.status}`);
+        if (response.status !== 429 && (response.status < 200 || response.status >= 300)) {
+          this.ctx.logger.error(`Failed to fetch data. Status: ${response.status}`);
           throw new Error(`Failed to fetch data. Status: ${response.status}`);
         }
 
@@ -152,34 +151,35 @@ export default class ReadwiseApi {
           let rateLimitedDelayTime = Number.parseInt(response.headers['Retry-After'], 10) * 1000 + 1000;
           if (Number.isNaN(rateLimitedDelayTime)) {
             // Default to a 1-second delay if 'Retry-After' is missing or invalid
-            this.logger.warn("'Retry-After' header is missing or invalid. Defaulting to 1 second delay.");
+            this.ctx.logger.warn("'Retry-After' header is missing or invalid. Defaulting to 1 second delay.");
             rateLimitedDelayTime = 1000;
           } else {
-            this.logger.warn(`API Rate Limited, waiting to retry for ${rateLimitedDelayTime}`);
+            this.ctx.logger.warn(`API Rate Limited, waiting to retry for ${rateLimitedDelayTime}`);
           }
-          this.notify.setStatusBarText(`Readwise: API Rate Limited, waiting ${rateLimitedDelayTime}`);
+          this.ctx.notify.setStatusBarText(`Readwise: API Rate Limited, waiting ${rateLimitedDelayTime}`);
 
           await new Promise((_) => setTimeout(_, rateLimitedDelayTime));
-          this.logger.info('Trying to fetch highlights again...');
-          this.notify.setStatusBarText('Readwise: Attempting to retry...');
+          this.ctx.logger.info('Trying to fetch highlights again...');
+          this.ctx.notify.setStatusBarText('Readwise: Attempting to retry...');
         } else {
           if (data.results && Array.isArray(data.results)) {
             results.push(...data.results);
           } else {
-            this.logger.warn('No results found in the response data.');
+            this.ctx.logger.warn('No results found in the response data.');
           }
           nextPageCursor = data.nextPageCursor as string;
           if (!nextPageCursor) {
             break;
           }
-          this.logger.debug(`There are more records left, proceeding to next page: ${data.nextPageCursor}`);
+          this.ctx.logger.debug(`There are more records left, proceeding to next page: ${data.nextPageCursor}`);
         }
       }
     } finally {
-      this.logger.groupEnd();
+      this.ctx.logger.groupEnd();
     }
 
-    if (results.length > 0) this.logger.info(`Processed ${results.length} total ${contentType} results successfully`);
+    if (results.length > 0)
+      this.ctx.logger.info(`Processed ${results.length} total ${contentType} results successfully`);
     return results;
   }
 
@@ -227,7 +227,7 @@ export default class ReadwiseApi {
     const recordsUpdated = (await this.fetchData('export', lastUpdated, undefined, true)) as Export[];
     const bookIds = recordsUpdated.map((r) => r.user_book_id);
 
-    this.logger.debug(`Fetched ids of ${bookIds.length} updated books...`);
+    this.ctx.logger.debug(`Fetched ids of ${bookIds.length} updated books...`);
 
     if (bookIds.length > 0) {
       const CHUNK = 100;

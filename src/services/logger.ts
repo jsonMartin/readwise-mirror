@@ -3,11 +3,7 @@
  * @module services/logger
  */
 class Logger {
-  private debugMode: boolean;
-
-  constructor(debugMode: boolean) {
-    this.debugMode = debugMode;
-  }
+  constructor(private debugMode: boolean) {}
 
   group(label: string): void {
     if (this.debugMode) console.group(`Readwise Mirror: ${label}`);

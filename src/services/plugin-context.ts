@@ -9,9 +9,10 @@ import type Notify from 'ui/notify';
  * to reduce parameter sprawl across service constructors
  */
 export interface PluginContext {
+  settings: PluginSettings;
+  app: App;
   plugin: ReadwiseMirror;
   notify: Notify;
   logger: Logger;
-  app: App;
-  settings: PluginSettings;
+  saveSettings: () => Promise<void>;
 }
