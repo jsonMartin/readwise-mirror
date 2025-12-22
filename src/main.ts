@@ -1,7 +1,7 @@
 // Constants
 
 import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS, NUNJUCKS_CORE_TEMPLATE } from 'constants/index';
-import { type App, type CachedMetadata, Plugin, type PluginManifest, TFile, TFolder } from 'obsidian';
+import { type App, type CachedMetadata, normalizePath, Plugin, type PluginManifest, TFile, TFolder } from 'obsidian';
 import { Atomizer } from 'services/atomizer';
 import { ReadwiseCommandManager } from 'services/command-manager';
 import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
@@ -441,10 +441,10 @@ export default class ReadwiseMirror extends Plugin {
       };
 
       // Get the primary path for new file before checking for duplicates
-      readwiseFile.primary = this.deduplicatingVaultWriter.getNormalizedPath(
-        this.deduplicatingVaultWriter.getCategoryPath(category),
-        `${basename}.md`
+      const readwisePrimary = normalizePath(
+        `${this.deduplicatingVaultWriter.getCategoryPath(category)}/${basename}.md`
       );
+
       // note_link is just the basename in this case
       doc.linktext = basename;
 
@@ -457,25 +457,24 @@ export default class ReadwiseMirror extends Plugin {
             `Found ${existingFiles.length} existing file(s) for '${title}' (${source_url}), using primary: ${primary.path}`
           );
 
-          // We only rename files if the respective settings are enabled and the filenames differ
-          if (this.settings.enableFileNameUpdates && readwiseFile.basename !== primary.basename) {
-            let newPath = this.deduplicatingVaultWriter.getNormalizedPath(
-              primary.parent.path,
-              `${readwiseFile.basename}.md`
-            );
-            const newFileExists = await this.app.vault.adapter.exists(newPath, false);
-            if (newFileExists) {
-              // Add hash to filename if there's a collision
-              const hash = this.deduplicatingVaultWriter.generateShortHash(readwiseFile.doc);
-              newPath = this.deduplicatingVaultWriter.getNormalizedPath(
-                primary.parent.path,
-                `${readwiseFile.basename} ${hash}.md`
-              );
-            }
+          if (this.settings.enableFileNameUpdates) {
+            const hash = this.deduplicatingVaultWriter.generateShortHash(readwiseFile);
 
-            if (newPath !== primary.path) {
-              this.logger.debug(`Renamed file from ${primary.path} to ${newPath}`);
+            try {
+              for (let i = 0; i < duplicates.length; i++) {
+                const newPath = normalizePath(`${duplicates[i].parent.path}/${basename} ${i + 1}.md`);
+                await this.app.fileManager.renameFile(duplicates[i], newPath);
+              }
+
+              const newFileExists = await this.app.vault.adapter.exists(readwisePrimary, false);
+              // Add hash to filename if there's a collision (and the primary is not in the duplicates)
+              const newPath = newFileExists
+                ? normalizePath(`${primary.parent.path}/${basename} ${hash}.md`)
+                : normalizePath(`${primary.parent.path}/${basename}.md`);
+              this.logger.debug(`Rename file from ${primary.path} to ${newPath}`);
               await this.app.fileManager.renameFile(primary, newPath);
+            } catch (error) {
+              this.logger.error(`Error renaming file ${primary.path}`, error);
             }
           }
 

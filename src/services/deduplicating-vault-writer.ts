@@ -25,15 +25,6 @@ export class DeduplicatingVaultWriter {
   }
 
   /**
-   * Creates a normalized path for any vault path
-   * @param segments - Path segments to join
-   * @returns Normalized path string
-   */
-  public getNormalizedPath(...segments: string[]): string {
-    return normalizePath(segments.join('/'));
-  }
-
-  /**
    * Creates category folders in the vault
    *
    * @param categories - The categories to create folders for
@@ -65,7 +56,7 @@ export class DeduplicatingVaultWriter {
     const files = this.vault.getMarkdownFiles();
 
     // Filter files by the tracking property
-    return files.filter((file) => {
+    const matchedFiles = files.filter((file) => {
       const metadata = this.app.metadataCache.getFileCache(file);
       const isTracked = isTrackedReadwiseNote(file, this.app, this.ctx.settings);
       const isInLibrary = isInReadwiseLibrary(file, this.ctx.settings);
@@ -81,16 +72,35 @@ export class DeduplicatingVaultWriter {
       // Compare the tracking property value to the readwise_url
       return metadata?.frontmatter?.[this.ctx.settings.trackingProperty] === doc.readwise_url;
     });
+
+    // Sort: Files WITHOUT "duplicate" property come first
+    return matchedFiles.sort((a, b) => {
+      const cacheA = this.app.metadataCache.getFileCache(a);
+      const cacheB = this.app.metadataCache.getFileCache(b);
+
+      // Check if the 'duplicate' key exists in frontmatter (regardless of value)
+      const hasDuplicateA = cacheA?.frontmatter?.duplicate !== undefined;
+      const hasDuplicateB = cacheB?.frontmatter?.duplicate !== undefined;
+
+      // If both have it or both don't have it, keep original order
+      if (hasDuplicateA === hasDuplicateB) {
+        return 0;
+      }
+
+      // If A does NOT have it, A comes first (-1)
+      // If A HAS it (and B doesn't per above check), A comes last (1)
+      return !hasDuplicateA ? -1 : 1;
+    });
   }
 
   /**
-   * Generates a short hash based on the metadata ID
+   * Generates a short hash based on the metadata ID and
    *
-   * @param doc - The readwise document to generate a hash for
+   * @param file - The readwise file to generate a hash for
    * @returns A short hash
    */
-  public generateShortHash(doc: ReadwiseDocument): string {
-    return md5(doc.id.toString()).substring(0, 4);
+  public generateShortHash(file: BaseFile | AtomicFile): string {
+    return md5(file.doc.id.toString() + file.basename).substring(0, 4);
   }
 
   /**
@@ -106,7 +116,7 @@ export class DeduplicatingVaultWriter {
 
   public getCategoryPath(category: string): string {
     const formattedCategory = category.charAt(0).toUpperCase() + category.slice(1);
-    return this.getNormalizedPath(this.ctx.settings.baseFolderName, formattedCategory);
+    return normalizePath(`${this.ctx.settings.baseFolderName}/${formattedCategory}`);
   }
 
   /**
@@ -315,7 +325,7 @@ export class DeduplicatingVaultWriter {
      */
 
     if (file.type === 'base') this.notifyFileCount();
-    const path = this.getNormalizedPath(this.getCategoryPathFromFile(file), `${file.basename}.md`);
+    const path = normalizePath(`${this.getCategoryPathFromFile(file)}/${file.basename}.md`);
     try {
       const frontmatter = this.frontmatterManager.getFrontmatter(file);
       const fileOptions = {
@@ -333,8 +343,8 @@ export class DeduplicatingVaultWriter {
           return existingFile;
         }
         // Create new path with hash
-        const hash = this.generateShortHash(file.doc);
-        const newPath = this.getNormalizedPath(this.getCategoryPathFromFile(file), `${file.basename} ${hash}.md`);
+        const hash = this.generateShortHash(file);
+        const newPath = normalizePath(`${this.getCategoryPathFromFile(file)}/${file.basename} ${hash}.md`);
         const newFileExists = await this.app.vault.adapter.exists(newPath, false);
         if (newFileExists) {
           const existingNewFile: TFile = await this.vault.getFileByPath(newPath);
