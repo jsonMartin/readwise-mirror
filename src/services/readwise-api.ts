@@ -230,17 +230,29 @@ export default class ReadwiseApi {
     this.ctx.logger.debug(`Fetched ids of ${bookIds.length} updated books...`);
 
     if (bookIds.length > 0) {
-      const CHUNK = 100;
-      let merged: Export[] = [];
-      for (let i = 0; i < bookIds.length; i += CHUNK) {
-        const chunk = bookIds.slice(i, i + CHUNK);
-        const page = (await this.fetchData('export', undefined, chunk, true)) as Export[];
-        merged = merged.concat(page);
-      }
-      return this.buildLibrary(merged);
+      return await this.downloadMultipleBooks(bookIds);
     }
     // Essentially return an empty library
     return this.buildLibrary(recordsUpdated);
+  }
+
+  /**
+   * Fetches multiple books from Readwise API (in chunks, sequentially)
+   * @param bookIds
+   * @returns
+   */
+  async downloadMultipleBooks(bookIds: number[]): Promise<Library> {
+    // Fetch multiple books in chunks sequentially to avoid freezing
+    const CHUNK = 100;
+    let merged: Export[] = [];
+
+    for (let i = 0; i < bookIds.length; i += CHUNK) {
+      const chunk = bookIds.slice(i, i + CHUNK);
+      const page = (await this.fetchData('export', undefined, chunk, true)) as Export[];
+      merged = merged.concat(page);
+    }
+
+    return this.buildLibrary(merged);
   }
 
   /**

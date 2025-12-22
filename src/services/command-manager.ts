@@ -78,7 +78,7 @@ export class ReadwiseCommandManager {
         checkCallback: (checking: boolean) => {
           const trackedFile = this.getUpdatableNote(this.ctx.app.workspace.getActiveFile());
           if (!trackedFile) return false;
-          if (!checking) this.updateCurrentNote(trackedFile);
+          if (!checking) this.updateSingleNote(trackedFile);
           return true;
         },
       },
@@ -127,6 +127,9 @@ export class ReadwiseCommandManager {
    */
   public registerEvents(): void {
     // Register context menu for files and folders
+    this.ctx.plugin.registerEvent(
+      this.ctx.app.workspace.on('file-menu', (menu, file) => this.onMenuOpenCallback(menu, file))
+    );
 
     this.ctx.plugin.registerDomEvent(this.ctx.notify.statusBarItem, 'click', this.sync.bind(this));
   }
@@ -137,6 +140,133 @@ export class ReadwiseCommandManager {
       this.sync();
     }
   }
+  /**
+   * Handle context menu for files and folders
+   */
+  private onMenuOpenCallback(menu: Menu, file: TAbstractFile) {
+    if (file instanceof TFile && file.extension === 'md') {
+      const tracked = this.getUpdatableNote(file);
+      if (tracked) {
+        // Update this note
+        menu.addItem((item) => {
+          item
+            .setIcon('refresh-cw')
+            .setTitle('Update this note')
+            .onClick(() => this.updateSingleNote(tracked));
+        });
+
+        // View in Readwise
+        const trackingUrl = this.getTrackingUrl(file);
+        if (trackingUrl) {
+          menu.addItem((item) => {
+            item
+              .setIcon('external-link')
+              .setTitle('View in Readwise')
+              .onClick(() => window.open(trackingUrl));
+          });
+
+          // Copy Readwise URL
+          menu.addItem((item) => {
+            item
+              .setIcon('copy')
+              .setTitle('Copy Readwise URL')
+              .onClick(async () => {
+                await navigator.clipboard.writeText(trackingUrl);
+                this.ctx.notify.notice('Readwise: URL copied to clipboard');
+              });
+          });
+        }
+      }
+    } else if (file instanceof TFolder) {
+      // Check if this folder is in the Readwise library
+      if (this.isFolderInReadwiseLibrary(file)) {
+        menu.addItem((item) => {
+          item
+            .setIcon('refresh-cw')
+            .setTitle('Update all notes in folder')
+            .onClick(async () => this.syncFolder(file));
+        });
+      }
+    }
+  }
+
+  /**
+   * Check if a folder is in the Readwise library hierarchy
+   */
+  private isFolderInReadwiseLibrary(folder: TFolder): boolean {
+    const baseFolderName = this.ctx.settings.baseFolderName?.trim();
+    if (!baseFolderName) return false;
+
+    // Check if folder is the base folder or a direct child of it
+    return folder.path === baseFolderName || folder.parent?.path === baseFolderName;
+  }
+
+  /**
+   * Get tracking URL from a file's frontmatter
+   */
+  private getTrackingUrl(file: TFile): string | undefined {
+    const fileCache = this.ctx.app.metadataCache.getFileCache(file);
+    const trackingProperty = this.ctx.settings.trackingProperty;
+    const trackingUrl = fileCache?.frontmatter?.[trackingProperty];
+    return typeof trackingUrl === 'string' && trackingUrl.startsWith(READWISE_REVIEW_URL_BASE)
+      ? trackingUrl
+      : undefined;
+  }
+
+  /**
+   * Update all Readwise notes in a folder
+   */
+  private async syncFolder(folder: TFolder) {
+    if (this.syncLock.isAcquired('folder-sync')) {
+      this.ctx.notify.notice('Readwise: sync already in progress');
+      return;
+    }
+
+    if (!this.ctx.plugin.readwiseApi?.hasValidToken()) {
+      this.ctx.notify.notice('Readwise: Valid API Token Required');
+      return;
+    }
+
+    await this.syncLock.acquire('folder-sync');
+
+    try {
+      // Get all markdown files in the folder (recursively)
+      const updateableNotes = this.ctx.app.vault.getFiles().filter((f) => {
+        return (
+          f.extension === 'md' && f.parent && this.isFileInFolder(f, folder) && this.getUpdatableNote(f).isUpdatable
+        );
+      });
+
+      const bookIds = updateableNotes.map((file) => this.getUpdatableNote(file).readwiseId);
+
+      try {
+        this.ctx.notify.notice(
+          `Readwise: Updating ${bookIds.length} note${bookIds.length !== 1 ? 's' : ''} in "${folder.name}"...`
+        );
+
+        await this.updateMultipleNotes(bookIds);
+      } catch (error) {
+        this.ctx.logger.warn('Failed to update multiple files', error);
+      }
+
+      this.ctx.notify.notice(
+        `Readwise: Updated ${bookIds.length} note${bookIds.length !== 1 ? 's' : ''} in "${folder.name}"`
+      );
+    } catch (error) {
+      this.ctx.logger.error('Error syncing folder:', error);
+      this.ctx.notify.notice(`Readwise: Sync failed. ${error}`);
+    } finally {
+      this.syncLock.release('folder-sync');
+    }
+  }
+
+  /**
+   * Check if a file is within a folder (including subfolders)
+   */
+  private isFileInFolder(file: TFile, folder: TFolder): boolean {
+    return file.path.startsWith(`${folder.path}/`);
+  }
+
   /**
    * Return a tracked file if the given file is a Readwise note that can be updated.
    */
@@ -151,8 +281,7 @@ export class ReadwiseCommandManager {
     // Otherwise, check if it's a Readwise note AND in the Readwise library.
     const isUpdatable = this.ctx.settings.trackAcrossVault ? isReadwiseNote : isReadwiseNote && isInLibrary;
 
-    const fileCache = this.ctx.app.metadataCache.getFileCache(file);
-    const trackingUrl = fileCache?.frontmatter?.[this.ctx.settings.trackingProperty];
+    const trackingUrl = this.getTrackingUrl(file);
     if (typeof trackingUrl !== 'string' || !trackingUrl.startsWith(READWISE_REVIEW_URL_BASE)) {
       this.ctx.logger.warn('Tracking URL missing/invalid for current note.');
       return null;
@@ -266,7 +395,7 @@ export class ReadwiseCommandManager {
   /**
    * Update current note with Readwise data
    */
-  private async updateCurrentNote(trackedFile: TTrackedFile): Promise<void> {
+  private async updateSingleNote(trackedFile: TTrackedFile): Promise<void> {
     if (this.syncLock.isAcquired(trackedFile.readwiseId.toString())) {
       this.ctx.notify.notice('Readwise: Update for this note already in progress');
       return;
@@ -313,6 +442,51 @@ export class ReadwiseCommandManager {
     }
   }
 
+  /**
+   * Update current note with Readwise data
+   */
+  private async updateMultipleNotes(bookIds: number[]): Promise<void> {
+    if (this.syncLock.isAcquired('multiple-note-update')) {
+      this.ctx.notify.notice('Readwise: Update for this note already in progress');
+      return;
+    }
+
+    if (!this.ctx.plugin.readwiseApi?.hasValidToken()) {
+      this.ctx.notify.notice('Readwise: Valid API Token Required');
+      return;
+    }
+
+    // Now that we are sure we can process the file, we acquire a lock for the specific note
+    this.ctx.logger.debug('Readwise: Updating current note...');
+
+    await this.syncLock.acquire('multiple-note-update');
+
+    try {
+      const library = await this.ctx.plugin.readwiseApi.downloadMultipleBooks(bookIds);
+      if (Object.keys(library.books).length > 0) {
+        if (this.ctx.settings.atomicHighlights) {
+          library.categories.add('Highlight');
+        }
+
+        if (this.ctx.settings.syncNotifications)
+          this.ctx.notify.notice(`Readwise: writing ${Object.keys(library.books).length} updated books to markdown...`);
+        this.ctx.logger.debug(`Readwise: writing ${Object.keys(library.books).length} updated books to markdown...`);
+        await this.ctx.plugin.writeLibraryToMarkdown(library);
+        if (this.ctx.settings.logFile) await this.ctx.plugin.writeLogToMarkdown(library);
+        if (this.ctx.settings.syncNotifications) this.ctx.notify.notice('Readwise: Book update complete.');
+      } else {
+        this.ctx.notify.notice('Readwise: No notes from folder found on Readwise.');
+        this.ctx.logger.warn('Readwise: No notes from folder found on Readwise.');
+        return;
+      }
+    } catch (error) {
+      this.ctx.logger.error('Error during single-book update:', error);
+      this.ctx.notify.notice(`Readwise: Sync failed. ${error}`);
+    } finally {
+      // Make sure we release the lock even if the operation fails
+      this.syncLock.release('multiple-note-update');
+    }
+  }
   /**
    * Updates the frontmatter for all markdown files within the configured base folder.
    */
