@@ -36,11 +36,7 @@ export function getPluginCommands(ctr: ReadwiseController, ctx: PluginContext): 
     {
       id: 'update',
       name: 'Sync new highlights',
-      callback: () => {
-        if (typeof ctr.sync === 'function') {
-          ctr.sync();
-        }
-      },
+      callback: () => ctr.sync(),
     },
     {
       id: 'adjust-filenames',
@@ -82,7 +78,7 @@ export function getPluginCommands(ctr: ReadwiseController, ctx: PluginContext): 
           if (!checking) {
             const d = spacetime.now().subtract(2, 'months');
             ctx.settings.lastUpdated = d.format('iso');
-            ctx.saveAndApplySettings();
+            ctx.saveAndApplySettings().catch((err) => ctx.notify.notice(`Failed to save settings: ${err.message}`));
           }
           return true;
         }
