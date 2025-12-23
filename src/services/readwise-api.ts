@@ -34,31 +34,6 @@ export default class ReadwiseApi {
   }
 
   /**
-   * Sets the API token for the Readwise API instance
-   * @param apiToken - The API token to set
-   */
-  async setToken(apiToken: string): Promise<boolean> {
-    const tempToken = this.apiToken;
-    try {
-      this.apiToken = apiToken;
-      this.validToken = await this.validateToken();
-      if (this.validToken) {
-        // Optionally update context settings for persistence
-        this.ctx.settings.apiToken = apiToken;
-      } else {
-        // Restore previous token if validation fails
-        this.apiToken = tempToken;
-      }
-    } catch (e) {
-      this.ctx.logger.error(`Failed to set token: ${e.message}`);
-      this.apiToken = tempToken; // Restore on error
-      return false;
-    }
-
-    return this.validToken;
-  }
-
-  /**
    * Returns the options object for the Readwise API instance
    * @returns {Record<string, unknown>} - Returns an object containing the headers for the API request
    */
