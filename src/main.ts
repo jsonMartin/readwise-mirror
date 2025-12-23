@@ -399,6 +399,7 @@ export default class ReadwiseMirror extends Plugin {
 
     if (readwiseFiles.length === 0) {
       this.logger.debug('No eligible Readwise files to process (all highlights filtered out). Skipping write.');
+      this.logger.groupEnd();
       return;
     }
 
