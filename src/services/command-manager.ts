@@ -33,6 +33,11 @@ export class ReadwiseCommandManager {
     return ReadwiseCommandManager.instance;
   }
 
+  // Reset the singleton instance (for testing purposes)
+  public static reset(): void {
+    ReadwiseCommandManager.instance = undefined;
+  }
+
   /**
    * Manifest of all plugin commands
    */
