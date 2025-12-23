@@ -31,7 +31,7 @@ export class ReadwiseCommandManager {
         id: 'test',
         name: 'Test Readwise API key',
         callback: async () => {
-          const isTokenValid = this.ctx.plugin.readwiseApi?.hasValidToken();
+          const isTokenValid = this.ctx.api?.hasValidToken();
           this.ctx.notify.notice(`Readwise: ${isTokenValid ? 'Token is valid' : 'INVALID TOKEN'}`);
         },
       },
@@ -222,7 +222,7 @@ export class ReadwiseCommandManager {
       return;
     }
 
-    if (!this.ctx.plugin.readwiseApi?.hasValidToken()) {
+    if (!this.ctx.api?.hasValidToken()) {
       this.ctx.notify.notice('Readwise: Valid API Token Required');
       return;
     }
@@ -316,7 +316,7 @@ export class ReadwiseCommandManager {
 
     await this.syncLock.acquire('library-sync');
     try {
-      if (!this.ctx.plugin.readwiseApi?.hasValidToken()) {
+      if (!this.ctx.api?.hasValidToken()) {
         this.ctx.notify.notice('Readwise: Valid API Token Required');
         return;
       }
@@ -327,14 +327,14 @@ export class ReadwiseCommandManager {
       if (!lastUpdated) {
         if (this.ctx.settings.syncNotifications)
           this.ctx.notify.notice('Readwise: Previous sync not detected...\nDownloading full Readwise library');
-        library = await this.ctx.plugin.readwiseApi.downloadFullLibrary();
+        library = await this.ctx.api.downloadFullLibrary();
       } else {
         // Load Updates and cache
         if (this.ctx.settings.syncNotifications)
           this.ctx.notify.notice(
             `Readwise: Checking for new updates since ${this.ctx.plugin.lastUpdatedHumanReadableFormat()}`
           );
-        library = await this.ctx.plugin.readwiseApi.downloadUpdates(lastUpdated);
+        library = await this.ctx.api.downloadUpdates(lastUpdated);
       }
 
       this.ctx.logger.group('Filter Library: Deleted and by Tag');
@@ -402,7 +402,7 @@ export class ReadwiseCommandManager {
       return;
     }
 
-    if (!this.ctx.plugin.readwiseApi?.hasValidToken()) {
+    if (!this.ctx.api?.hasValidToken()) {
       this.ctx.notify.notice('Readwise: Valid API Token Required');
       return;
     }
@@ -419,7 +419,7 @@ export class ReadwiseCommandManager {
 
     try {
       this.ctx.logger.debug(`Readwise: downloading current book with ID ${trackedFile.readwiseId}...`);
-      const library = await this.ctx.plugin.readwiseApi.downloadSingleBook(trackedFile.readwiseId);
+      const library = await this.ctx.api.downloadSingleBook(trackedFile.readwiseId);
       if (Object.keys(library.books).length > 0) {
         if (this.ctx.settings.atomicHighlights) {
           library.categories.add('Highlight');
@@ -452,7 +452,7 @@ export class ReadwiseCommandManager {
       return;
     }
 
-    if (!this.ctx.plugin.readwiseApi?.hasValidToken()) {
+    if (!this.ctx.api?.hasValidToken()) {
       this.ctx.notify.notice('Readwise: Valid API Token Required');
       return;
     }
@@ -463,7 +463,7 @@ export class ReadwiseCommandManager {
     await this.syncLock.acquire('multiple-note-update');
 
     try {
-      const library = await this.ctx.plugin.readwiseApi.downloadMultipleBooks(bookIds);
+      const library = await this.ctx.api.downloadMultipleBooks(bookIds);
       if (Object.keys(library.books).length > 0) {
         if (this.ctx.settings.atomicHighlights) {
           library.categories.add('Highlight');
@@ -497,7 +497,7 @@ export class ReadwiseCommandManager {
       return;
     }
 
-    if (!this.ctx.plugin.readwiseApi?.hasValidToken()) {
+    if (!this.ctx.api?.hasValidToken()) {
       this.ctx.notify.notice('Readwise: Valid API Token Required');
       return;
     }
@@ -506,7 +506,7 @@ export class ReadwiseCommandManager {
     await this.syncLock.acquire('frontmatter-update');
     try {
       this.ctx.logger.info('Readwise: downloading full library to update frontmatter...');
-      const library = await this.ctx.plugin.readwiseApi.downloadFullLibrary();
+      const library = await this.ctx.api.downloadFullLibrary();
 
       // Remove deleted books
       for (const bookId in library.books) {

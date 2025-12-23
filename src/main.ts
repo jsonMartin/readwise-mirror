@@ -77,7 +77,7 @@ export default class ReadwiseMirror extends Plugin {
     try {
       // Update and try to compile
       this._loader.setSource('header', template);
-      this._env.getTemplate('header', true);
+      this.env.getTemplate('header', true);
     } catch (error) {
       this.logger.error('Error setting header template:', error);
       this.notify.notice('Readwise: Error setting header template. Check console for details.');
@@ -88,7 +88,7 @@ export default class ReadwiseMirror extends Plugin {
     try {
       // Update and try to compile
       this._loader.setSource('highlight', template);
-      this._env.getTemplate('highlight', true);
+      this.env.getTemplate('highlight', true);
     } catch (error) {
       this.logger.error('Error setting highlight template:', error);
       this.notify.notice('Readwise: Error setting highlight template. Check console for details.');
@@ -509,7 +509,7 @@ export default class ReadwiseMirror extends Plugin {
       const shouldAtomize = this.shouldAtomize(frontmatter);
       // Render header, and highlights by rendering the core template
       this._loader.setSource('file', NUNJUCKS_CORE_TEMPLATE);
-      const _contents = this._env.render('file', {
+      const _contents = this.env.render('file', {
         // We pass the doc (current Readwise document) and book (Export) for access to all fields
         doc,
         book,
@@ -561,7 +561,7 @@ export default class ReadwiseMirror extends Plugin {
         updated: updatedDate(book.highlights),
       };
       this._loader.setSource('filename', template);
-      filename = this._env.render('filename', context);
+      filename = this.env.render('filename', context);
     } else {
       filename = book.title;
     }
@@ -705,12 +705,13 @@ export default class ReadwiseMirror extends Plugin {
 
     // Create plugin context for dependency injection
     const context: PluginContext = {
+      // TODO: refactor
       plugin: this,
       settings: this.settings,
       app: this.app,
-      // TODO: refactor
+      api: this.readwiseApi,
+      logger: this.logger,
       notify: this.notify,
-      logger: this._logger,
       saveSettings: this.saveSettings.bind(this),
     };
 
@@ -749,7 +750,7 @@ export default class ReadwiseMirror extends Plugin {
       }, 1000)
     );
 
-    this.addSettingTab(new ReadwiseMirrorSettingTab(context));
+    this.addSettingTab(new ReadwiseMirrorSettingTab(this, context, this._env));
   }
 
   async loadSettings() {

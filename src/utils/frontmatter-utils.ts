@@ -3,9 +3,9 @@
  */
 
 import { FRONTMATTER_TO_ESCAPE, YAML_INDENT } from 'constants/index';
-import type { Environment } from 'nunjucks';
 import { parseYaml } from 'obsidian';
 import { Frontmatter } from 'services/frontmatter';
+import type { ReadwiseEnvironment } from 'services/readwise-environment';
 import { sampleMetadata } from 'test/sample-data';
 import type { ReadwiseDocument } from 'types/document';
 import type { YamlEscapeOptions, YamlStringState } from 'types/utilities';
@@ -33,7 +33,7 @@ export function sanitizeFrontmatterTemplate(template: string): string {
  * @returns Validation result
  */
 export function validateFrontmatterTemplate(
-  env: Environment,
+  env: ReadwiseEnvironment,
   template: string
 ): {
   isValidYaml: boolean;

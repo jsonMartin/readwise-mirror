@@ -1,20 +1,26 @@
 import { EMPTY_FRONTMATTER, FRONTMATTER_TO_ESCAPE, READWISE_URI_FIELD } from 'constants/index';
-import { type Environment, Template } from 'nunjucks';
+import { Template } from 'nunjucks';
 import { type FileManager, parseYaml, type TFile } from 'obsidian';
 import { Frontmatter, FrontmatterError } from 'services/frontmatter';
 import type { AtomicFile, BaseFile, ReadwiseDocument } from 'types/document';
 import type { PluginContext } from 'types/plugin-context';
 import { escapeMetadata } from 'utils/frontmatter-utils';
+import type { ReadwiseEnvironment } from './readwise-environment';
 
 export class FrontmatterManager {
-  private readonly settings = this.context.settings;
-  private readonly logger = this.context.logger;
-
   constructor(
-    private readonly context: PluginContext,
-    private readonly env: Environment,
+    private readonly ctx: PluginContext,
+    private readonly env: ReadwiseEnvironment,
     private readonly fm: FileManager
   ) {}
+
+  get logger() {
+    return this.ctx.logger;
+  }
+
+  get settings() {
+    return this.ctx.settings;
+  }
 
   /**
    * Get updated and merged frontmatter based on a document's existing frontmatter
