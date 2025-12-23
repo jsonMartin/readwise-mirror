@@ -1,3 +1,4 @@
+import type { Lock } from 'async-await-mutex-lock';
 import type { App } from 'obsidian';
 import type Logger from 'services/logger';
 import type ReadwiseApi from 'services/readwise-api';
@@ -15,4 +16,5 @@ export interface PluginContext {
   logger: Logger;
   notify: Notify;
   saveAndApplySettings: () => Promise<void>;
+  syncLock: Lock<string>;
 }

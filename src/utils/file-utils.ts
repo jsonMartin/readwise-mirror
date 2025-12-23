@@ -1,6 +1,8 @@
 import slugify from '@sindresorhus/slugify';
+import { READWISE_REVIEW_URL_BASE } from 'constants/index';
 import filenamify from 'filenamify';
-import { normalizePath } from 'obsidian';
+import { normalizePath, type TFile, type TFolder } from 'obsidian';
+import type { PluginContext } from 'types/plugin-context';
 import type { PluginSettings } from 'types/settings';
 
 /**
@@ -28,4 +30,21 @@ export function normalizeFilename(filename: string, settings: PluginSettings) {
         .trim();
 
   return normalizePath(normalizedFilename);
+}
+
+/**
+ * Check if a file is within a folder (including subfolders)
+ */
+export function isFileInFolder(file: TFile, folder: TFolder): boolean {
+  return file.path.startsWith(`${folder.path}/`);
+}
+
+/**
+ * Get tracking URL from a file's frontmatter
+ */
+export function getTrackingUrl(file: TFile, ctx: PluginContext): string | undefined {
+  const fileCache = ctx.app.metadataCache.getFileCache(file);
+  const trackingProperty = ctx.settings.trackingProperty;
+  const trackingUrl = fileCache?.frontmatter?.[trackingProperty];
+  return typeof trackingUrl === 'string' && trackingUrl.startsWith(READWISE_REVIEW_URL_BASE) ? trackingUrl : undefined;
 }

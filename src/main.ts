@@ -1,13 +1,12 @@
-// Constants
-
+// Plugin classes
+import { Lock } from 'async-await-mutex-lock';
 import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS, NUNJUCKS_CORE_TEMPLATE } from 'constants/index';
-import { type App, type CachedMetadata, normalizePath, Plugin, type PluginManifest, TFile, TFolder } from 'obsidian';
+import { type App, type CachedMetadata, normalizePath, Plugin, type PluginManifest, TFile } from 'obsidian';
 import { Atomizer } from 'services/atomizer';
 import { ReadwiseCommandManager } from 'services/command-manager';
 import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
 import { Frontmatter } from 'services/frontmatter';
 import { FrontmatterManager } from 'services/frontmatter-manager';
-// Plugin classes
 import Logger from 'services/logger';
 import ReadwiseApi from 'services/readwise-api';
 import { ReadwiseEnvironment, ReadwiseLoader } from 'services/readwise-environment';
@@ -15,10 +14,10 @@ import spacetime from 'spacetime';
 import type { BaseFile, ReadwiseDocument } from 'types/document';
 import type { Export, Highlight, Library, Tag } from 'types/library';
 import type { PluginContext } from 'types/plugin-context';
-// Types
 import Notify from 'ui/notify';
 import ReadwiseMirrorSettingTab from 'ui/settings-tab';
-import { normalizeFilename } from 'utils/filename-utils';
+import { normalizeFilename } from 'utils/file-utils';
+import { humanReadableFormat } from 'utils/format-utils';
 import { createdDate, lastHighlightedDate, updatedDate } from 'utils/highlight-date-utils';
 import type { PluginSettings } from './types/settings';
 
@@ -88,17 +87,16 @@ export default class ReadwiseMirror extends Plugin {
 
     // Create plugin context for dependency injection
     const context: PluginContext = {
-      // TODO: refactor
       settings: this.settings,
       app: this.app,
-      get api() {
-        return this.plugin.readwiseApi;
-      },
+      api: this._readwiseApi,
       logger: this.logger,
       notify: this.notify,
       saveAndApplySettings: this.saveAndApplySettings.bind(this),
+      syncLock: new Lock(),
     };
 
+    // Instantiate controller and attach to context
     this.frontmatterManager = new FrontmatterManager(context, this._env, this.app.fileManager);
     this.deduplicatingVaultWriter = new DeduplicatingVaultWriter(context, this.frontmatterManager);
 
@@ -111,7 +109,7 @@ export default class ReadwiseMirror extends Plugin {
 
       //Update status bar with last sync time
       if (this.settings.lastUpdated)
-        this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`);
+        this.notify.setStatusBarText(`Readwise: Updated ${humanReadableFormat(this.settings.lastUpdated)}`);
       else this.notify.setStatusBarText('Readwise: Click to Sync');
     }
 
@@ -122,7 +120,7 @@ export default class ReadwiseMirror extends Plugin {
     this.registerInterval(
       window.setInterval(() => {
         if (/Synced/.test(this.notify.getStatusBarText())) {
-          this.notify.setStatusBarText(`Readwise: Synced ${this.lastUpdatedHumanReadableFormat()}`);
+          this.notify.setStatusBarText(`Readwise: Synced ${humanReadableFormat(this.settings.lastUpdated)}`);
         }
       }, 1000)
     );
@@ -135,7 +133,7 @@ export default class ReadwiseMirror extends Plugin {
     await this.loadAndApplySettings();
     this.logger.info('Reloading settings due to external change');
     if (this.settings.lastUpdated)
-      this.notify?.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`);
+      this.notify?.setStatusBarText(`Readwise: Updated ${humanReadableFormat(this.settings.lastUpdated)}`);
     if (!this.settings.apiToken) {
       this.notify?.notice('Readwise: API Token not detected\nPlease enter in configuration page');
       this.notify?.setStatusBarText('Readwise: API Token Required');
@@ -691,75 +689,5 @@ export default class ReadwiseMirror extends Plugin {
     }
 
     this.notify.setStatusBarText('Readwise: Click to Sync');
-  }
-
-  lastUpdatedHumanReadableFormat() {
-    return spacetime.now().since(spacetime(this.settings.lastUpdated)).rounded;
-  }
-
-  /**
-   * Handles the adjustment of filenames in the Readwise folder.
-   */
-  public async handleFilenameAdjustment() {
-    const vault = this.app.vault;
-    const path = `${this.settings.baseFolderName}`;
-    const readwiseFolder = vault.getAbstractFileByPath(path);
-    if (readwiseFolder && readwiseFolder instanceof TFolder) {
-      this.notify.notice('Readwise: Filename adjustment started');
-      // Iterate all files in the Readwise folder and "fix" their names according to the current settings using
-      const renamedFiles = await this.iterativeReadwiseRenamer(readwiseFolder);
-      if (renamedFiles > 0) {
-        this.notify.notice(`Readwise: Renamed ${renamedFiles} files. Check console for renaming errors.`);
-      } else {
-        this.notify.notice('Readwise: No files renamed. Check console for renaming errors.');
-      }
-    }
-  }
-
-  /**
-   * Iteratively renames files in the Readwise folder.
-   * @param folder - The folder to iterate through
-   * @returns
-   */
-  private async iterativeReadwiseRenamer(folder: TFolder): Promise<number> {
-    const files = folder.children;
-    let countRenamed = 0;
-    for (const file of files) {
-      if (file instanceof TFolder) {
-        // Skip folders
-        countRenamed += await this.iterativeReadwiseRenamer(file);
-      }
-
-      if (file instanceof TFile && file.extension === 'md') {
-        const result = await this.renameReadwiseNote(file);
-        if (result) {
-          countRenamed++;
-        }
-      }
-    }
-    return countRenamed;
-  }
-
-  /**
-   * Formats the filename of a Readwise note based on the settings.
-   *
-   * @param file The file to format.
-   */
-  private async renameReadwiseNote(file: TFile): Promise<boolean> {
-    const newFilename = normalizeFilename(file.basename, this.settings);
-
-    // Only rename if there's a difference
-    if (newFilename !== file.basename) {
-      const newPath = `${file.parent.path}/${newFilename}.md`;
-      try {
-        await this.app.fileManager.renameFile(file, newPath);
-        this.logger.info(`Renamed file '${file.name}' to '${newFilename}.md'`);
-        return true;
-      } catch (error) {
-        this.logger.error(`Error renaming file: '${file.name}' to '${newFilename}.md': ${error}`);
-        return false;
-      }
-    }
-    return false;
   }
 }

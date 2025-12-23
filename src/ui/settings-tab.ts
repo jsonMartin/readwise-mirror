@@ -97,7 +97,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
   constructor(
     plugin: ReadwiseMirror,
-    private readonly ctx: PluginContext,
+    private ctx: PluginContext,
     private readonly env: ReadwiseEnvironment
   ) {
     super(ctx.app, plugin);
