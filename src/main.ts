@@ -9,7 +9,7 @@ import { Frontmatter } from 'services/frontmatter';
 import { FrontmatterManager } from 'services/frontmatter-manager';
 import Logger from 'services/logger';
 import type ReadwiseApi from 'services/readwise-api';
-import { Controller } from 'services/readwise-controller';
+import { Controller } from 'services/controller';
 import { ReadwiseEnvironment, ReadwiseLoader } from 'services/readwise-environment';
 import spacetime from 'spacetime';
 import type { BaseFile, ReadwiseDocument } from 'types/document';

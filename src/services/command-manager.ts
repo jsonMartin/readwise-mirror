@@ -3,7 +3,7 @@ import { type Command, type Menu, type TAbstractFile, TFile, TFolder } from 'obs
 import { getTrackingUrl, isFolderInReadwiseLibrary } from 'utils/file-utils';
 import type { PluginContext } from '../types/plugin-context';
 import { getPluginCommands } from '../utils/plugin-commands';
-import type { Controller } from './readwise-controller';
+import type { Controller } from './controller';
 
 /**
  * Manages command registration for the Readwise Mirror plugin

@@ -1,6 +1,6 @@
 import type { Command } from 'obsidian';
 import spacetime from 'spacetime';
-import { Controller } from '../services/readwise-controller';
+import { Controller } from '../services/controller';
 import type { PluginContext } from '../types/plugin-context';
 
 /**

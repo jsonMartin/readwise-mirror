@@ -2,7 +2,7 @@ import type { App } from 'obsidian';
 import type Logger from 'services/logger';
 import type { PluginSettings } from 'types/settings';
 import type Notify from 'ui/notify';
-import type { Controller } from '../services/readwise-controller';
+import type { Controller } from '../services/controller';
 
 /**
  * Context object that bundles commonly-used plugin dependencies

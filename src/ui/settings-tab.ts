@@ -10,7 +10,7 @@ import {
   type TextComponent,
 } from 'obsidian';
 import { TokenValidationError } from 'services/readwise-api';
-import { Controller } from 'services/readwise-controller';
+import { Controller } from 'services/controller';
 import type { ReadwiseEnvironment } from 'services/readwise-environment';
 import type { PluginContext } from 'types/plugin-context';
 import type { TemplateValidationResult } from 'types/utilities';
