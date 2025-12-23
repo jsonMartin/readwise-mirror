@@ -31,7 +31,6 @@ export default class ReadwiseMirror extends Plugin {
   private notify: Notify;
   private frontmatterManager: FrontmatterManager;
   private deduplicatingVaultWriter: DeduplicatingVaultWriter;
-  private commandManager: ReadwiseCommandManager;
 
   constructor(app: App, manifest: PluginManifest) {
     super(app, manifest);
@@ -117,10 +116,7 @@ export default class ReadwiseMirror extends Plugin {
     }
 
     // Register all commands and run startup commands
-    this.commandManager = new ReadwiseCommandManager(context);
-    this.commandManager.registerCommands();
-    this.commandManager.registerEvents();
-    this.commandManager.runStartupCommands();
+    ReadwiseCommandManager.initialize(this, context);
 
     // Update status bar every second if synced
     this.registerInterval(

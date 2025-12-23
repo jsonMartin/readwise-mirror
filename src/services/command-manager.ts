@@ -1,5 +1,6 @@
 import { Lock } from 'async-await-mutex-lock';
 import { READWISE_REVIEW_URL_BASE } from 'constants/index';
+import type ReadwiseMirror from 'main';
 import { type Command, type Menu, type TAbstractFile, TFile, TFolder } from 'obsidian';
 import spacetime from 'spacetime';
 import type { Library } from 'types/library';
@@ -10,14 +11,31 @@ import type { PluginContext } from '../types/plugin-context';
 
 /**
  * Manages command registration for the Readwise Mirror plugin
+ * Singleton class to ensure only one instance exists
  */
 export class ReadwiseCommandManager {
   private syncLock = new Lock<string>();
+  private static instance: ReadwiseCommandManager;
 
-  constructor(
+  private constructor(
     private plugin: ReadwiseMirror,
     private ctx: PluginContext
   ) {}
+
+  // Create and initialize the command manager
+  public static initialize(plugin: ReadwiseMirror, ctx: PluginContext): ReadwiseCommandManager {
+    if (!ReadwiseCommandManager.instance) {
+      ReadwiseCommandManager.instance = new ReadwiseCommandManager(plugin, ctx);
+      ReadwiseCommandManager.instance.registerCommands();
+      ReadwiseCommandManager.instance.registerEvents();
+      ReadwiseCommandManager.instance.runStartupCommands();
+    }
+    return ReadwiseCommandManager.instance;
+  }
+
+  /**
+   * Manifest of all plugin commands
+   */
   private get commandManifest(): Command[] {
     return [
       {
