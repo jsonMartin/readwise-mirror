@@ -26,9 +26,9 @@ export function getPluginCommands(ctr: Controller, ctx: PluginContext): Command[
       callback: async () => {
         try {
           const isTokenValid = await Controller.validateAPIInstance();
-          ctx.notify.notice(`Readwise: ${isTokenValid ? 'Token is valid' : 'INVALID TOKEN'}`);
+          ctx.notice(`Readwise: ${isTokenValid ? 'Token is valid' : 'INVALID TOKEN'}`);
         } catch (err) {
-          ctx.notify.notice(`Failed to validate API key: ${err.message}`);
+          ctx.notice(`Failed to validate API key: ${err.message}`);
         }
       },
     },
@@ -82,7 +82,7 @@ export function getPluginCommands(ctr: Controller, ctx: PluginContext): Command[
           if (!checking) {
             const d = spacetime.now().subtract(2, 'months');
             ctx.settings.lastUpdated = d.format('iso');
-            ctx.saveAndApplySettings().catch((err) => ctx.notify.notice(`Failed to save settings: ${err.message}`));
+            ctx.saveAndApplySettings().catch((err) => ctx.notice(`Failed to save settings: ${err.message}`));
           }
           return true;
         }

@@ -54,7 +54,7 @@ export class CommandManager {
       this.ctx.app.workspace.on('file-menu', (menu, file) => this.onMenuOpenCallback(menu, file))
     );
 
-    this.plugin.registerDomEvent(this.ctx.notify.statusBarItem, 'click', async () => await this.ctr.sync());
+    this.plugin.registerDomEvent(this.ctx.statusBarItem, 'click', async () => await this.ctr.sync());
   }
 
   public runStartupCommands(): void {
@@ -95,7 +95,7 @@ export class CommandManager {
               .setTitle('Copy Readwise URL')
               .onClick(async () => {
                 await navigator.clipboard.writeText(trackingUrl);
-                this.ctx.notify.notice('Readwise: URL copied to clipboard');
+                this.ctx.notice('Readwise: URL copied to clipboard');
               });
           });
         }

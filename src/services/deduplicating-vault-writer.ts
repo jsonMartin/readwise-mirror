@@ -21,7 +21,7 @@ export class DeduplicatingVaultWriter {
 
   private notifyFileCount() {
     this.fileCount++;
-    this.ctx.notify.setStatusBarText(`Readwise: ${this.fileCount} of ${this.totalFileCount} files processed`);
+    this.ctx.setStatusBarText(`Readwise: ${this.fileCount} of ${this.totalFileCount} files processed`);
   }
 
   /**
@@ -197,7 +197,7 @@ export class DeduplicatingVaultWriter {
     this.totalFileCount = readwiseFiles.length;
     this.fileCount = 0;
 
-    this.ctx.notify.setStatusBarText(`Readwise: ${this.totalFileCount} files to process`);
+    this.ctx.setStatusBarText(`Readwise: ${this.totalFileCount} files to process`);
 
     // Group by path (which includes category and filename)
     const groupedByPath = new Map<string, BaseFile[]>();
@@ -227,7 +227,7 @@ export class DeduplicatingVaultWriter {
     this.totalFileCount = readwiseFiles.length;
     this.fileCount = 0;
 
-    this.ctx.notify.setStatusBarText(`Readwise: ${this.totalFileCount} files to process`);
+    this.ctx.setStatusBarText(`Readwise: ${this.totalFileCount} files to process`);
 
     // Process each file
     for (const readwiseFile of readwiseFiles) {

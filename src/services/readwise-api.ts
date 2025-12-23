@@ -118,7 +118,7 @@ export default class ReadwiseApi {
         if (bookId) this.ctx.logger.debug(`Checking for all highlights on book ID: ${bookId}`);
         let statusBarText = `Readwise: Fetching ${contentType}`;
         if (data?.count) statusBarText += ` (${results.length})`;
-        this.ctx.notify.setStatusBarText(statusBarText);
+        this.ctx.setStatusBarText(statusBarText);
 
         // FIXME: When fetching very long period of data, the request might fail due to an URL which is too long (Error 414)
         const response: RequestUrlResponse = await requestUrl({ url: url + queryParams.toString(), ...this.options });
@@ -139,11 +139,11 @@ export default class ReadwiseApi {
           } else {
             this.ctx.logger.warn(`API Rate Limited, waiting to retry for ${rateLimitedDelayTime}`);
           }
-          this.ctx.notify.setStatusBarText(`Readwise: API Rate Limited, waiting ${rateLimitedDelayTime}`);
+          this.ctx.setStatusBarText(`Readwise: API Rate Limited, waiting ${rateLimitedDelayTime}`);
 
           await new Promise((_) => setTimeout(_, rateLimitedDelayTime));
           this.ctx.logger.debug('Trying to fetch highlights again...');
-          this.ctx.notify.setStatusBarText('Readwise: Attempting to retry...');
+          this.ctx.setStatusBarText('Readwise: Attempting to retry...');
         } else {
           if (data.results && Array.isArray(data.results)) {
             results.push(...data.results);

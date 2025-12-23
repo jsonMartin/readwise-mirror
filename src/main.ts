@@ -9,7 +9,6 @@ import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
 import { Frontmatter } from 'services/frontmatter';
 import { FrontmatterManager } from 'services/frontmatter-manager';
 import Logger from 'services/logger';
-import type ReadwiseApi from 'services/readwise-api';
 import { ReadwiseEnvironment, ReadwiseLoader } from 'services/readwise-environment';
 import spacetime from 'spacetime';
 import type { BaseFile, ReadwiseDocument } from 'types/document';
@@ -23,12 +22,11 @@ import { createdDate, lastHighlightedDate, updatedDate } from 'utils/highlight-d
 import type { PluginSettings } from './types/settings';
 
 export default class ReadwiseMirror extends Plugin {
+  private notify: Notify;
   private settings: PluginSettings;
-  private readwiseApi: ReadwiseApi;
   private loader: ReadwiseLoader;
   private env: ReadwiseEnvironment;
   private logger: Logger;
-  private notify: Notify;
   private lock: Lock<string>;
   private frontmatterManager: FrontmatterManager;
   private deduplicatingVaultWriter: DeduplicatingVaultWriter;
@@ -49,9 +47,12 @@ export default class ReadwiseMirror extends Plugin {
       settings: this.settings,
       app: this.app,
       logger: this.logger,
-      notify: this.notify,
-      saveAndApplySettings: this.saveAndApplySettings.bind(this),
       syncLock: this.lock,
+      statusBarItem: this.notify.statusBarItem,
+      // exposed methods
+      notice: this.notify.notice.bind(this.notify),
+      setStatusBarText: this.notify.setStatusBarText.bind(this.notify),
+      saveAndApplySettings: this.saveAndApplySettings.bind(this),
     };
     return ctx;
   }

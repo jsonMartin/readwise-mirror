@@ -9,8 +9,8 @@ import {
   Setting,
   type TextComponent,
 } from 'obsidian';
-import { TokenValidationError } from 'services/readwise-api';
 import { Controller } from 'services/controller';
+import { TokenValidationError } from 'services/readwise-api';
 import type { ReadwiseEnvironment } from 'services/readwise-environment';
 import type { PluginContext } from 'types/plugin-context';
 import type { TemplateValidationResult } from 'types/utilities';
@@ -171,7 +171,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     }
 
     if (attempt >= MAX_ATTEMPTS) {
-      this.ctx.notify.notice('Authentication timeout. Please try again.');
+      this.ctx.notice('Authentication timeout. Please try again.');
       return false;
     }
 
@@ -398,7 +398,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
           try {
             hasValidToken = await Controller.validateAPIInstance();
-            if (hasValidToken) this.ctx.notify.setStatusBarText('Readwise: Click to Sync');
+            if (hasValidToken) this.ctx.setStatusBarText('Readwise: Click to Sync');
             this.updateAuthButtons(hasValidToken ? 'valid' : 'invalid');
             this.setTokenValidationStatus(hasValidToken ? 'success' : 'invalid');
           } catch (error) {
@@ -484,18 +484,18 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               this.updateAuthButtons('empty');
               this.setTokenValidationStatus('empty');
               await this.ctx.saveAndApplySettings();
-              this.ctx.notify.notice('Cleared token. Add or retrieve token to sync.');
+              this.ctx.notice('Cleared token. Add or retrieve token to sync.');
             } else if (value !== this.ctx.settings.apiToken) {
               this.updateAuthButtons('verifying');
               this.ctx.settings.apiToken = value;
               await this.ctx.saveAndApplySettings();
-              this.ctx.notify.notice('New token set.');
+              this.ctx.notice('New token set.');
 
               try {
                 const hasValidToken = await Controller.validateAPIInstance();
                 this.updateAuthButtons(hasValidToken ? 'valid' : 'invalid');
               } catch (error) {
-                this.ctx.notify.notice('Failed to verify token:', error.message);
+                this.ctx.notice('Failed to verify token:', error.message);
                 this.setTokenValidationStatus('invalid');
                 this.updateAuthButtons('invalid');
               }
@@ -1114,7 +1114,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               // Trigger re-render to show/hide frontmatter settings
               this.display();
             } else if (value && !isValidYaml) {
-              this.ctx.notify.notice(`Invalid frontmatter template: ${error}`);
+              this.ctx.notice(`Invalid frontmatter template: ${error}`);
               toggle.setValue(false);
               // Trigger re-render to show/hide property selector
               this.display();

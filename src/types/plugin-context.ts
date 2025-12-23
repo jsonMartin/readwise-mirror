@@ -1,7 +1,6 @@
 import type { App } from 'obsidian';
 import type Logger from 'services/logger';
 import type { PluginSettings } from 'types/settings';
-import type Notify from 'ui/notify';
 import type { Controller } from '../services/controller';
 
 /**
@@ -12,12 +11,14 @@ export interface PluginContext {
   app: App;
   settings: PluginSettings;
   logger: Logger;
-  notify?: Notify;
   controller?: Controller;
   syncLock: {
     isAcquired(key: string): boolean;
     acquire(key: string): Promise<void>;
     release(key: string): void;
   };
+  statusBarItem: HTMLElement;
+  notice: (message: string, duration?: number) => void;
+  setStatusBarText: (message: string) => void;
   saveAndApplySettings: () => Promise<void>;
 }

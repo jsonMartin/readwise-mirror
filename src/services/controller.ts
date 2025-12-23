@@ -32,7 +32,7 @@ export class Controller {
     } catch (err) {
       // Keep instance but log/notify — callers must still check api presence/validity.
       Controller.instance.ctx.logger.error('ReadwiseController: failed to create API instance', err);
-      Controller.instance.ctx.notify.notice('Readwise: Failed to initialize API. Check settings.');
+      Controller.instance.ctx.notice('Readwise: Failed to initialize API. Check settings.');
       Controller.instance.api = undefined;
     }
     return Controller.instance;
@@ -61,25 +61,30 @@ export class Controller {
   public async sync() {
     // Equivalent to plugin.sync()
     if (this.ctx.syncLock?.isAcquired('library-sync')) {
-      this.ctx.notify.notice('Sync already in progress');
+      this.ctx.notice('Sync already in progress');
       return;
     }
     await this.ctx.syncLock?.acquire('library-sync');
     try {
-      if (!(await Controller.validateAPIInstance())) {
-        this.ctx.notify.notice('Readwise: Network connection and valid API Token required');
-        return;
-      }
       let library: Library;
       if (!this.ctx.settings.lastUpdated) {
         if (this.ctx.settings.syncNotifications)
-          this.ctx.notify.notice('Readwise: Previous sync not detected...\nDownloading full Readwise library');
+          this.ctx.notice('Readwise: Previous sync not detected...\nDownloading full Readwise library');
+        if (!(await Controller.validateAPIInstance())) {
+          this.ctx.notice('Readwise: Network connection and valid API Token required');
+          return;
+        }
         library = await this.api.downloadFullLibrary();
       } else {
-        if (this.ctx.settings.syncNotifications)
-          this.ctx.notify.notice(
+        if (this.ctx.settings.syncNotifications) {
+          this.ctx.notice(
             `Readwise: Checking for new updates since ${humanReadableFormat(this.ctx.settings.lastUpdated)}...`
           );
+        }
+        if (!(await Controller.validateAPIInstance())) {
+          this.ctx.notice('Readwise: Network connection and valid API Token required');
+          return;
+        }
         library = await this.api.downloadUpdates(this.ctx.settings.lastUpdated);
       }
       // ...existing filtering and writing logic...
@@ -87,11 +92,11 @@ export class Controller {
       if (this.ctx.settings.logFile) await this.plugin.writeLogToMarkdown(library);
       this.ctx.settings.lastUpdated = new Date().toISOString();
       await this.ctx.saveAndApplySettings();
-      this.ctx.notify.setStatusBarText(`Readwise: Synced ${humanReadableFormat(this.ctx.settings.lastUpdated)}`);
+      this.ctx.setStatusBarText(`Readwise: Synced ${humanReadableFormat(this.ctx.settings.lastUpdated)}`);
     } catch (error) {
       this.ctx.logger.error('Error during sync:', error);
-      this.ctx.notify.notice(`Readwise: Sync failed. ${error}`);
-      this.ctx.notify.setStatusBarText(`Readwise: Sync error ${error}`);
+      this.ctx.notice(`Readwise: Sync failed. ${error}`);
+      this.ctx.setStatusBarText(`Readwise: Sync error ${error}`);
     } finally {
       this.ctx.syncLock?.release('library-sync');
     }
@@ -108,13 +113,13 @@ export class Controller {
       try {
         this.ctx.logger.debug('Attempting to delete entire library at:', abstractFile);
         await this.ctx.app.fileManager.trashFile(abstractFile);
-        if (this.ctx.settings.syncNotifications) this.ctx.notify.notice('Readwise: library folder deleted');
+        if (this.ctx.settings.syncNotifications) this.ctx.notice('Readwise: library folder deleted');
       } catch (err) {
         this.ctx.logger.error(`Attempted to delete file ${path} but no file was found`, err);
-        if (this.ctx.settings.syncNotifications) this.ctx.notify.notice('Readwise: Error deleting library folder');
+        if (this.ctx.settings.syncNotifications) this.ctx.notice('Readwise: Error deleting library folder');
       }
     }
-    this.ctx.notify.setStatusBarText('Readwise: Click to Sync');
+    this.ctx.setStatusBarText('Readwise: Click to Sync');
   }
 
   /**
@@ -122,17 +127,17 @@ export class Controller {
    */
   public async updateSingleNote(trackedFile: TTrackedFile): Promise<void> {
     if (this.ctx.syncLock.isAcquired(trackedFile.readwiseId.toString())) {
-      this.ctx.notify.notice('Readwise: Update already in progress');
+      this.ctx.notice('Readwise: Update already in progress');
       return;
     }
 
     if (!(await Controller.validateAPIInstance())) {
-      this.ctx.notify.notice('Readwise: Network connection and valid API Token required');
+      this.ctx.notice('Readwise: Network connection and valid API Token required');
       return;
     }
 
     if (!trackedFile.isUpdatable) {
-      this.ctx.notify.notice('Readwise: Current note is not a tracked Readwise note.');
+      this.ctx.notice('Readwise: Current note is not a tracked Readwise note.');
       return;
     }
 
@@ -152,15 +157,15 @@ export class Controller {
 
         if (this.ctx.settings.logFile) await this.plugin.writeLogToMarkdown(library);
 
-        if (this.ctx.settings.syncNotifications) this.ctx.notify.notice('Readwise: Book update complete.');
+        if (this.ctx.settings.syncNotifications) this.ctx.notice('Readwise: Book update complete.');
       } else {
-        this.ctx.notify.notice(`Readwise: Note with id ${trackedFile.readwiseId} not found on Readwise.`);
+        this.ctx.notice(`Readwise: Note with id ${trackedFile.readwiseId} not found on Readwise.`);
         this.ctx.logger.warn(`Readwise: Note with id ${trackedFile.readwiseId} not found on Readwise.`);
         return;
       }
     } catch (error) {
       this.ctx.logger.error('Error during single-book update:', error);
-      this.ctx.notify.notice(`Readwise: Sync failed. ${error}`);
+      this.ctx.notice(`Readwise: Sync failed. ${error}`);
     } finally {
       // Make sure we release the lock even if the operation fails
       this.ctx.syncLock.release(trackedFile.readwiseId.toString());
@@ -170,14 +175,14 @@ export class Controller {
   public async updateAllFrontmatter() {
     // Equivalent to plugin.updateAllFrontmatter()
     if (this.ctx.syncLock?.isAcquired('frontmatter-update')) {
-      this.ctx.notify.notice('Readwise: update already in progress');
+      this.ctx.notice('Readwise: update already in progress');
       return;
     }
     if (!(await Controller.validateAPIInstance())) {
-      this.ctx.notify.notice('Readwise: Network connection and valid API Token required');
+      this.ctx.notice('Readwise: Network connection and valid API Token required');
       return;
     }
-    this.ctx.notify.notice('Readwise: Updating all note frontmatter...');
+    this.ctx.notice('Readwise: Updating all note frontmatter...');
     await this.ctx.syncLock?.acquire('frontmatter-update');
     try {
       this.ctx.logger.debug('Readwise: downloading full library to update frontmatter...');
@@ -188,10 +193,10 @@ export class Controller {
       if (this.ctx.settings.filterNotesByTag && this.ctx.settings.filteredTags?.length > 0) {
         message += ` (filtered by tags: ${this.ctx.settings.filteredTags.join(', ')})`;
       }
-      this.ctx.notify.notice(message);
+      this.ctx.notice(message);
     } catch (error) {
       this.ctx.logger.error('Error during frontmatter sync:', error);
-      this.ctx.notify.notice(`Readwise: Sync failed. ${error}`);
+      this.ctx.notice(`Readwise: Sync failed. ${error}`);
     } finally {
       this.ctx.syncLock?.release('frontmatter-update');
     }
@@ -205,13 +210,13 @@ export class Controller {
     const path = `${this.ctx.settings.baseFolderName}`;
     const readwiseFolder = vault.getAbstractFileByPath(path);
     if (readwiseFolder && readwiseFolder instanceof TFolder) {
-      this.ctx.notify.notice('Readwise: Filename adjustment started');
+      this.ctx.notice('Readwise: Filename adjustment started');
       // Iterate all files in the Readwise folder and "fix" their names according to the current settings using
       const renamedFiles = await this.iterativeReadwiseRenamer(readwiseFolder);
       if (renamedFiles > 0) {
-        this.ctx.notify.notice(`Readwise: Renamed ${renamedFiles} files. Check console for renaming errors.`);
+        this.ctx.notice(`Readwise: Renamed ${renamedFiles} files. Check console for renaming errors.`);
       } else {
-        this.ctx.notify.notice('Readwise: No files renamed. Check console for renaming errors.');
+        this.ctx.notice('Readwise: No files renamed. Check console for renaming errors.');
       }
     }
   }
@@ -281,12 +286,12 @@ export class Controller {
    */
   public async syncFolder(folder: TFolder) {
     if (this.ctx.syncLock.isAcquired('folder-sync')) {
-      this.ctx.notify.notice('Readwise: sync already in progress');
+      this.ctx.notice('Readwise: sync already in progress');
       return;
     }
 
     if (!(await Controller.validateAPIInstance())) {
-      this.ctx.notify.notice('Readwise: Network connection and valid API Token required');
+      this.ctx.notice('Readwise: Network connection and valid API Token required');
       return;
     }
 
@@ -304,7 +309,7 @@ export class Controller {
       const bookIds = trackedNotes.map((tracked) => tracked.readwiseId);
 
       try {
-        this.ctx.notify.notice(
+        this.ctx.notice(
           `Readwise: Updating ${bookIds.length} note${bookIds.length !== 1 ? 's' : ''} in "${folder.name}"...`
         );
 
@@ -313,12 +318,10 @@ export class Controller {
         this.ctx.logger.warn('Failed to update multiple files', error);
       }
 
-      this.ctx.notify.notice(
-        `Readwise: Updated ${bookIds.length} note${bookIds.length !== 1 ? 's' : ''} in "${folder.name}"`
-      );
+      this.ctx.notice(`Readwise: Updated ${bookIds.length} note${bookIds.length !== 1 ? 's' : ''} in "${folder.name}"`);
     } catch (error) {
       this.ctx.logger.error('Error syncing folder:', error);
-      this.ctx.notify.notice(`Readwise: Sync failed. ${error}`);
+      this.ctx.notice(`Readwise: Sync failed. ${error}`);
     } finally {
       this.ctx.syncLock.release('folder-sync');
     }
@@ -351,12 +354,12 @@ export class Controller {
    */
   private async updateMultipleNotes(bookIds: number[]): Promise<void> {
     if (this.ctx.syncLock.isAcquired('multiple-note-update')) {
-      this.ctx.notify.notice('Readwise: Update for this note already in progress');
+      this.ctx.notice('Readwise: Update for this note already in progress');
       return;
     }
 
     if (!(await Controller.validateAPIInstance())) {
-      this.ctx.notify.notice('Readwise: Network connection and valid API Token required');
+      this.ctx.notice('Readwise: Network connection and valid API Token required');
       return;
     }
 
@@ -373,19 +376,19 @@ export class Controller {
         }
 
         if (this.ctx.settings.syncNotifications)
-          this.ctx.notify.notice(`Readwise: writing ${Object.keys(library.books).length} updated books to markdown...`);
+          this.ctx.notice(`Readwise: writing ${Object.keys(library.books).length} updated books to markdown...`);
         this.ctx.logger.debug(`Readwise: writing ${Object.keys(library.books).length} updated books to markdown...`);
         await this.plugin.writeLibraryToMarkdown(library);
         if (this.ctx.settings.logFile) await this.plugin.writeLogToMarkdown(library);
-        if (this.ctx.settings.syncNotifications) this.ctx.notify.notice('Readwise: Book update complete.');
+        if (this.ctx.settings.syncNotifications) this.ctx.notice('Readwise: Book update complete.');
       } else {
-        this.ctx.notify.notice('Readwise: No notes from folder found on Readwise.');
+        this.ctx.notice('Readwise: No notes from folder found on Readwise.');
         this.ctx.logger.warn('Readwise: No notes from folder found on Readwise.');
         return;
       }
     } catch (error) {
       this.ctx.logger.error('Error during multiple-book update:', error);
-      this.ctx.notify.notice(`Readwise: Sync failed. ${error}`);
+      this.ctx.notice(`Readwise: Sync failed. ${error}`);
     } finally {
       // Make sure we release the lock even if the operation fails
       this.ctx.syncLock.release('multiple-note-update');
