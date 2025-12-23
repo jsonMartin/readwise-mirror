@@ -9,7 +9,8 @@ import {
   Setting,
   type TextComponent,
 } from 'obsidian';
-import ReadwiseApi, { TokenValidationError } from 'services/readwise-api';
+import { TokenValidationError } from 'services/readwise-api';
+import { ReadwiseController } from 'services/readwise-controller';
 import type { ReadwiseEnvironment } from 'services/readwise-environment';
 import type { PluginContext } from 'types/plugin-context';
 import type { TemplateValidationResult } from 'types/utilities';
@@ -158,10 +159,8 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       if (response.status === 200) {
         data = await response.json;
         if (data.userAccessToken) {
-          this.ctx.logger.info('Token successfully retrieved');
+          this.ctx.logger.debug('Token successfully retrieved');
           this.ctx.settings.apiToken = data.userAccessToken as string;
-          if (this.ctx.api) this.ctx.api.setToken(data?.userAccessToken as string);
-          else this.ctx.api = await ReadwiseApi.create(data?.userAccessToken as string, this.ctx);
           await this.ctx.saveAndApplySettings();
           this.display(); // Refresh the settings page
           return true;
@@ -388,7 +387,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           fragment.createEl('br');
           fragment.append(this.tokenValidationMessage);
           // Show success or error message based on token validity
-          if (this.ctx.api) {
+          if (ReadwiseController.validateAPIInstance()) {
             this.setTokenValidationStatus('running');
           } else {
             this.setTokenValidationStatus('error');
@@ -396,22 +395,18 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           this.updateAuthButtons('verifying');
 
           // Validate the token on load
-          if (this.ctx.api) {
-            try {
-              hasValidToken = this.ctx.api.hasValidToken() || (await this.ctx.api.validateToken());
 
-              if (hasValidToken) this.ctx.notify.setStatusBarText('Readwise: Click to Sync');
-              this.updateAuthButtons(hasValidToken ? 'valid' : 'invalid');
-              this.setTokenValidationStatus(hasValidToken ? 'success' : 'invalid');
-            } catch (error) {
-              this.updateAuthButtons('invalid');
-              if (error instanceof TokenValidationError) {
-                this.setTokenValidationStatus('error', error.message);
-              } else {
-                this.setTokenValidationStatus('error', 'Token validation error');
-              }
-            } finally {
-              this.setTokenValidationStatus('empty');
+          try {
+            hasValidToken = await ReadwiseController.validateAPIInstance();
+            if (hasValidToken) this.ctx.notify.setStatusBarText('Readwise: Click to Sync');
+            this.updateAuthButtons(hasValidToken ? 'valid' : 'invalid');
+            this.setTokenValidationStatus(hasValidToken ? 'success' : 'invalid');
+          } catch (error) {
+            this.updateAuthButtons('invalid');
+            if (error instanceof TokenValidationError) {
+              this.setTokenValidationStatus('error', error.message);
+            } else {
+              this.setTokenValidationStatus('error', 'Token validation error');
             }
           }
         })
@@ -485,10 +480,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           .onClick(async () => {
             const value = this.tokenValue.inputEl.value;
             if (value === '') {
-              // Invalidate API and cached auth state when token is cleared
-              this.ctx.api = null;
               this.ctx.settings.apiToken = value;
-              // If you have a cached "hasValidToken" flag, set it to false here
               this.updateAuthButtons('empty');
               this.setTokenValidationStatus('empty');
               await this.ctx.saveAndApplySettings();
@@ -499,21 +491,14 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               await this.ctx.saveAndApplySettings();
               this.ctx.notify.notice('New token set.');
 
-              if (this.ctx.api) {
-                this.ctx.api.setToken(value);
-              } else {
-                this.ctx.api = await ReadwiseApi.create(value, this.ctx);
+              try {
+                const hasValidToken = await ReadwiseController.validateAPIInstance();
+                this.updateAuthButtons(hasValidToken ? 'valid' : 'invalid');
+              } catch (error) {
+                this.ctx.notify.notice('Failed to verify token:', error.message);
+                this.setTokenValidationStatus('invalid');
+                this.updateAuthButtons('invalid');
               }
-              await this.ctx.api
-                .validateToken()
-                .then((isValid) => {
-                  this.updateAuthButtons(isValid ? 'valid' : 'invalid');
-                })
-                .catch(() => {
-                  this.ctx.notify.notice('Failed to verify token.');
-                  this.setTokenValidationStatus('invalid');
-                  this.updateAuthButtons('invalid');
-                });
             }
           });
         // Add fixed width class
@@ -625,7 +610,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         if (!this.ctx.settings.trackFiles) {
           toggle.setValue(false);
           toggle.setDisabled(true);
-          this.ctx.settings.atomicHighlights = false;
+          if (this.ctx.settings.atomicHighlights) {
+            this.ctx.settings.atomicHighlights = false;
+            this.ctx.saveAndApplySettings(); // Fire and forget is acceptable here
+          }
         } else {
           toggle.setValue(this.ctx.settings.atomicHighlights).onChange(async (value) => {
             if (value) {
@@ -983,7 +971,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
                 this.ctx.logger.warn(`Colon replacement: empty or invalid value: ${value}`);
                 this.ctx.settings.colonSubstitute = DEFAULT_SETTINGS.colonSubstitute;
               } else {
-                this.ctx.logger.info(`Colon replacement: setting value: ${value}`);
+                this.ctx.logger.debug(`Colon replacement: setting value: ${value}`);
                 this.ctx.settings.colonSubstitute = value;
               }
               await this.ctx.saveAndApplySettings();

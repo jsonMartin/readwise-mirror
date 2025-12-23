@@ -8,7 +8,8 @@ import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
 import { Frontmatter } from 'services/frontmatter';
 import { FrontmatterManager } from 'services/frontmatter-manager';
 import Logger from 'services/logger';
-import ReadwiseApi from 'services/readwise-api';
+import type ReadwiseApi from 'services/readwise-api';
+import { ReadwiseController } from 'services/readwise-controller';
 import { ReadwiseEnvironment, ReadwiseLoader } from 'services/readwise-environment';
 import spacetime from 'spacetime';
 import type { BaseFile, ReadwiseDocument } from 'types/document';
@@ -22,12 +23,13 @@ import { createdDate, lastHighlightedDate, updatedDate } from 'utils/highlight-d
 import type { PluginSettings } from './types/settings';
 
 export default class ReadwiseMirror extends Plugin {
-  private _settings: PluginSettings;
-  private _readwiseApi: ReadwiseApi;
-  private _loader: ReadwiseLoader;
-  private _env: ReadwiseEnvironment;
-  private _logger: Logger;
+  private settings: PluginSettings;
+  private readwiseApi: ReadwiseApi;
+  private loader: ReadwiseLoader;
+  private env: ReadwiseEnvironment;
+  private logger: Logger;
   private notify: Notify;
+  private lock: Lock<string>;
   private frontmatterManager: FrontmatterManager;
   private deduplicatingVaultWriter: DeduplicatingVaultWriter;
 
@@ -35,78 +37,46 @@ export default class ReadwiseMirror extends Plugin {
     super(app, manifest);
 
     // Set new custom Environment using our custom loader
-    this._loader = new ReadwiseLoader();
-    this._env = new ReadwiseEnvironment(this._loader, { autoescape: false });
-    this._logger = new Logger(false);
+    this.loader = new ReadwiseLoader();
+    this.env = new ReadwiseEnvironment(this.loader, { autoescape: false });
+    this.logger = new Logger(false);
+    this.lock = new Lock<string>();
   }
 
-  // Add getter for environment
-  get env() {
-    return this._env;
-  }
-
-  // Add getter for loader
-  get loader() {
-    return this._loader;
-  }
-
-  // Add logger getter
-  get logger() {
-    return this._logger;
-  }
-
-  // Getters and setters for settings and templates
-  get settings() {
-    return this._settings;
-  }
-
-  set settings(settings: PluginSettings) {
-    this._settings = settings;
-  }
-
-  get readwiseApi() {
-    return this._readwiseApi;
-  }
-
-  set readwiseApi(api: ReadwiseApi) {
-    this._readwiseApi = api;
+  private get ctx() {
+    // Create plugin context for dependency injection
+    const ctx: PluginContext = {
+      settings: this.settings,
+      app: this.app,
+      logger: this.logger,
+      notify: this.notify,
+      saveAndApplySettings: this.saveAndApplySettings.bind(this),
+      syncLock: this.lock,
+    };
+    return ctx;
   }
 
   async onload() {
     // Move UI setup to onLayoutReady
     this.app.workspace.onLayoutReady(async () => {
+      const statusBarItem = this.addStatusBarItem();
+      this.notify = new Notify(statusBarItem);
       await this.initializeUI();
     });
   }
 
   private async initializeUI() {
     await this.loadAndApplySettings();
-
-    const statusBarItem = this.addStatusBarItem();
-    this.notify = new Notify(statusBarItem);
-
-    // Create plugin context for dependency injection
-    const context: PluginContext = {
-      settings: this.settings,
-      app: this.app,
-      api: this._readwiseApi,
-      logger: this.logger,
-      notify: this.notify,
-      saveAndApplySettings: this.saveAndApplySettings.bind(this),
-      syncLock: new Lock(),
-    };
+    this.logger.info('Readwise Mirror plugin loaded.');
 
     // Instantiate controller and attach to context
-    this.frontmatterManager = new FrontmatterManager(context, this._env, this.app.fileManager);
-    this.deduplicatingVaultWriter = new DeduplicatingVaultWriter(context, this.frontmatterManager);
+    this.frontmatterManager = new FrontmatterManager(this.ctx, this.env, this.app.fileManager);
+    this.deduplicatingVaultWriter = new DeduplicatingVaultWriter(this.ctx, this.frontmatterManager);
 
     if (!this.settings.apiToken) {
       this.notify.notice('Readwise: API Token not detected\nPlease enter in configuration page');
       this.notify.setStatusBarText('Readwise: API Token Required');
     } else {
-      this.logger.info('Validating Readwise token ...');
-      this.readwiseApi = await ReadwiseApi.create(this.settings.apiToken, context);
-
       //Update status bar with last sync time
       if (this.settings.lastUpdated)
         this.notify.setStatusBarText(`Readwise: Updated ${humanReadableFormat(this.settings.lastUpdated)}`);
@@ -114,7 +84,7 @@ export default class ReadwiseMirror extends Plugin {
     }
 
     // Register all commands and run startup commands
-    ReadwiseCommandManager.initialize(this, context);
+    ReadwiseCommandManager.initialize(this, this.ctx, await ReadwiseController.initialize(this, this.ctx));
 
     // Update status bar every second if synced
     this.registerInterval(
@@ -125,22 +95,12 @@ export default class ReadwiseMirror extends Plugin {
       }, 1000)
     );
 
-    this.addSettingTab(new ReadwiseMirrorSettingTab(this, context, this._env));
+    this.addSettingTab(new ReadwiseMirrorSettingTab(this, this.ctx, this.env));
   }
 
   // Reload settings after external change (e.g. after sync)
   async onExternalSettingsChange() {
     await this.loadAndApplySettings();
-    this.logger.info('Reloading settings due to external change');
-    if (this.settings.lastUpdated)
-      this.notify?.setStatusBarText(`Readwise: Updated ${humanReadableFormat(this.settings.lastUpdated)}`);
-    if (!this.settings.apiToken) {
-      this.notify?.notice('Readwise: API Token not detected\nPlease enter in configuration page');
-      this.notify?.setStatusBarText('Readwise: API Token Required');
-      this.readwiseApi = null; // Invalidate the API instance
-    } else {
-      this.readwiseApi?.setToken(this.settings.apiToken);
-    }
   }
 
   /**
@@ -157,8 +117,8 @@ export default class ReadwiseMirror extends Plugin {
    * In particular, this updates the header and highlight templates.
    */
   private async saveAndApplySettings() {
-    this.applySettings();
     await this.saveData(this.settings);
+    this.applySettings();
   }
 
   /**
@@ -166,10 +126,10 @@ export default class ReadwiseMirror extends Plugin {
    */
   private applySettings() {
     // Set logger debug mode
-    this._logger.setDebugMode(this.settings.debugMode);
+    this.logger.setDebugMode(this.settings.debugMode);
     try {
       // Update and try to compile
-      this._loader.setSource('header', this.settings.headerTemplate);
+      this.loader.setSource('header', this.settings.headerTemplate);
       this.env.getTemplate('header', true);
     } catch (error) {
       this.logger.error('Error setting header template:', error);
@@ -177,12 +137,15 @@ export default class ReadwiseMirror extends Plugin {
     }
     try {
       // Update and try to compile
-      this._loader.setSource('highlight', this.settings.highlightTemplate);
+      this.loader.setSource('highlight', this.settings.highlightTemplate);
       this.env.getTemplate('highlight', true);
     } catch (error) {
       this.logger.error('Error setting highlight template:', error);
       this.notify.notice('Readwise: Error setting highlight template. Check console for details.');
     }
+
+    // Re-initiatlie the ReadwiseController instance
+    ReadwiseController.initialize(this, this.ctx);
   }
 
   /**
@@ -383,7 +346,7 @@ export default class ReadwiseMirror extends Plugin {
       if (abstractFile) {
         // If log file already exists, append to the content instead of overwriting
         const logFile = vault.getFiles().filter((file) => file.name === this.settings.logFileName)[0];
-        this.logger.info('logFile:', logFile);
+        this.logger.debug('logFile:', logFile);
 
         await vault.process(logFile, (content) => `${content}\n\n${logString}`);
       } else {
@@ -410,7 +373,7 @@ export default class ReadwiseMirror extends Plugin {
     const readwiseFiles: BaseFile[] = await this.processReadwiseLibrary(library);
 
     if (readwiseFiles.length === 0) {
-      this.logger.info('No eligible Readwise files to process (all highlights filtered out). Skipping write.');
+      this.logger.debug('No eligible Readwise files to process (all highlights filtered out). Skipping write.');
       return;
     }
 
@@ -598,7 +561,7 @@ export default class ReadwiseMirror extends Plugin {
       // Determine if we should atomize this file
       const shouldAtomize = this.shouldAtomize(frontmatter);
       // Render header, and highlights by rendering the core template
-      this._loader.setSource('file', NUNJUCKS_CORE_TEMPLATE);
+      this.loader.setSource('file', NUNJUCKS_CORE_TEMPLATE);
       const _contents = this.env.render('file', {
         // We pass the doc (current Readwise document) and book (Export) for access to all fields
         doc,
@@ -650,7 +613,7 @@ export default class ReadwiseMirror extends Plugin {
         created: createdDate(book.highlights),
         updated: updatedDate(book.highlights),
       };
-      this._loader.setSource('filename', template);
+      this.loader.setSource('filename', template);
       filename = this.env.render('filename', context);
     } else {
       filename = book.title;
@@ -668,7 +631,7 @@ export default class ReadwiseMirror extends Plugin {
     // Delete old instance of file
     if (abstractFile) {
       try {
-        this.logger.info('Attempting to delete entire library at:', abstractFile);
+        this.logger.debug('Attempting to delete entire library at:', abstractFile);
         await this.app.fileManager.trashFile(abstractFile);
         return true;
       } catch (err) {

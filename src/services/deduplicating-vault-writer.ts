@@ -36,7 +36,7 @@ export class DeduplicatingVaultWriter {
 
       if (!abstractFolder) {
         await this.vault.createFolder(path);
-        this.ctx.logger.info('Successfully created folder', path);
+        this.ctx.logger.debug('Successfully created folder', path);
       }
     }
   }

@@ -1,9 +1,8 @@
-import type { Lock } from 'async-await-mutex-lock';
 import type { App } from 'obsidian';
 import type Logger from 'services/logger';
-import type ReadwiseApi from 'services/readwise-api';
 import type { PluginSettings } from 'types/settings';
 import type Notify from 'ui/notify';
+import type { ReadwiseController } from '../services/readwise-controller';
 
 /**
  * Context object that bundles commonly-used plugin dependencies
@@ -12,9 +11,13 @@ import type Notify from 'ui/notify';
 export interface PluginContext {
   app: App;
   settings: PluginSettings;
-  api: ReadwiseApi;
   logger: Logger;
-  notify: Notify;
+  notify?: Notify;
+  controller?: ReadwiseController;
+  syncLock: {
+    isAcquired(key: string): boolean;
+    acquire(key: string): Promise<void>;
+    release(key: string): void;
+  };
   saveAndApplySettings: () => Promise<void>;
-  syncLock: Lock<string>;
 }

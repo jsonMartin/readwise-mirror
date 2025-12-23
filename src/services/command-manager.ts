@@ -3,30 +3,33 @@ import { type Command, type Menu, type TAbstractFile, TFile, TFolder } from 'obs
 import { getTrackingUrl, isFolderInReadwiseLibrary } from 'utils/file-utils';
 import type { PluginContext } from '../types/plugin-context';
 import { getPluginCommands } from '../utils/plugin-commands';
-import { ReadwiseController } from './readwise-controller';
+import type { ReadwiseController } from './readwise-controller';
 
 /**
  * Manages command registration for the Readwise Mirror plugin
  * Singleton class to ensure only one instance exists
  */
 export class ReadwiseCommandManager {
-  private readonly ctr: ReadwiseController;
   private static instance: ReadwiseCommandManager;
 
   private constructor(
     private plugin: ReadwiseMirror,
-    private ctx: PluginContext
-  ) {
-    this.ctr = new ReadwiseController(this.plugin, this.ctx);
-  }
+    private ctx: PluginContext,
+    private ctr: ReadwiseController
+  ) {}
 
   // Create and initialize the command manager
-  public static initialize(plugin: ReadwiseMirror, ctx: PluginContext): ReadwiseCommandManager {
+  public static async initialize(
+    plugin: ReadwiseMirror,
+    ctx: PluginContext,
+    ctr: ReadwiseController
+  ): Promise<ReadwiseCommandManager> {
     if (!ReadwiseCommandManager.instance) {
-      ReadwiseCommandManager.instance = new ReadwiseCommandManager(plugin, ctx);
-      ReadwiseCommandManager.instance.registerCommands();
-      ReadwiseCommandManager.instance.registerEvents();
-      ReadwiseCommandManager.instance.runStartupCommands();
+      const instance = new ReadwiseCommandManager(plugin, ctx, ctr);
+      instance.registerCommands();
+      instance.registerEvents();
+      instance.runStartupCommands();
+      ReadwiseCommandManager.instance = instance;
     }
     return ReadwiseCommandManager.instance;
   }
@@ -39,7 +42,7 @@ export class ReadwiseCommandManager {
   /**
    * Register all plugin commands from the manifest
    */
-  public registerCommands(): void {
+  private registerCommands(): void {
     const commands = getPluginCommands(this.ctr, this.ctx);
     for (const cmd of commands) {
       this.plugin.addCommand(cmd as Command);
@@ -55,7 +58,7 @@ export class ReadwiseCommandManager {
       this.ctx.app.workspace.on('file-menu', (menu, file) => this.onMenuOpenCallback(menu, file))
     );
 
-    this.plugin.registerDomEvent(this.ctx.notify.statusBarItem, 'click', this.ctr.sync.bind(this));
+    this.plugin.registerDomEvent(this.ctx.notify.statusBarItem, 'click', async () => await this.ctr.sync());
   }
 
   public runStartupCommands(): void {

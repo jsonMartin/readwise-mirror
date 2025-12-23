@@ -17,19 +17,18 @@ export class TokenValidationError extends Error {
  */
 export default class ReadwiseApi {
   private validToken: boolean | undefined;
+  private apiToken: string;
 
-  private constructor(
-    private apiToken: string,
-    private ctx: PluginContext
-  ) {
-    if (!apiToken) {
+  private constructor(private ctx: PluginContext) {
+    if (!ctx.settings.apiToken) {
       throw new Error('API Token Required!');
     }
+    this.apiToken = ctx.settings.apiToken;
   }
 
   // The only way to create an instance
-  static async create(apiToken: string, ctx: PluginContext): Promise<ReadwiseApi> {
-    const api = new ReadwiseApi(apiToken, ctx);
+  static async create(ctx: PluginContext): Promise<ReadwiseApi> {
+    const api = new ReadwiseApi(ctx);
     await api.validateToken(); // Await validation before returning
     return api;
   }
@@ -38,16 +37,25 @@ export default class ReadwiseApi {
    * Sets the API token for the Readwise API instance
    * @param apiToken - The API token to set
    */
-  setToken(apiToken: string) {
-    this.apiToken = apiToken;
-    this.validateToken()
-      .then((isValid) => {
-        this.validToken = isValid;
-      })
-      .catch((e) => {
-        this.ctx.logger.error(`Failed to set token: ${e.message}`);
-        this.validToken = false;
-      });
+  async setToken(apiToken: string): Promise<boolean> {
+    const tempToken = this.apiToken;
+    try {
+      this.apiToken = apiToken;
+      this.validToken = await this.validateToken();
+      if (this.validToken) {
+        // Optionally update context settings for persistence
+        this.ctx.settings.apiToken = apiToken;
+      } else {
+        // Restore previous token if validation fails
+        this.apiToken = tempToken;
+      }
+    } catch (e) {
+      this.ctx.logger.error(`Failed to set token: ${e.message}`);
+      this.apiToken = tempToken; // Restore on error
+      return false;
+    }
+
+    return this.validToken;
   }
 
   /**
@@ -131,7 +139,7 @@ export default class ReadwiseApi {
         }
 
         // Notify user of progress
-        if (lastUpdated) this.ctx.logger.info(`Checking for new content since ${lastUpdated}`);
+        if (lastUpdated) this.ctx.logger.debug(`Checking for new content since ${lastUpdated}`);
         if (bookId) this.ctx.logger.debug(`Checking for all highlights on book ID: ${bookId}`);
         let statusBarText = `Readwise: Fetching ${contentType}`;
         if (data?.count) statusBarText += ` (${results.length})`;
@@ -159,7 +167,7 @@ export default class ReadwiseApi {
           this.ctx.notify.setStatusBarText(`Readwise: API Rate Limited, waiting ${rateLimitedDelayTime}`);
 
           await new Promise((_) => setTimeout(_, rateLimitedDelayTime));
-          this.ctx.logger.info('Trying to fetch highlights again...');
+          this.ctx.logger.debug('Trying to fetch highlights again...');
           this.ctx.notify.setStatusBarText('Readwise: Attempting to retry...');
         } else {
           if (data.results && Array.isArray(data.results)) {
@@ -179,7 +187,7 @@ export default class ReadwiseApi {
     }
 
     if (results.length > 0)
-      this.ctx.logger.info(`Processed ${results.length} total ${contentType} results successfully`);
+      this.ctx.logger.debug(`Processed ${results.length} total ${contentType} results successfully`);
     return results;
   }
 

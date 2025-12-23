@@ -1,6 +1,6 @@
 import type { Command } from 'obsidian';
 import spacetime from 'spacetime';
-import type { ReadwiseController } from '../services/readwise-controller';
+import { ReadwiseController } from '../services/readwise-controller';
 import type { PluginContext } from '../types/plugin-context';
 
 /**
@@ -24,19 +24,23 @@ export function getPluginCommands(ctr: ReadwiseController, ctx: PluginContext): 
       id: 'test',
       name: 'Test Readwise API key',
       callback: async () => {
-        const isTokenValid = ctx.api?.hasValidToken();
-        ctx.notify.notice(`Readwise: ${isTokenValid ? 'Token is valid' : 'INVALID TOKEN'}`);
+        try {
+          const isTokenValid = await ReadwiseController.validateAPIInstance();
+          ctx.notify.notice(`Readwise: ${isTokenValid ? 'Token is valid' : 'INVALID TOKEN'}`);
+        } catch (err) {
+          ctx.notify.notice(`Failed to validate API key: ${err.message}`);
+        }
       },
     },
     {
       id: 'delete',
       name: 'Delete Readwise library',
-      callback: () => ctr.deleteLibrary(),
+      callback: async () => await ctr.deleteLibrary(),
     },
     {
       id: 'update',
       name: 'Sync new highlights',
-      callback: () => ctr.sync(),
+      callback: async () => await ctr.sync(),
     },
     {
       id: 'adjust-filenames',

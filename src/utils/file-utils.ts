@@ -11,7 +11,7 @@ import type { PluginSettings } from 'types/settings';
  * @param filename - The filename to normalize
  * @returns The normalized filename
  */
-export function normalizeFilename(filename: string, settings: PluginSettings) {
+export function normalizeFilename(filename: string, settings: PluginSettings): string {
   const { useSlugify, colonSubstitute, slugifySeparator, slugifyLowercase } = settings;
   const normalizedFilename = useSlugify
     ? slugify(filename.replace(/:/g, colonSubstitute ?? '-'), {
@@ -24,7 +24,7 @@ export function normalizeFilename(filename: string, settings: PluginSettings) {
         maxLength: 252,
       })
         // Ensure we remove additional critical characters, replace multiple spaces with one, and trim
-        // Replace # as this inrerferes with WikiLinks (other characters are taken care of in "filenamify")
+        // Replace # as this interferes with WikiLinks (other characters are taken care of in "filenamify")
         .replace(/[#]+/g, ' ')
         .replace(/ +/g, ' ')
         .trim();

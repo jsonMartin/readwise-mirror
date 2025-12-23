@@ -7,12 +7,52 @@ import { humanReadableFormat } from 'utils/format-utils';
 import { isInReadwiseLibrary, isTrackedReadwiseNote } from 'utils/tracking-utils';
 import type ReadwiseMirror from '../main';
 import type { PluginContext } from '../types/plugin-context';
+import ReadwiseApi from './readwise-api';
 
 export class ReadwiseController {
+  private static instance: ReadwiseController;
+  private api: ReadwiseApi;
+
   constructor(
     private plugin: ReadwiseMirror,
     private ctx: PluginContext
   ) {}
+
+  public static async initialize(plugin: ReadwiseMirror, ctx: PluginContext): Promise<ReadwiseController> {
+    if (!ReadwiseController.instance) {
+      ReadwiseController.instance = new ReadwiseController(plugin, ctx);
+    }
+    // Always (re)create or refresh the API instance so methods can safely assume `this.api` exists.
+    try {
+      ReadwiseController.instance.api = await ReadwiseApi.create(ctx);
+    } catch (err) {
+      // Keep instance but log/notify — callers must still check api presence/validity.
+      ReadwiseController.instance.ctx.logger.error('ReadwiseController: failed to create API instance', err);
+      ReadwiseController.instance.ctx.notify.notice('Readwise: Failed to initialize API. Check settings.');
+      ReadwiseController.instance.api = undefined;
+    }
+    return ReadwiseController.instance;
+  }
+
+  // Check if a valid API instance exists (safe)
+  public static async validateAPIInstance(): Promise<boolean> {
+    const instance = ReadwiseController.instance;
+    if (!instance) return false;
+    if (!instance.api) {
+      try {
+        instance.api = await ReadwiseApi.create(instance.ctx);
+      } catch (err) {
+        instance.ctx.logger.error('validateAPIInstance: failed to create API', err);
+        return false;
+      }
+    }
+    try {
+      return !!(await instance.api.validateToken());
+    } catch (err) {
+      instance.ctx.logger.warn('validateAPIInstance: token validation failed', err);
+      return false;
+    }
+  }
 
   public async sync() {
     // Equivalent to plugin.sync()
@@ -22,21 +62,21 @@ export class ReadwiseController {
     }
     await this.ctx.syncLock?.acquire('library-sync');
     try {
-      if (!this.ctx.api?.hasValidToken()) {
-        this.ctx.notify.notice('Readwise: Valid API Token Required');
+      if (!(await ReadwiseController.validateAPIInstance())) {
+        this.ctx.notify.notice('Readwise: Network connection and valid API Token required');
         return;
       }
       let library: Library;
       if (!this.ctx.settings.lastUpdated) {
         if (this.ctx.settings.syncNotifications)
           this.ctx.notify.notice('Readwise: Previous sync not detected...\nDownloading full Readwise library');
-        library = await this.ctx.api.downloadFullLibrary();
+        library = await this.api.downloadFullLibrary();
       } else {
         if (this.ctx.settings.syncNotifications)
           this.ctx.notify.notice(
             `Readwise: Checking for new updates since ${humanReadableFormat(this.ctx.settings.lastUpdated)}...`
           );
-        library = await this.ctx.api.downloadUpdates(this.ctx.settings.lastUpdated);
+        library = await this.api.downloadUpdates(this.ctx.settings.lastUpdated);
       }
       // ...existing filtering and writing logic...
       await this.plugin.writeLibraryToMarkdown(library);
@@ -62,7 +102,7 @@ export class ReadwiseController {
     const abstractFile = vault.getAbstractFileByPath(path);
     if (abstractFile) {
       try {
-        this.ctx.logger.info('Attempting to delete entire library at:', abstractFile);
+        this.ctx.logger.debug('Attempting to delete entire library at:', abstractFile);
         await this.ctx.app.fileManager.trashFile(abstractFile);
         if (this.ctx.settings.syncNotifications) this.ctx.notify.notice('Readwise: library folder deleted');
       } catch (err) {
@@ -82,8 +122,8 @@ export class ReadwiseController {
       return;
     }
 
-    if (!this.ctx.api?.hasValidToken()) {
-      this.ctx.notify.notice('Readwise: Valid API Token Required');
+    if (!(await ReadwiseController.validateAPIInstance())) {
+      this.ctx.notify.notice('Readwise: Network connection and valid API Token required');
       return;
     }
 
@@ -93,13 +133,13 @@ export class ReadwiseController {
     }
 
     // Now that we are sure we can process the file, we acquire a lock for the specific note
-    this.ctx.logger.debug('Readwise: Updating multiple notes...');
+    this.ctx.logger.debug('Readwise: Updating single note...');
 
     await this.ctx.syncLock.acquire(trackedFile.readwiseId.toString());
 
     try {
       this.ctx.logger.debug(`Readwise: downloading current book with ID ${trackedFile.readwiseId}...`);
-      const library = await this.ctx.api.downloadSingleBook(trackedFile.readwiseId);
+      const library = await this.api.downloadSingleBook(trackedFile.readwiseId);
       if (Object.keys(library.books).length > 0) {
         if (this.ctx.settings.atomicHighlights) {
           library.categories.add('Highlight');
@@ -115,7 +155,7 @@ export class ReadwiseController {
         return;
       }
     } catch (error) {
-      this.ctx.logger.error('Error during multiple-book update:', error);
+      this.ctx.logger.error('Error during single-book update:', error);
       this.ctx.notify.notice(`Readwise: Sync failed. ${error}`);
     } finally {
       // Make sure we release the lock even if the operation fails
@@ -129,15 +169,15 @@ export class ReadwiseController {
       this.ctx.notify.notice('Readwise: update already in progress');
       return;
     }
-    if (!this.ctx.api?.hasValidToken()) {
-      this.ctx.notify.notice('Readwise: Valid API Token Required');
+    if (!(await ReadwiseController.validateAPIInstance())) {
+      this.ctx.notify.notice('Readwise: Network connection and valid API Token required');
       return;
     }
     this.ctx.notify.notice('Readwise: Updating all note frontmatter...');
     await this.ctx.syncLock?.acquire('frontmatter-update');
     try {
-      this.ctx.logger.info('Readwise: downloading full library to update frontmatter...');
-      const library = await this.ctx.api.downloadFullLibrary();
+      this.ctx.logger.debug('Readwise: downloading full library to update frontmatter...');
+      const library = await this.api.downloadFullLibrary();
       // ...existing filtering logic...
       this.plugin.processFrontmatterUpdatesInLibrary(library);
       let message = `Readwise: Updated ${Object.keys(library.books).length} notes`;
@@ -181,10 +221,11 @@ export class ReadwiseController {
 
     // Only rename if there's a difference
     if (newFilename !== file.basename) {
-      const newPath = `${file.parent.path}/${newFilename}.md`;
+      const parentPath = file.parent?.path ?? '';
+      const newPath = parentPath ? `${parentPath}/${newFilename}.md` : `${newFilename}.md`;
       try {
         await this.ctx.app.fileManager.renameFile(file, newPath);
-        this.ctx.logger.info(`Renamed file '${file.name}' to '${newFilename}.md'`);
+        this.ctx.logger.debug(`Renamed file '${file.name}' to '${newFilename}.md'`);
         return true;
       } catch (error) {
         this.ctx.logger.error(`Error renaming file: '${file.name}' to '${newFilename}.md': ${error}`);
@@ -240,8 +281,8 @@ export class ReadwiseController {
       return;
     }
 
-    if (!this.ctx.api?.hasValidToken()) {
-      this.ctx.notify.notice('Readwise: Valid API Token Required');
+    if (!(await ReadwiseController.validateAPIInstance())) {
+      this.ctx.notify.notice('Readwise: Network connection and valid API Token required');
       return;
     }
 
@@ -310,18 +351,18 @@ export class ReadwiseController {
       return;
     }
 
-    if (!this.ctx.api?.hasValidToken()) {
-      this.ctx.notify.notice('Readwise: Valid API Token Required');
+    if (!(await ReadwiseController.validateAPIInstance())) {
+      this.ctx.notify.notice('Readwise: Network connection and valid API Token required');
       return;
     }
 
     // Now that we are sure we can process the file, we acquire a lock for the specific note
-    this.ctx.logger.debug('Readwise: Updating current note...');
+    this.ctx.logger.debug('Readwise: Updating multiple notes...');
 
     await this.ctx.syncLock.acquire('multiple-note-update');
 
     try {
-      const library = await this.ctx.api.downloadMultipleBooks(bookIds);
+      const library = await this.api.downloadMultipleBooks(bookIds);
       if (Object.keys(library.books).length > 0) {
         if (this.ctx.settings.atomicHighlights) {
           library.categories.add('Highlight');
@@ -339,7 +380,7 @@ export class ReadwiseController {
         return;
       }
     } catch (error) {
-      this.ctx.logger.error('Error during single-book update:', error);
+      this.ctx.logger.error('Error during multiple-book update:', error);
       this.ctx.notify.notice(`Readwise: Sync failed. ${error}`);
     } finally {
       // Make sure we release the lock even if the operation fails
