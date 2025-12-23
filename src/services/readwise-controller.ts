@@ -9,8 +9,12 @@ import type ReadwiseMirror from '../main';
 import type { PluginContext } from '../types/plugin-context';
 import ReadwiseApi from './readwise-api';
 
-export class ReadwiseController {
-  private static instance: ReadwiseController;
+/**
+ * Controller class managing Readwise API interactions and sync operations
+ * Singleton pattern to ensure only one instance exists
+ */
+export class Controller {
+  private static instance: Controller;
   private api: ReadwiseApi | undefined;
 
   constructor(
@@ -18,25 +22,25 @@ export class ReadwiseController {
     private ctx: PluginContext
   ) {}
 
-  public static async initialize(plugin: ReadwiseMirror, ctx: PluginContext): Promise<ReadwiseController> {
-    if (!ReadwiseController.instance) {
-      ReadwiseController.instance = new ReadwiseController(plugin, ctx);
+  public static async initialize(plugin: ReadwiseMirror, ctx: PluginContext): Promise<Controller> {
+    if (!Controller.instance) {
+      Controller.instance = new Controller(plugin, ctx);
     }
     // Always (re)create or refresh the API instance so methods can safely assume `this.api` exists.
     try {
-      ReadwiseController.instance.api = await ReadwiseApi.create(ctx);
+      Controller.instance.api = await ReadwiseApi.create(ctx);
     } catch (err) {
       // Keep instance but log/notify — callers must still check api presence/validity.
-      ReadwiseController.instance.ctx.logger.error('ReadwiseController: failed to create API instance', err);
-      ReadwiseController.instance.ctx.notify.notice('Readwise: Failed to initialize API. Check settings.');
-      ReadwiseController.instance.api = undefined;
+      Controller.instance.ctx.logger.error('ReadwiseController: failed to create API instance', err);
+      Controller.instance.ctx.notify.notice('Readwise: Failed to initialize API. Check settings.');
+      Controller.instance.api = undefined;
     }
-    return ReadwiseController.instance;
+    return Controller.instance;
   }
 
   // Check if a valid API instance exists (safe)
   public static async validateAPIInstance(): Promise<boolean> {
-    const instance = ReadwiseController.instance;
+    const instance = Controller.instance;
     if (!instance) return false;
     if (!instance.api) {
       try {
@@ -62,7 +66,7 @@ export class ReadwiseController {
     }
     await this.ctx.syncLock?.acquire('library-sync');
     try {
-      if (!(await ReadwiseController.validateAPIInstance())) {
+      if (!(await Controller.validateAPIInstance())) {
         this.ctx.notify.notice('Readwise: Network connection and valid API Token required');
         return;
       }
@@ -122,7 +126,7 @@ export class ReadwiseController {
       return;
     }
 
-    if (!(await ReadwiseController.validateAPIInstance())) {
+    if (!(await Controller.validateAPIInstance())) {
       this.ctx.notify.notice('Readwise: Network connection and valid API Token required');
       return;
     }
@@ -169,7 +173,7 @@ export class ReadwiseController {
       this.ctx.notify.notice('Readwise: update already in progress');
       return;
     }
-    if (!(await ReadwiseController.validateAPIInstance())) {
+    if (!(await Controller.validateAPIInstance())) {
       this.ctx.notify.notice('Readwise: Network connection and valid API Token required');
       return;
     }
@@ -281,7 +285,7 @@ export class ReadwiseController {
       return;
     }
 
-    if (!(await ReadwiseController.validateAPIInstance())) {
+    if (!(await Controller.validateAPIInstance())) {
       this.ctx.notify.notice('Readwise: Network connection and valid API Token required');
       return;
     }
@@ -351,7 +355,7 @@ export class ReadwiseController {
       return;
     }
 
-    if (!(await ReadwiseController.validateAPIInstance())) {
+    if (!(await Controller.validateAPIInstance())) {
       this.ctx.notify.notice('Readwise: Network connection and valid API Token required');
       return;
     }

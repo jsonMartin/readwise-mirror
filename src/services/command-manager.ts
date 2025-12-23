@@ -3,40 +3,36 @@ import { type Command, type Menu, type TAbstractFile, TFile, TFolder } from 'obs
 import { getTrackingUrl, isFolderInReadwiseLibrary } from 'utils/file-utils';
 import type { PluginContext } from '../types/plugin-context';
 import { getPluginCommands } from '../utils/plugin-commands';
-import type { ReadwiseController } from './readwise-controller';
+import type { Controller } from './readwise-controller';
 
 /**
  * Manages command registration for the Readwise Mirror plugin
  * Singleton class to ensure only one instance exists
  */
-export class ReadwiseCommandManager {
-  private static instance: ReadwiseCommandManager;
+export class CommandManager {
+  private static instance: CommandManager;
 
   private constructor(
     private plugin: ReadwiseMirror,
     private ctx: PluginContext,
-    private ctr: ReadwiseController
+    private ctr: Controller
   ) {}
 
   // Create and initialize the command manager
-  public static async initialize(
-    plugin: ReadwiseMirror,
-    ctx: PluginContext,
-    ctr: ReadwiseController
-  ): Promise<ReadwiseCommandManager> {
-    if (!ReadwiseCommandManager.instance) {
-      const instance = new ReadwiseCommandManager(plugin, ctx, ctr);
+  public static async initialize(plugin: ReadwiseMirror, ctx: PluginContext, ctr: Controller): Promise<CommandManager> {
+    if (!CommandManager.instance) {
+      const instance = new CommandManager(plugin, ctx, ctr);
       instance.registerCommands();
       instance.registerEvents();
       instance.runStartupCommands();
-      ReadwiseCommandManager.instance = instance;
+      CommandManager.instance = instance;
     }
-    return ReadwiseCommandManager.instance;
+    return CommandManager.instance;
   }
 
   // Reset the singleton instance (for testing purposes)
   public static reset(): void {
-    ReadwiseCommandManager.instance = undefined;
+    CommandManager.instance = undefined;
   }
 
   /**

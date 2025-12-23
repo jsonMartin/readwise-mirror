@@ -10,7 +10,7 @@ import {
   type TextComponent,
 } from 'obsidian';
 import { TokenValidationError } from 'services/readwise-api';
-import { ReadwiseController } from 'services/readwise-controller';
+import { Controller } from 'services/readwise-controller';
 import type { ReadwiseEnvironment } from 'services/readwise-environment';
 import type { PluginContext } from 'types/plugin-context';
 import type { TemplateValidationResult } from 'types/utilities';
@@ -387,7 +387,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           fragment.createEl('br');
           fragment.append(this.tokenValidationMessage);
           // Show success or error message based on token validity
-          if (ReadwiseController.validateAPIInstance()) {
+          if (Controller.validateAPIInstance()) {
             this.setTokenValidationStatus('running');
           } else {
             this.setTokenValidationStatus('error');
@@ -397,7 +397,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           // Validate the token on load
 
           try {
-            hasValidToken = await ReadwiseController.validateAPIInstance();
+            hasValidToken = await Controller.validateAPIInstance();
             if (hasValidToken) this.ctx.notify.setStatusBarText('Readwise: Click to Sync');
             this.updateAuthButtons(hasValidToken ? 'valid' : 'invalid');
             this.setTokenValidationStatus(hasValidToken ? 'success' : 'invalid');
@@ -492,7 +492,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               this.ctx.notify.notice('New token set.');
 
               try {
-                const hasValidToken = await ReadwiseController.validateAPIInstance();
+                const hasValidToken = await Controller.validateAPIInstance();
                 this.updateAuthButtons(hasValidToken ? 'valid' : 'invalid');
               } catch (error) {
                 this.ctx.notify.notice('Failed to verify token:', error.message);

@@ -2,7 +2,7 @@ import type { App } from 'obsidian';
 import type Logger from 'services/logger';
 import type { PluginSettings } from 'types/settings';
 import type Notify from 'ui/notify';
-import type { ReadwiseController } from '../services/readwise-controller';
+import type { Controller } from '../services/readwise-controller';
 
 /**
  * Context object that bundles commonly-used plugin dependencies
@@ -13,7 +13,7 @@ export interface PluginContext {
   settings: PluginSettings;
   logger: Logger;
   notify?: Notify;
-  controller?: ReadwiseController;
+  controller?: Controller;
   syncLock: {
     isAcquired(key: string): boolean;
     acquire(key: string): Promise<void>;

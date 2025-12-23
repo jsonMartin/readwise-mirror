@@ -1,6 +1,6 @@
 import type { Command } from 'obsidian';
 import spacetime from 'spacetime';
-import { ReadwiseController } from '../services/readwise-controller';
+import { Controller } from '../services/readwise-controller';
 import type { PluginContext } from '../types/plugin-context';
 
 /**
@@ -9,7 +9,7 @@ import type { PluginContext } from '../types/plugin-context';
  * @param ctx PluginContext instance
  * @returns Array of Obsidian Command objects
  */
-export function getPluginCommands(ctr: ReadwiseController, ctx: PluginContext): Command[] {
+export function getPluginCommands(ctr: Controller, ctx: PluginContext): Command[] {
   return [
     {
       id: 'download',
@@ -25,7 +25,7 @@ export function getPluginCommands(ctr: ReadwiseController, ctx: PluginContext): 
       name: 'Test Readwise API key',
       callback: async () => {
         try {
-          const isTokenValid = await ReadwiseController.validateAPIInstance();
+          const isTokenValid = await Controller.validateAPIInstance();
           ctx.notify.notice(`Readwise: ${isTokenValid ? 'Token is valid' : 'INVALID TOKEN'}`);
         } catch (err) {
           ctx.notify.notice(`Failed to validate API key: ${err.message}`);

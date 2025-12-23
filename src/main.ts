@@ -3,13 +3,13 @@ import { Lock } from 'async-await-mutex-lock';
 import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS, NUNJUCKS_CORE_TEMPLATE } from 'constants/index';
 import { type App, type CachedMetadata, normalizePath, Plugin, type PluginManifest, TFile } from 'obsidian';
 import { Atomizer } from 'services/atomizer';
-import { ReadwiseCommandManager } from 'services/command-manager';
+import { CommandManager } from 'services/command-manager';
 import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
 import { Frontmatter } from 'services/frontmatter';
 import { FrontmatterManager } from 'services/frontmatter-manager';
 import Logger from 'services/logger';
 import type ReadwiseApi from 'services/readwise-api';
-import { ReadwiseController } from 'services/readwise-controller';
+import { Controller } from 'services/readwise-controller';
 import { ReadwiseEnvironment, ReadwiseLoader } from 'services/readwise-environment';
 import spacetime from 'spacetime';
 import type { BaseFile, ReadwiseDocument } from 'types/document';
@@ -84,7 +84,16 @@ export default class ReadwiseMirror extends Plugin {
     }
 
     // Register all commands and run startup commands
-    ReadwiseCommandManager.initialize(this, this.ctx, await ReadwiseController.initialize(this, this.ctx));
+    let controllerInstance: Controller;
+    try {
+      controllerInstance = await Controller.initialize(this, this.ctx);
+    } catch (error) {
+      this.logger.error('Error initializing Readwise controller:', error);
+      // Show concise user-facing notice but do not rethrow — allow plugin to continue
+      // eslint-disable-next-line no-new
+      this.notify.notice('Readwise: Controller initialization failed. Check console for details.');
+    }
+    CommandManager.initialize(this, this.ctx, controllerInstance);
 
     // Update status bar every second if synced
     this.registerInterval(
@@ -145,7 +154,12 @@ export default class ReadwiseMirror extends Plugin {
     }
 
     // Re-initialize the ReadwiseController instance
-    await ReadwiseController.initialize(this, this.ctx);
+    try {
+      await Controller.initialize(this, this.ctx);
+    } catch (error) {
+      this.logger.error('Error initializing Readwise controller during settings apply:', error);
+      this.notify.notice('Readwise: Controller initialization failed. Check console for details.');
+    }
   }
 
   /**
