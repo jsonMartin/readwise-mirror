@@ -1,8 +1,8 @@
 import type ReadwiseMirror from 'main';
 import { type Command, type Menu, type TAbstractFile, TFile, TFolder } from 'obsidian';
-import { getTrackingUrl } from 'utils/file-utils';
+import { getTrackingUrl, isFolderInReadwiseLibrary } from 'utils/file-utils';
 import type { PluginContext } from '../types/plugin-context';
-import { getReadwiseCommands } from './readwise-commands';
+import { getPluginCommands } from '../utils/plugin-commands';
 import { ReadwiseController } from './readwise-controller';
 
 /**
@@ -40,7 +40,7 @@ export class ReadwiseCommandManager {
    * Register all plugin commands from the manifest
    */
   public registerCommands(): void {
-    const commands = getReadwiseCommands(this.ctr, this.ctx);
+    const commands = getPluginCommands(this.ctr, this.ctx);
     for (const cmd of commands) {
       this.plugin.addCommand(cmd as Command);
     }
@@ -103,7 +103,7 @@ export class ReadwiseCommandManager {
       }
     } else if (file instanceof TFolder) {
       // Check if this folder is in the Readwise library
-      if (this.isFolderInReadwiseLibrary(file)) {
+      if (isFolderInReadwiseLibrary(file, this.ctx)) {
         menu.addItem((item) => {
           item
             .setIcon('refresh-cw')
@@ -112,16 +112,5 @@ export class ReadwiseCommandManager {
         });
       }
     }
-  }
-
-  /**
-   * Check if a folder is in the Readwise library hierarchy
-   */
-  private isFolderInReadwiseLibrary(folder: TFolder): boolean {
-    const baseFolderName = this.ctx.settings.baseFolderName?.trim();
-    if (!baseFolderName) return false;
-
-    // Check if folder is the base folder or a direct child of it
-    return folder.path === baseFolderName || folder.parent?.path === baseFolderName;
   }
 }

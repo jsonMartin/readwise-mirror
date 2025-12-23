@@ -1,9 +1,15 @@
 import type { Command } from 'obsidian';
 import spacetime from 'spacetime';
+import type { ReadwiseController } from '../services/readwise-controller';
 import type { PluginContext } from '../types/plugin-context';
-import type { ReadwiseController } from './readwise-controller';
 
-export function getReadwiseCommands(ctr: ReadwiseController, ctx: PluginContext): Command[] {
+/**
+ * Construct all plugin commands for the CommandManager
+ * @param ctr ReadwiseController instance
+ * @param ctx PluginContext instance
+ * @returns Array of Obsidian Command objects
+ */
+export function getPluginCommands(ctr: ReadwiseController, ctx: PluginContext): Command[] {
   return [
     {
       id: 'download',

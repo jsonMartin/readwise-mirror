@@ -40,6 +40,16 @@ export function isFileInFolder(file: TFile, folder: TFolder): boolean {
 }
 
 /**
+ * Check if a folder is in the Readwise library hierarchy
+ */
+export function isFolderInReadwiseLibrary(folder: TFolder, ctx: PluginContext): boolean {
+  const baseFolderName = ctx.settings.baseFolderName?.trim();
+  if (!baseFolderName) return false;
+
+  // Check if folder is the base folder or a direct child of it
+  return folder.path === baseFolderName || folder.parent?.path === baseFolderName;
+}
+/**
  * Get tracking URL from a file's frontmatter
  */
 export function getTrackingUrl(file: TFile, ctx: PluginContext): string | undefined {
