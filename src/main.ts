@@ -15,12 +15,12 @@ import spacetime from 'spacetime';
 import type { BaseFile, ReadwiseDocument } from 'types/document';
 import type { Export, Highlight, Library, Tag } from 'types/library';
 import type { PluginContext } from 'types/plugin-context';
-import type { PluginSettings } from 'types/settings';
 // Types
 import Notify from 'ui/notify';
 import ReadwiseMirrorSettingTab from 'ui/settings-tab';
 import { normalizeFilename } from 'utils/filename-utils';
 import { createdDate, lastHighlightedDate, updatedDate } from 'utils/highlight-date-utils';
+import type { PluginSettings } from './types/settings';
 
 export default class ReadwiseMirror extends Plugin {
   private _settings: PluginSettings;
@@ -39,6 +39,7 @@ export default class ReadwiseMirror extends Plugin {
     // Set new custom Environment using our custom loader
     this._loader = new ReadwiseLoader();
     this._env = new ReadwiseEnvironment(this._loader, { autoescape: false });
+    this._logger = new Logger(false);
   }
 
   // Add getter for environment
@@ -74,11 +75,6 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   async onload() {
-    await this.loadAndApplySettings();
-
-    // Initialize logger with debug mode from settings
-    this._logger = new Logger(this.settings.debugMode || false);
-
     // Move UI setup to onLayoutReady
     this.app.workspace.onLayoutReady(async () => {
       await this.initializeUI();
@@ -86,20 +82,22 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   private async initializeUI() {
-    const statusBarItem = this.addStatusBarItem();
+    await this.loadAndApplySettings();
 
+    const statusBarItem = this.addStatusBarItem();
     this.notify = new Notify(statusBarItem);
 
     // Create plugin context for dependency injection
     const context: PluginContext = {
       // TODO: refactor
-      plugin: this,
       settings: this.settings,
       app: this.app,
-      api: this.readwiseApi,
+      get api() {
+        return this.plugin.readwiseApi;
+      },
       logger: this.logger,
       notify: this.notify,
-      saveSettings: this.saveAndApplySettings.bind(this),
+      saveAndApplySettings: this.saveAndApplySettings.bind(this),
     };
 
     this.frontmatterManager = new FrontmatterManager(context, this._env, this.app.fileManager);
@@ -138,13 +136,13 @@ export default class ReadwiseMirror extends Plugin {
 
   // Reload settings after external change (e.g. after sync)
   async onExternalSettingsChange() {
-    this.logger.info('Reloading settings due to external change');
     await this.loadAndApplySettings();
+    this.logger.info('Reloading settings due to external change');
     if (this.settings.lastUpdated)
-      this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`);
+      this.notify?.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`);
     if (!this.settings.apiToken) {
-      this.notify.notice('Readwise: API Token not detected\nPlease enter in configuration page');
-      this.notify.setStatusBarText('Readwise: API Token Required');
+      this.notify?.notice('Readwise: API Token not detected\nPlease enter in configuration page');
+      this.notify?.setStatusBarText('Readwise: API Token Required');
       this.readwiseApi = null; // Invalidate the API instance
     } else {
       this.readwiseApi?.setToken(this.settings.apiToken);
@@ -157,7 +155,7 @@ export default class ReadwiseMirror extends Plugin {
    */
   async loadAndApplySettings() {
     this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData()) };
-    this.applyTemplateSettings();
+    this.applySettings();
   }
 
   /**
@@ -165,14 +163,16 @@ export default class ReadwiseMirror extends Plugin {
    * In particular, this updates the header and highlight templates.
    */
   private async saveAndApplySettings() {
-    this.applyTemplateSettings();
+    this.applySettings();
     await this.saveData(this.settings);
   }
 
   /**
-   * Applies the header and highlight templates from the current settings to the plugin instance.
+   * Applies the logger mode, and header and highlight templates from the current settings to the plugin instance.
    */
-  private applyTemplateSettings() {
+  private applySettings() {
+    // Set logger debug mode
+    this._logger.setDebugMode(this.settings.debugMode);
     try {
       // Update and try to compile
       this._loader.setSource('header', this.settings.headerTemplate);

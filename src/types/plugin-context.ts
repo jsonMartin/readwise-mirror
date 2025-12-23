@@ -1,4 +1,3 @@
-import type ReadwiseMirror from 'main';
 import type { App } from 'obsidian';
 import type Logger from 'services/logger';
 import type ReadwiseApi from 'services/readwise-api';
@@ -13,8 +12,7 @@ export interface PluginContext {
   app: App;
   settings: PluginSettings;
   api: ReadwiseApi;
-  plugin: ReadwiseMirror; //TODO: Plugin is base class – should not be needed here
   logger: Logger;
   notify: Notify;
-  saveSettings: () => Promise<void>;
+  saveAndApplySettings: () => Promise<void>;
 }

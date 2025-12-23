@@ -14,7 +14,10 @@ import type { PluginContext } from '../types/plugin-context';
 export class ReadwiseCommandManager {
   private syncLock = new Lock<string>();
 
-  constructor(private ctx: PluginContext) {}
+  constructor(
+    private plugin: ReadwiseMirror,
+    private ctx: PluginContext
+  ) {}
   private get commandManifest(): Command[] {
     return [
       {
@@ -22,7 +25,7 @@ export class ReadwiseCommandManager {
         name: 'Download entire Readwise library (force)',
         callback: async () => {
           this.ctx.settings.lastUpdated = null;
-          await this.ctx.saveSettings();
+          await this.ctx.saveAndApplySettings();
           await this.sync();
         },
       },
@@ -39,7 +42,7 @@ export class ReadwiseCommandManager {
       {
         id: 'delete',
         name: 'Delete Readwise library',
-        callback: () => this.ctx.plugin.deleteLibrary(),
+        callback: () => this.plugin.deleteLibrary(),
       },
 
       {
@@ -53,7 +56,7 @@ export class ReadwiseCommandManager {
         name: 'Adjust Filenames to current settings',
         checkCallback: (checking: boolean) => {
           if (this.ctx.settings.trackFiles && this.ctx.settings.enableFileNameUpdates) {
-            if (!checking) this.ctx.plugin.handleFilenameAdjustment();
+            if (!checking) this.plugin.handleFilenameAdjustment();
             return true;
           }
           return false;
@@ -97,7 +100,7 @@ export class ReadwiseCommandManager {
                 async (result) => {
                   if (result) {
                     this.ctx.settings.lastUpdated = d.iso();
-                    await this.ctx.saveSettings();
+                    await this.ctx.saveAndApplySettings();
                     this.ctx.notify.setStatusBarText(
                       `Readwise: lastUpdated reset to ${spacetime.now().since(d).rounded}`
                     );
@@ -118,7 +121,7 @@ export class ReadwiseCommandManager {
    */
   public registerCommands(): void {
     for (const cmd of this.commandManifest) {
-      this.ctx.plugin.addCommand(cmd as Command);
+      this.plugin.addCommand(cmd as Command);
     }
   }
 
@@ -127,11 +130,11 @@ export class ReadwiseCommandManager {
    */
   public registerEvents(): void {
     // Register context menu for files and folders
-    this.ctx.plugin.registerEvent(
+    this.plugin.registerEvent(
       this.ctx.app.workspace.on('file-menu', (menu, file) => this.onMenuOpenCallback(menu, file))
     );
 
-    this.ctx.plugin.registerDomEvent(this.ctx.notify.statusBarItem, 'click', this.sync.bind(this));
+    this.plugin.registerDomEvent(this.ctx.notify.statusBarItem, 'click', this.sync.bind(this));
   }
 
   public runStartupCommands(): void {
@@ -332,7 +335,7 @@ export class ReadwiseCommandManager {
         // Load Updates and cache
         if (this.ctx.settings.syncNotifications)
           this.ctx.notify.notice(
-            `Readwise: Checking for new updates since ${this.ctx.plugin.lastUpdatedHumanReadableFormat()}`
+            `Readwise: Checking for new updates since ${this.plugin.lastUpdatedHumanReadableFormat()}`
           );
         library = await this.ctx.api.downloadUpdates(lastUpdated);
       }
@@ -367,9 +370,9 @@ export class ReadwiseCommandManager {
           library.categories.add('Highlight');
         }
 
-        await this.ctx.plugin.writeLibraryToMarkdown(library);
+        await this.plugin.writeLibraryToMarkdown(library);
 
-        if (this.ctx.settings.logFile) await this.ctx.plugin.writeLogToMarkdown(library);
+        if (this.ctx.settings.logFile) await this.plugin.writeLogToMarkdown(library);
 
         let message = `Readwise: Downloaded ${library.highlightCount} Highlights from ${Object.keys(library.books).length} Sources`;
         if (this.ctx.settings.filterNotesByTag && this.ctx.settings.filteredTags?.length > 0) {
@@ -381,8 +384,8 @@ export class ReadwiseCommandManager {
       }
 
       this.ctx.settings.lastUpdated = new Date().toISOString();
-      await this.ctx.saveSettings();
-      this.ctx.notify.setStatusBarText(`Readwise: Synced ${this.ctx.plugin.lastUpdatedHumanReadableFormat()}`);
+      await this.ctx.saveAndApplySettings();
+      this.ctx.notify.setStatusBarText(`Readwise: Synced ${this.plugin.lastUpdatedHumanReadableFormat()}`);
     } catch (error) {
       this.ctx.logger.error('Error during sync:', error);
       this.ctx.notify.notice(`Readwise: Sync failed. ${error}`);
@@ -424,9 +427,9 @@ export class ReadwiseCommandManager {
         if (this.ctx.settings.atomicHighlights) {
           library.categories.add('Highlight');
         }
-        await this.ctx.plugin.writeLibraryToMarkdown(library);
+        await this.plugin.writeLibraryToMarkdown(library);
 
-        if (this.ctx.settings.logFile) await this.ctx.plugin.writeLogToMarkdown(library);
+        if (this.ctx.settings.logFile) await this.plugin.writeLogToMarkdown(library);
 
         if (this.ctx.settings.syncNotifications) this.ctx.notify.notice('Readwise: Book update complete.');
       } else {
@@ -472,8 +475,8 @@ export class ReadwiseCommandManager {
         if (this.ctx.settings.syncNotifications)
           this.ctx.notify.notice(`Readwise: writing ${Object.keys(library.books).length} updated books to markdown...`);
         this.ctx.logger.debug(`Readwise: writing ${Object.keys(library.books).length} updated books to markdown...`);
-        await this.ctx.plugin.writeLibraryToMarkdown(library);
-        if (this.ctx.settings.logFile) await this.ctx.plugin.writeLogToMarkdown(library);
+        await this.plugin.writeLibraryToMarkdown(library);
+        if (this.ctx.settings.logFile) await this.plugin.writeLogToMarkdown(library);
         if (this.ctx.settings.syncNotifications) this.ctx.notify.notice('Readwise: Book update complete.');
       } else {
         this.ctx.notify.notice('Readwise: No notes from folder found on Readwise.');
@@ -528,7 +531,7 @@ export class ReadwiseCommandManager {
       }
 
       this.ctx.logger.group('Frontmatter Update');
-      this.ctx.plugin.processFrontmatterUpdatesInLibrary(library);
+      this.plugin.processFrontmatterUpdatesInLibrary(library);
       this.ctx.logger.groupEnd();
       let message = `Readwise: Updated ${Object.keys(library.books).length} notes`;
       if (this.ctx.settings.filterNotesByTag && this.ctx.settings.filteredTags?.length > 0) {
