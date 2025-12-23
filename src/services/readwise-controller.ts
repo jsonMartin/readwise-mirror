@@ -11,7 +11,7 @@ import ReadwiseApi from './readwise-api';
 
 export class ReadwiseController {
   private static instance: ReadwiseController;
-  private api: ReadwiseApi;
+  private api: ReadwiseApi | undefined;
 
   constructor(
     private plugin: ReadwiseMirror,

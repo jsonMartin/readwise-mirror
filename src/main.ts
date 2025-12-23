@@ -109,7 +109,7 @@ export default class ReadwiseMirror extends Plugin {
    */
   async loadAndApplySettings() {
     this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData()) };
-    this.applySettings();
+    await this.applySettings();
   }
 
   /**
@@ -118,13 +118,13 @@ export default class ReadwiseMirror extends Plugin {
    */
   private async saveAndApplySettings() {
     await this.saveData(this.settings);
-    this.applySettings();
+    await this.applySettings();
   }
 
   /**
    * Applies the logger mode, and header and highlight templates from the current settings to the plugin instance.
    */
-  private applySettings() {
+  private async applySettings() {
     // Set logger debug mode
     this.logger.setDebugMode(this.settings.debugMode);
     try {
@@ -144,8 +144,8 @@ export default class ReadwiseMirror extends Plugin {
       this.notify.notice('Readwise: Error setting highlight template. Check console for details.');
     }
 
-    // Re-initiatlie the ReadwiseController instance
-    ReadwiseController.initialize(this, this.ctx);
+    // Re-initialize the ReadwiseController instance
+    await ReadwiseController.initialize(this, this.ctx);
   }
 
   /**
