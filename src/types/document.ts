@@ -19,7 +19,7 @@ interface ReadwiseNote {
 
 export interface BaseFile extends ReadwiseNote {
   type: 'base';
-  primary: TFile | string; // The primary TFile in case of duplicates
+  primary: TFile | string; // The primary file (TFile object or file path string) in case of duplicates
   duplicates?: TFile[]; // Array of duplicate TFiles
   atoms?: Atom[]; // Optional array of atoms if the file is atomized
 }
