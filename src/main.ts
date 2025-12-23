@@ -56,13 +56,20 @@ export default class ReadwiseMirror extends Plugin {
     return ctx;
   }
 
-  async onload() {
+  public async onload() {
     // Move UI setup to onLayoutReady
     this.app.workspace.onLayoutReady(async () => {
+      await this.lock.acquire('readwise-mirror:loaded');
       const statusBarItem = this.addStatusBarItem();
       this.notify = new Notify(statusBarItem);
       await this.initializeUI();
     });
+  }
+
+  public onunload(): void {
+    this.logger.debug('Readwise Mirror plugin unloaded.');
+    this.lock.release('readwise-mirror:loaded');
+    super.onunload();
   }
 
   private async initializeUI() {
@@ -109,6 +116,7 @@ export default class ReadwiseMirror extends Plugin {
 
   // Reload settings after external change (e.g. after sync)
   async onExternalSettingsChange() {
+    this.logger.debug('External settings change detected, reloading settings...');
     await this.loadAndApplySettings();
   }
 
@@ -118,7 +126,10 @@ export default class ReadwiseMirror extends Plugin {
    */
   async loadAndApplySettings() {
     this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData()) };
-    await this.applySettings();
+    if (this.lock.isAcquired('readwise-mirror:loaded')) {
+      // Only apply settings if plugin is loaded
+      await this.applySettings();
+    }
   }
 
   /**
