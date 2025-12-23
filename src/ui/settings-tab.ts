@@ -1476,7 +1476,6 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           } else {
             this.ctx.settings.headerTemplate = value;
           }
-          this.ctx.plugin.headerTemplate = this.ctx.settings.headerTemplate;
           await this.ctx.saveSettings();
         });
 
@@ -1536,8 +1535,6 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           } else {
             this.ctx.settings.highlightTemplate = value;
           }
-
-          this.ctx.plugin.highlightTemplate = this.ctx.settings.highlightTemplate;
           await this.ctx.saveSettings();
         });
 

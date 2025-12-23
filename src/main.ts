@@ -73,21 +73,117 @@ export default class ReadwiseMirror extends Plugin {
     this._readwiseApi = api;
   }
 
-  set headerTemplate(template: string) {
+  async onload() {
+    await this.loadAndApplySettings();
+
+    // Initialize logger with debug mode from settings
+    this._logger = new Logger(this.settings.debugMode || false);
+
+    // Move UI setup to onLayoutReady
+    this.app.workspace.onLayoutReady(async () => {
+      await this.initializeUI();
+    });
+  }
+
+  private async initializeUI() {
+    const statusBarItem = this.addStatusBarItem();
+
+    this.notify = new Notify(statusBarItem);
+
+    // Create plugin context for dependency injection
+    const context: PluginContext = {
+      // TODO: refactor
+      plugin: this,
+      settings: this.settings,
+      app: this.app,
+      api: this.readwiseApi,
+      logger: this.logger,
+      notify: this.notify,
+      saveSettings: this.saveAndApplySettings.bind(this),
+    };
+
+    this.frontmatterManager = new FrontmatterManager(context, this._env, this.app.fileManager);
+    this.deduplicatingVaultWriter = new DeduplicatingVaultWriter(context, this.frontmatterManager);
+
+    if (!this.settings.apiToken) {
+      this.notify.notice('Readwise: API Token not detected\nPlease enter in configuration page');
+      this.notify.setStatusBarText('Readwise: API Token Required');
+    } else {
+      this.logger.info('Validating Readwise token ...');
+      this.readwiseApi = await ReadwiseApi.create(this.settings.apiToken, context);
+
+      //Update status bar with last sync time
+      if (this.settings.lastUpdated)
+        this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`);
+      else this.notify.setStatusBarText('Readwise: Click to Sync');
+    }
+
+    // Register all commands and run startup commands
+    this.commandManager = new ReadwiseCommandManager(context);
+    this.commandManager.registerCommands();
+    this.commandManager.registerEvents();
+    this.commandManager.runStartupCommands();
+
+    // Update status bar every second if synced
+    this.registerInterval(
+      window.setInterval(() => {
+        if (/Synced/.test(this.notify.getStatusBarText())) {
+          this.notify.setStatusBarText(`Readwise: Synced ${this.lastUpdatedHumanReadableFormat()}`);
+        }
+      }, 1000)
+    );
+
+    this.addSettingTab(new ReadwiseMirrorSettingTab(this, context, this._env));
+  }
+
+  // Reload settings after external change (e.g. after sync)
+  async onExternalSettingsChange() {
+    this.logger.info('Reloading settings due to external change');
+    await this.loadAndApplySettings();
+    if (this.settings.lastUpdated)
+      this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`);
+    if (!this.settings.apiToken) {
+      this.notify.notice('Readwise: API Token not detected\nPlease enter in configuration page');
+      this.notify.setStatusBarText('Readwise: API Token Required');
+      this.readwiseApi = null; // Invalidate the API instance
+    } else {
+      this.readwiseApi?.setToken(this.settings.apiToken);
+    }
+  }
+
+  /**
+   * Loads settings from disk and applies them to the plugin instance.
+   * In particular, this updates the header and highlight templates.
+   */
+  async loadAndApplySettings() {
+    this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData()) };
+    this.applyTemplateSettings();
+  }
+
+  /**
+   * Saves the current settings to disk and applies them to the plugin instance.
+   * In particular, this updates the header and highlight templates.
+   */
+  private async saveAndApplySettings() {
+    this.applyTemplateSettings();
+    await this.saveData(this.settings);
+  }
+
+  /**
+   * Applies the header and highlight templates from the current settings to the plugin instance.
+   */
+  private applyTemplateSettings() {
     try {
       // Update and try to compile
-      this._loader.setSource('header', template);
+      this._loader.setSource('header', this.settings.headerTemplate);
       this.env.getTemplate('header', true);
     } catch (error) {
       this.logger.error('Error setting header template:', error);
       this.notify.notice('Readwise: Error setting header template. Check console for details.');
     }
-  }
-
-  set highlightTemplate(template: string) {
     try {
       // Update and try to compile
-      this._loader.setSource('highlight', template);
+      this._loader.setSource('highlight', this.settings.highlightTemplate);
       this.env.getTemplate('highlight', true);
     } catch (error) {
       this.logger.error('Error setting highlight template:', error);
@@ -590,7 +686,7 @@ export default class ReadwiseMirror extends Plugin {
 
   async deleteLibrary() {
     this.settings.lastUpdated = null;
-    await this.saveSettings();
+    await this.saveAndApplySettings();
 
     if (await this.deleteLibraryFolder()) {
       if (this.settings.syncNotifications) this.notify.notice('Readwise: library folder deleted');
@@ -669,95 +765,5 @@ export default class ReadwiseMirror extends Plugin {
       }
     }
     return false;
-  }
-
-  // Reload settings after external change (e.g. after sync)
-  async onExternalSettingsChange() {
-    this.logger.info('Reloading settings due to external change');
-    await this.loadSettings();
-    if (this.settings.lastUpdated)
-      this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`);
-    if (!this.settings.apiToken) {
-      this.notify.notice('Readwise: API Token not detected\nPlease enter in configuration page');
-      this.notify.setStatusBarText('Readwise: API Token Required');
-      this.readwiseApi = null; // Invalidate the API instance
-    } else {
-      this.readwiseApi?.setToken(this.settings.apiToken);
-    }
-  }
-
-  async onload() {
-    await this.loadSettings();
-
-    // Initialize logger with debug mode from settings
-    this._logger = new Logger(this.settings.debugMode || false);
-
-    // Move UI setup to onLayoutReady
-    this.app.workspace.onLayoutReady(async () => {
-      await this.initializeUI();
-    });
-  }
-
-  private async initializeUI() {
-    const statusBarItem = this.addStatusBarItem();
-
-    this.notify = new Notify(statusBarItem);
-
-    // Create plugin context for dependency injection
-    const context: PluginContext = {
-      // TODO: refactor
-      plugin: this,
-      settings: this.settings,
-      app: this.app,
-      api: this.readwiseApi,
-      logger: this.logger,
-      notify: this.notify,
-      saveSettings: this.saveSettings.bind(this),
-    };
-
-    this.frontmatterManager = new FrontmatterManager(context, this._env, this.app.fileManager);
-
-    this.headerTemplate = this.settings.headerTemplate;
-    this.highlightTemplate = this.settings.highlightTemplate;
-
-    this.deduplicatingVaultWriter = new DeduplicatingVaultWriter(context, this.frontmatterManager);
-
-    if (!this.settings.apiToken) {
-      this.notify.notice('Readwise: API Token not detected\nPlease enter in configuration page');
-      this.notify.setStatusBarText('Readwise: API Token Required');
-    } else {
-      this.logger.info('Validating Readwise token ...');
-      this.readwiseApi = await ReadwiseApi.create(this.settings.apiToken, context);
-
-      //Update status bar with last sync time
-      if (this.settings.lastUpdated)
-        this.notify.setStatusBarText(`Readwise: Updated ${this.lastUpdatedHumanReadableFormat()}`);
-      else this.notify.setStatusBarText('Readwise: Click to Sync');
-    }
-
-    // Register all commands and run startup commands
-    this.commandManager = new ReadwiseCommandManager(context);
-    this.commandManager.registerCommands();
-    this.commandManager.registerEvents();
-    this.commandManager.runStartupCommands();
-
-    // Update status bar every second if synced
-    this.registerInterval(
-      window.setInterval(() => {
-        if (/Synced/.test(this.notify.getStatusBarText())) {
-          this.notify.setStatusBarText(`Readwise: Synced ${this.lastUpdatedHumanReadableFormat()}`);
-        }
-      }, 1000)
-    );
-
-    this.addSettingTab(new ReadwiseMirrorSettingTab(this, context, this._env));
-  }
-
-  async loadSettings() {
-    this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData()) };
-  }
-
-  private async saveSettings() {
-    await this.saveData(this.settings);
   }
 }
