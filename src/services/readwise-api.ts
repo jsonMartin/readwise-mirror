@@ -1,6 +1,6 @@
 import { type RequestUrlResponse, requestUrl } from 'obsidian';
 import type { Export, Library } from 'types/library';
-import type { PluginContext } from './plugin-context';
+import type { PluginContext } from '../types/plugin-context';
 
 const API_ENDPOINT = 'https://readwise.io/api/v2';
 const API_PAGE_SIZE = 1000; // number of results per page, default 100 / max 1000

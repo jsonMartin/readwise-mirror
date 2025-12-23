@@ -8,8 +8,8 @@ import {
   Setting,
   type TextComponent,
 } from 'obsidian';
-import type { PluginContext } from 'services/plugin-context';
 import ReadwiseApi, { TokenValidationError } from 'services/readwise-api';
+import type { PluginContext } from 'types/plugin-context';
 import type { TemplateValidationResult } from 'types/utilities';
 import { WarningDialog } from 'ui/dialog';
 import { sanitizeFrontmatterTemplate, validateFrontmatterTemplate } from 'utils/frontmatter-utils';

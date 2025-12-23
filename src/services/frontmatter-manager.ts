@@ -2,8 +2,8 @@ import { EMPTY_FRONTMATTER, FRONTMATTER_TO_ESCAPE, READWISE_URI_FIELD } from 'co
 import { type Environment, Template } from 'nunjucks';
 import { type FileManager, parseYaml, type TFile } from 'obsidian';
 import { Frontmatter, FrontmatterError } from 'services/frontmatter';
-import type { PluginContext } from 'services/plugin-context';
 import type { AtomicFile, BaseFile, ReadwiseDocument } from 'types/document';
+import type { PluginContext } from 'types/plugin-context';
 import { escapeMetadata } from 'utils/frontmatter-utils';
 
 export class FrontmatterManager {

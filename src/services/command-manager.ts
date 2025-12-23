@@ -6,7 +6,7 @@ import type { Library } from 'types/library';
 import type { TTrackedFile } from 'types/readwise-note';
 import { ConfirmDialog } from 'ui/dialog';
 import { isInReadwiseLibrary, isTrackedReadwiseNote } from 'utils/tracking-utils';
-import type { PluginContext } from './plugin-context';
+import type { PluginContext } from '../types/plugin-context';
 
 /**
  * Manages command registration for the Readwise Mirror plugin

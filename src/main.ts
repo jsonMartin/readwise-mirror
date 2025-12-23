@@ -9,12 +9,12 @@ import { Frontmatter } from 'services/frontmatter';
 import { FrontmatterManager } from 'services/frontmatter-manager';
 // Plugin classes
 import Logger from 'services/logger';
-import type { PluginContext } from 'services/plugin-context';
 import ReadwiseApi from 'services/readwise-api';
 import { ReadwiseEnvironment, ReadwiseLoader } from 'services/readwise-environment';
 import spacetime from 'spacetime';
 import type { BaseFile, ReadwiseDocument } from 'types/document';
 import type { Export, Highlight, Library, Tag } from 'types/library';
+import type { PluginContext } from 'types/plugin-context';
 import type { PluginSettings } from 'types/settings';
 // Types
 import Notify from 'ui/notify';

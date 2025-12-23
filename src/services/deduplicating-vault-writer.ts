@@ -1,8 +1,8 @@
 import md5 from 'md5'; // Fix imports
 import { getFrontMatterInfo, normalizePath, TFile, type Vault } from 'obsidian';
 import type { FrontmatterManager } from 'services/frontmatter-manager';
-import type { PluginContext } from 'services/plugin-context';
 import type { AtomicFile, BaseFile, ReadwiseDocument } from 'types/document';
+import type { PluginContext } from 'types/plugin-context';
 import { isInReadwiseLibrary, isTrackedReadwiseNote } from 'utils/tracking-utils';
 import type { Frontmatter } from './frontmatter';
 
