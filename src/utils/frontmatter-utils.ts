@@ -85,7 +85,19 @@ function analyzeString(value: string): YamlStringState {
  */
 function isStringEscaped(value: string): boolean {
   if (value.length <= 1) return false;
-  return (value.startsWith("'") && value.endsWith("'")) || (value.startsWith('"') && value.endsWith('"'));
+
+  // Matching edge quotes alone can misclassify raw content as pre-escaped YAML.
+  if (value.startsWith('"') && value.endsWith('"')) {
+    const inner = value.slice(1, -1);
+    return !/(?<!\\)"/.test(inner);
+  }
+
+  if (value.startsWith("'") && value.endsWith("'")) {
+    const inner = value.slice(1, -1);
+    return !inner.replaceAll("''", '').includes("'");
+  }
+
+  return false;
 }
 
 /**
