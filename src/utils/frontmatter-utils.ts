@@ -89,12 +89,29 @@ function isStringEscaped(value: string): boolean {
   // Matching edge quotes alone can misclassify raw content as pre-escaped YAML.
   if (value.startsWith('"') && value.endsWith('"')) {
     const inner = value.slice(1, -1);
-    return !/(?<!\\)"/.test(inner);
+    return !hasUnescapedDoubleQuote(inner);
   }
 
   if (value.startsWith("'") && value.endsWith("'")) {
     const inner = value.slice(1, -1);
     return !inner.replaceAll("''", '').includes("'");
+  }
+
+  return false;
+}
+
+function hasUnescapedDoubleQuote(value: string): boolean {
+  for (let i = 0; i < value.length; i++) {
+    if (value[i] !== '"') continue;
+
+    let backslashCount = 0;
+    for (let j = i - 1; j >= 0 && value[j] === '\\'; j--) {
+      backslashCount++;
+    }
+
+    if (backslashCount % 2 === 0) {
+      return true;
+    }
   }
 
   return false;
