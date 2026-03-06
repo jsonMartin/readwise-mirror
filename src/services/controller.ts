@@ -69,7 +69,7 @@ export class Controller {
       let library: Library;
       if (!this.ctx.settings.lastUpdated) {
         if (this.ctx.settings.syncNotifications)
-          this.ctx.notice('Readwise: Previous sync not detected...\nDownloading full Readwise library');
+          this.ctx.notice('Readwise: Downloading full Readwise library');
         if (!(await Controller.validateAPIInstance())) {
           this.ctx.notice('Readwise: Network connection and valid API Token required');
           return;
