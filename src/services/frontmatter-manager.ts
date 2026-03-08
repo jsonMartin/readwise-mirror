@@ -1,10 +1,9 @@
-import { EMPTY_FRONTMATTER, FRONTMATTER_TO_ESCAPE, READWISE_URI_FIELD } from 'constants/index';
-import { Template } from 'nunjucks';
+import { EMPTY_FRONTMATTER, READWISE_URI_FIELD } from 'constants/index';
 import { type FileManager, parseYaml, type TFile } from 'obsidian';
 import { Frontmatter, FrontmatterError } from 'services/frontmatter';
+import { renderFrontmatterTemplate } from 'services/template-rendering';
 import type { AtomicFile, BaseFile, ReadwiseDocument } from 'types/document';
 import type { PluginContext } from 'types/plugin-context';
-import { escapeMetadata } from 'utils/frontmatter-utils';
 import type { ReadwiseEnvironment } from './readwise-environment';
 
 export class FrontmatterManager {
@@ -112,11 +111,7 @@ export class FrontmatterManager {
       this.logger.debug(`Processing merged frontmatter template\n${frontmatterTemplate}`);
 
       // Render and parse the template into YAML
-      const template = new Template(frontmatterTemplate, this.env, null, true);
-      const renderedTemplate = template
-        .render(escapeMetadata(metadata, FRONTMATTER_TO_ESCAPE))
-        .replaceAll(Frontmatter.DELIMITER, '')
-        .trim();
+      const renderedTemplate = renderFrontmatterTemplate(frontmatterTemplate, this.env, metadata);
 
       const yaml = parseYaml(renderedTemplate);
       return new Frontmatter(yaml);

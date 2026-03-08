@@ -4,6 +4,7 @@ import { type ConfigureOptions, Environment, type ILoader, type ILoaderAny, Load
 import { moment, stringifyYaml } from 'obsidian';
 import type { Atom } from 'types/document';
 import { AtomizeExtension } from './atomizer';
+import { registerCoreTemplateFilters } from './template-rendering';
 
 /**
  * Template name to source mapping for ReadwiseLoader
@@ -54,6 +55,8 @@ export class ReadwiseEnvironment extends Environment {
    * Initialize custom filters for the Readwise environment
    */
   private setupFilters(): void {
+    registerCoreTemplateFilters(this, (date, format) => moment(date).format(format));
+
     // Convert newlines to blockquotes
     this.addFilter('bq', (str: string) => {
       if (typeof str !== 'string') return str;
@@ -73,30 +76,6 @@ export class ReadwiseEnvironment extends Environment {
     this.addFilter('qa', (str: string) => {
       if (typeof str !== 'string') return str;
       return str.replace(/\.qa(.*)\?(.*)/g, '**Q:**$1?\r\n\r\n**A:**$2');
-    });
-
-    // Add a date filter
-    this.addFilter('date', (date: moment.MomentInput, format: string) => {
-      return moment(date).format(format);
-    });
-
-    // Add a filter to normalize author names by removing titles like dr. prof. etc.
-    this.addFilter('normalize_author', (author: string | string[]) => {
-      const normalize = (a: string) =>
-        a
-          .replace(/\b(dr|drs|prof|professor|sir|lord|lady|dame|ms|miss|mrs|mr|mx|lt|col)\b\.?/gi, '')
-          .replace(/\s+/g, ' ')
-          .trim();
-
-      if (typeof author === 'string') {
-        return normalize(author);
-      }
-
-      if (Array.isArray(author)) {
-        return author.map(normalize);
-      }
-
-      return author;
     });
 
     // biome-ignore lint/suspicious/noExplicitAny: stringifyYaml is accepting `any`

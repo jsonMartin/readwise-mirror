@@ -417,10 +417,8 @@ export class DeduplicatingVaultWriter {
     await this.vault.process(
       existingFile,
       (data) => {
-        // readwiseFile.contents
         const fmi = getFrontMatterInfo(data);
         if (fmi?.exists) {
-          // Return unchanged frontmatter + new contents
           return `${data.slice(0, fmi.contentStart)}\n${fileContents}`;
         }
         return data;

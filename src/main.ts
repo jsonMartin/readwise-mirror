@@ -1,6 +1,6 @@
 // Plugin classes
 import { Lock } from 'async-await-mutex-lock';
-import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS, NUNJUCKS_CORE_TEMPLATE } from 'constants/index';
+import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS } from 'constants/index';
 import { type App, type CachedMetadata, normalizePath, Plugin, type PluginManifest, TFile } from 'obsidian';
 import { Atomizer } from 'services/atomizer';
 import { CommandManager } from 'services/command-manager';
@@ -10,6 +10,13 @@ import { Frontmatter } from 'services/frontmatter';
 import { FrontmatterManager } from 'services/frontmatter-manager';
 import Logger from 'services/logger';
 import { ReadwiseEnvironment, ReadwiseLoader } from 'services/readwise-environment';
+import {
+  filterHighlights,
+  formatDate,
+  formatTags,
+  renderMarkdownTemplate,
+  sortHighlights,
+} from 'services/template-rendering';
 import spacetime from 'spacetime';
 import type { BaseFile, ReadwiseDocument } from 'types/document';
 import type { Export, Highlight, Library, Tag } from 'types/library';
@@ -201,100 +208,6 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   /**
-   * Formats tags for use in a template
-   * @param tags - The tags to format
-   * @param nohash - Whether to remove the hash from the tag name
-   * @param q - The quote character to use
-   * @returns The formatted tags
-   */
-  private formatTags(tags: Tag[], nohash = false, q = '') {
-    // use unique list of tags
-    const uniqueTags = [...new Set(tags.map((tag) => tag.name.replace(/\s/, '-')))];
-
-    if (nohash === true) {
-      // don't return a hash in the tag name
-      return uniqueTags.map((tag) => `${q}${tag}${q}`).join(', ');
-    }
-    return uniqueTags.map((tag) => `${q}#${tag}${q}`).join(', ');
-  }
-
-  /**
-   * Formats a highlight for use in a template
-   * @param highlight - The highlight to format
-   * @param book - The book the highlight belongs to
-   * @returns The highlight object for the template
-   */
-  private formatHighlight(highlight: Highlight, book: Export) {
-    const {
-      id,
-      text,
-      note,
-      location,
-      color,
-      url,
-      readwise_url,
-      tags,
-      highlighted_at,
-      created_at,
-      updated_at,
-      is_deleted,
-      is_discard,
-      is_favorite,
-      location_type,
-    } = highlight;
-
-    const location_url =
-      book.asin && location ? `https://readwise.io/to_kindle?action=open&asin=${book.asin}&location=${location}` : null;
-
-    const formattedTags = tags.filter((tag: Tag) => tag.name !== color);
-    const formattedTagStr = this.formatTags(formattedTags);
-
-    return {
-      // Highlight fields
-      book_id: book.user_book_id,
-      id,
-      text,
-      note,
-      location,
-      location_type,
-      location_url,
-      is_deleted,
-      is_discard,
-      is_favorite,
-      url, // URL is set for source of highlight (webpage, tweet, etc). null for books
-      readwise_url,
-      color,
-      created_at: created_at ? this.formatDate(created_at) : '',
-      updated_at: updated_at ? this.formatDate(updated_at) : '',
-      highlighted_at: highlighted_at ? this.formatDate(highlighted_at) : '',
-      tags: formattedTagStr,
-
-      // Book fields
-      category: book.category,
-    };
-  }
-
-  private filterHighlights(highlights: Highlight[]) {
-    return highlights.filter((highlight: Highlight) => {
-      if (this.settings.syncNotesOnly && !highlight.note) return false;
-
-      // Check if is deleted
-      if (highlight.is_deleted) {
-        this.logger.debug('Found deleted highlight, removing', highlight);
-        return false;
-      }
-
-      // Check if is discarded
-      if (this.settings.highlightDiscard && highlight.is_discard) {
-        this.logger.debug('Found discarded highlight, removing', highlight);
-        return false;
-      }
-
-      return true;
-    });
-  }
-
-  /**
    * Parses a string of authors into an array of individual authors
    * @param authorString The input string containing one or more authors
    * @returns Array of individual author names
@@ -315,34 +228,12 @@ export default class ReadwiseMirror extends Plugin {
       });
   }
 
-  private formatDate(dateStr: string) {
-    return dateStr.split('T')[0];
-  }
-
-  private sortHighlights = (highlights: Highlight[]) => {
-    let sortedHighlights = highlights.slice();
-
-    if (this.settings.highlightSortByLocation) {
-      sortedHighlights = sortedHighlights.sort((highlightA: Highlight, highlightB: Highlight) => {
-        if (highlightA.location < highlightB.location) return -1;
-        if (highlightA.location > highlightB.location) return 1;
-        return 0;
-      });
-
-      if (!this.settings.highlightSortOldestToNewest) sortedHighlights = sortedHighlights.reverse();
-    } else {
-      sortedHighlights = this.settings.highlightSortOldestToNewest ? sortedHighlights.reverse() : sortedHighlights;
-    }
-
-    return sortedHighlights;
-  };
-
   private getTagsFromHighlights(highlights: Highlight[]) {
     // extract all tags from all Highlights and
     // construct an array with unique values
 
     let tags: Tag[] = [];
-    for (const highlight of this.sortHighlights(highlights)) {
+    for (const highlight of sortHighlights(highlights, this.settings)) {
       if (highlight.tags) tags = [...tags, ...highlight.tags];
     }
     return tags;
@@ -467,7 +358,7 @@ export default class ReadwiseMirror extends Plugin {
       const basename = this.getFileNameFromDoc(book);
 
       // Filter highlights
-      const filteredHighlights = this.filterHighlights(highlights);
+      const filteredHighlights = filterHighlights(highlights, this.settings);
 
       // Get highlight count from filtered highlights
       const num_highlights = filteredHighlights.length;
@@ -501,15 +392,15 @@ export default class ReadwiseMirror extends Plugin {
         summary,
         category,
         num_highlights,
-        created: created ? this.formatDate(created) : '',
-        updated: updated ? this.formatDate(updated) : '',
+        created: created ? formatDate(created) : '',
+        updated: updated ? formatDate(updated) : '',
         cover_image_url: cover_image_url.replace('SL200', 'SL500').replace('SY160', 'SY500'),
         highlights,
-        last_highlight_at: last_highlight_at ? this.formatDate(last_highlight_at) : '',
-        tags: this.formatTags(book_tags),
-        highlight_tags: this.formatTags(highlightTags),
-        tags_nohash: this.formatTags(book_tags, true, "'"),
-        hl_tags_nohash: this.formatTags(highlightTags, true, "'"),
+        last_highlight_at: last_highlight_at ? formatDate(last_highlight_at) : '',
+        tags: formatTags(book_tags),
+        highlight_tags: formatTags(highlightTags),
+        tags_nohash: formatTags(book_tags, true, "'"),
+        hl_tags_nohash: formatTags(highlightTags, true, "'"),
       };
 
       // Get the primary path for new file before checking for duplicates
@@ -588,14 +479,13 @@ export default class ReadwiseMirror extends Plugin {
       // Determine if we should atomize this file
       const shouldAtomize = this.shouldAtomize(frontmatter);
       // Render header, and highlights by rendering the core template
-      this.loader.setSource('file', NUNJUCKS_CORE_TEMPLATE);
-      const _contents = this.env.render('file', {
-        // We pass the doc (current Readwise document) and book (Export) for access to all fields
+      const _contents = renderMarkdownTemplate(this.env, this.loader, {
         doc,
         book,
-        highlights: this.sortHighlights(filteredHighlights).map((hl) => this.formatHighlight(hl, book)),
+        highlights: filteredHighlights,
         headerTemplate: 'header',
         highlightTemplate: 'highlight',
+        settings: this.settings,
       });
 
       _contents;
