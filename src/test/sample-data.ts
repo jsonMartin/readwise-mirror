@@ -27,7 +27,7 @@ export const sampleMetadata: ReadwiseDocument = {
   readwise_url: 'https://readwise.io/bookreview/12345',
   unique_url: 'https://unique.com/[brackets]',
   source_url: 'https://test.com/path?q=special chars: & +',
-  title: "My Book:\nA Subtitle's Journey",
+  title: "'My Book':\nA Subtitle's \\\"Journey",
   sanitized_title: "My Book - A Subtitle's Journey",
   author: ["Tim O'Reilly", '"Doc" Smith', 'Homer Simpson'],
   authorStr: '[[Tim O\'Reilly]], [["Doc" Smith]] and [["Homer Simpson"]]',
