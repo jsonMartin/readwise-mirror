@@ -1,18 +1,26 @@
 import { EMPTY_FRONTMATTER, FRONTMATTER_TO_ESCAPE, READWISE_URI_FIELD } from 'constants/index';
-import { type Environment, Template } from 'nunjucks';
+import { Template } from 'nunjucks';
 import { type FileManager, parseYaml, type TFile } from 'obsidian';
 import { Frontmatter, FrontmatterError } from 'services/frontmatter';
-import type Logger from 'services/logger';
-import type { AtomicFile, BaseFile, PluginSettings, ReadwiseDocument } from 'types';
+import type { AtomicFile, BaseFile, ReadwiseDocument } from 'types/document';
+import type { PluginContext } from 'types/plugin-context';
 import { escapeMetadata } from 'utils/frontmatter-utils';
+import type { ReadwiseEnvironment } from './readwise-environment';
 
 export class FrontmatterManager {
   constructor(
-    private readonly settings: PluginSettings,
-    private readonly logger: Logger,
-    private readonly env: Environment,
+    private readonly ctx: PluginContext,
+    private readonly env: ReadwiseEnvironment,
     private readonly fm: FileManager
   ) {}
+
+  get logger() {
+    return this.ctx.logger;
+  }
+
+  get settings() {
+    return this.ctx.settings;
+  }
 
   /**
    * Get updated and merged frontmatter based on a document's existing frontmatter
@@ -114,6 +122,7 @@ export class FrontmatterManager {
       return new Frontmatter(yaml);
     } catch (error) {
       if (error instanceof Error) {
+        this.logger.debug('Rendered frontmatter template failed:', (error as Error).stack);
         this.logger.error('Error processing frontmatter template:', error.message);
         throw new FrontmatterError(`Failed to process frontmatter: ${error.message}`, error);
       }
@@ -129,7 +138,7 @@ export class FrontmatterManager {
   public filterProtectedFrontmatter(updates: Frontmatter): Frontmatter {
     const protectedFields = this.settings.protectedFields
       .split('\n')
-      .map((f) => f.trim())
+      .map((f: string) => f.trim())
       .filter(Boolean);
 
     // Using static methods from Frontmatter class

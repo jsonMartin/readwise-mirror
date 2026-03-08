@@ -1,7 +1,6 @@
 import { DEFAULT_SETTINGS } from 'constants/index';
 import type ReadwiseMirror from 'main';
 import {
-  type App,
   type ButtonComponent,
   Modal,
   PluginSettingTab,
@@ -10,10 +9,12 @@ import {
   Setting,
   type TextComponent,
 } from 'obsidian';
-import ReadwiseApi, { TokenValidationError } from 'services/readwise-api';
-import type { TemplateValidationResult } from 'types';
+import { Controller } from 'services/controller';
+import { TokenValidationError } from 'services/readwise-api';
+import type { ReadwiseEnvironment } from 'services/readwise-environment';
+import type { PluginContext } from 'types/plugin-context';
+import type { TemplateValidationResult } from 'types/utilities';
 import { WarningDialog } from 'ui/dialog';
-import type Notify from 'ui/notify';
 import { sanitizeFrontmatterTemplate, validateFrontmatterTemplate } from 'utils/frontmatter-utils';
 
 interface SettingsTab {
@@ -26,13 +27,12 @@ interface SettingsTab {
 class TabView {
   private static lastActiveTab: string;
   private activeTab: string;
-  private tabs: SettingsTab[];
-  private containerEl: HTMLElement;
   private tabContent: HTMLElement;
 
-  constructor(containerEl: HTMLElement, tabs: SettingsTab[]) {
-    this.containerEl = containerEl;
-    this.tabs = tabs;
+  constructor(
+    private containerEl: HTMLElement,
+    private tabs: SettingsTab[]
+  ) {
     // Use the last active tab if it exists and is valid, otherwise use first tab
     this.activeTab =
       TabView.lastActiveTab && tabs.some((t) => t.id === TabView.lastActiveTab) ? TabView.lastActiveTab : tabs[0].id;
@@ -91,23 +91,17 @@ class TabView {
 }
 
 export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
-  private plugin: ReadwiseMirror;
-  private notify: Notify;
-
   private tokenValidationMessage: HTMLElement;
   private retrievalButton: ButtonComponent;
   private tokenValue: TextComponent;
   private validationButton: ButtonComponent;
 
-  // Add logger reference
-  private get logger() {
-    return this.plugin.logger;
-  }
-
-  constructor(app: App, plugin: ReadwiseMirror, notify: Notify) {
-    super(app, plugin);
-    this.plugin = plugin;
-    this.notify = notify;
+  constructor(
+    plugin: ReadwiseMirror,
+    private ctx: PluginContext,
+    private readonly env: ReadwiseEnvironment
+  ) {
+    super(ctx.app, plugin);
   }
 
   /**
@@ -165,21 +159,19 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       if (response.status === 200) {
         data = await response.json;
         if (data.userAccessToken) {
-          this.logger.info('Token successfully retrieved');
-          this.plugin.settings.apiToken = data.userAccessToken as string;
-          if (this.plugin.readwiseApi) this.plugin.readwiseApi.setToken(data?.userAccessToken as string);
-          else this.plugin.readwiseApi = new ReadwiseApi(data?.userAccessToken as string, this.notify, this.logger);
-          await this.plugin.saveSettings();
+          this.ctx.logger.debug('Token successfully retrieved');
+          this.ctx.settings.apiToken = data.userAccessToken as string;
+          await this.ctx.saveAndApplySettings();
           this.display(); // Refresh the settings page
           return true;
         }
       }
     } catch (e) {
-      this.logger.error('Failed to authenticate with Readwise:', e);
+      this.ctx.logger.error('Failed to authenticate with Readwise:', e);
     }
 
     if (attempt >= MAX_ATTEMPTS) {
-      this.notify.notice('Authentication timeout. Please try again.');
+      this.ctx.notice('Authentication timeout. Please try again.');
       return false;
     }
 
@@ -362,11 +354,11 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setName('Debug mode')
       .setDesc('Enable debug logging')
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.debugMode).onChange(async (value) => {
-          this.plugin.settings.debugMode = value;
-          this.plugin.logger.setDebugMode(value);
-          this.plugin.logger.warn('Debug mode:', value ? 'enabled' : 'disabled');
-          await this.plugin.saveSettings();
+        toggle.setValue(this.ctx.settings.debugMode).onChange(async (value) => {
+          this.ctx.settings.debugMode = value;
+          this.ctx.logger.setDebugMode(value);
+          this.ctx.logger.warn('Debug mode:', value ? 'enabled' : 'disabled');
+          await this.ctx.saveAndApplySettings();
         })
       );
   }
@@ -395,7 +387,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           fragment.createEl('br');
           fragment.append(this.tokenValidationMessage);
           // Show success or error message based on token validity
-          if (this.plugin.readwiseApi) {
+          if (Controller.validateAPIInstance()) {
             this.setTokenValidationStatus('running');
           } else {
             this.setTokenValidationStatus('error');
@@ -403,23 +395,18 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           this.updateAuthButtons('verifying');
 
           // Validate the token on load
-          if (this.plugin.readwiseApi) {
-            try {
-              hasValidToken =
-                this.plugin.readwiseApi.hasValidToken() || (await this.plugin.readwiseApi.validateToken());
 
-              if (hasValidToken) this.notify.setStatusBarText('Readwise: Click to Sync');
-              this.updateAuthButtons(hasValidToken ? 'valid' : 'invalid');
-              this.setTokenValidationStatus(hasValidToken ? 'success' : 'invalid');
-            } catch (error) {
-              this.updateAuthButtons('invalid');
-              if (error instanceof TokenValidationError) {
-                this.setTokenValidationStatus('error', error.message);
-              } else {
-                this.setTokenValidationStatus('error', 'Token validation error');
-              }
-            } finally {
-              this.setTokenValidationStatus('empty');
+          try {
+            hasValidToken = await Controller.validateAPIInstance();
+            if (hasValidToken) this.ctx.setStatusBarText('Readwise: Click to Sync');
+            this.updateAuthButtons(hasValidToken ? 'valid' : 'invalid');
+            this.setTokenValidationStatus(hasValidToken ? 'success' : 'invalid');
+          } catch (error) {
+            this.updateAuthButtons('invalid');
+            if (error instanceof TokenValidationError) {
+              this.setTokenValidationStatus('error', error.message);
+            } else {
+              this.setTokenValidationStatus('error', 'Token validation error');
             }
           }
         })
@@ -462,14 +449,14 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       })
       .addText((text) => {
         this.tokenValue = text;
-        const token = this.plugin.settings.apiToken;
+        const token = this.ctx.settings.apiToken;
 
         this.tokenValue.inputEl.type = 'password';
 
         this.tokenValue.setPlaceholder('API Token').setValue(token);
         this.tokenValue.onChange(() => {
           const value = this.tokenValue.inputEl.value;
-          if (value !== this.plugin.settings.apiToken) {
+          if (value !== this.ctx.settings.apiToken) {
             this.setTokenValidationStatus('empty');
             this.updateAuthButtons('invalid');
           }
@@ -493,35 +480,25 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           .onClick(async () => {
             const value = this.tokenValue.inputEl.value;
             if (value === '') {
-              // Invalidate API and cached auth state when token is cleared
-              this.plugin.readwiseApi = null;
-              this.plugin.settings.apiToken = value;
-              // If you have a cached "hasValidToken" flag, set it to false here
+              this.ctx.settings.apiToken = value;
               this.updateAuthButtons('empty');
               this.setTokenValidationStatus('empty');
-              await this.plugin.saveSettings();
-              this.notify.notice('Cleared token. Add or retrieve token to sync.');
-            } else if (value !== this.plugin.settings.apiToken) {
+              await this.ctx.saveAndApplySettings();
+              this.ctx.notice('Cleared token. Add or retrieve token to sync.');
+            } else if (value !== this.ctx.settings.apiToken) {
               this.updateAuthButtons('verifying');
-              this.plugin.settings.apiToken = value;
-              await this.plugin.saveSettings();
-              this.notify.notice('New token set.');
+              this.ctx.settings.apiToken = value;
+              await this.ctx.saveAndApplySettings();
+              this.ctx.notice('New token set.');
 
-              if (this.plugin.readwiseApi) {
-                this.plugin.readwiseApi.setToken(value);
-              } else {
-                this.plugin.readwiseApi = new ReadwiseApi(value, this.notify, this.logger);
+              try {
+                const hasValidToken = await Controller.validateAPIInstance();
+                this.updateAuthButtons(hasValidToken ? 'valid' : 'invalid');
+              } catch (error) {
+                this.ctx.notice('Failed to verify token:', error.message);
+                this.setTokenValidationStatus('invalid');
+                this.updateAuthButtons('invalid');
               }
-              await this.plugin.readwiseApi
-                .validateToken()
-                .then((isValid) => {
-                  this.updateAuthButtons(isValid ? 'valid' : 'invalid');
-                })
-                .catch(() => {
-                  this.notify.notice('Failed to verify token.');
-                  this.setTokenValidationStatus('invalid');
-                  this.updateAuthButtons('invalid');
-                });
             }
           });
         // Add fixed width class
@@ -539,11 +516,11 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .addText((text) =>
         text
           .setPlaceholder('Readwise')
-          .setValue(this.plugin.settings.baseFolderName)
+          .setValue(this.ctx.settings.baseFolderName)
           .onChange(async (value) => {
             if (!value) return;
-            this.plugin.settings.baseFolderName = value;
-            await this.plugin.saveSettings();
+            this.ctx.settings.baseFolderName = value;
+            await this.ctx.saveAndApplySettings();
           })
       );
 
@@ -552,16 +529,16 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setName('Filter by tag')
       .setDesc('Only sync readwise items with specific document tags')
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.filterNotesByTag).onChange(async (value) => {
-          this.plugin.settings.filterNotesByTag = value;
+        toggle.setValue(this.ctx.settings.filterNotesByTag).onChange(async (value) => {
+          this.ctx.settings.filterNotesByTag = value;
           // Trigger a refresh of the settings display to show/hide the tags input
-          await this.plugin.saveSettings();
+          await this.ctx.saveAndApplySettings();
           this.display();
         })
       );
 
     // Add tags input field (only visible when filterByTag is enabled)
-    if (this.plugin.settings.filterNotesByTag) {
+    if (this.ctx.settings.filterNotesByTag) {
       new Setting(containerEl)
         .setName('Tags to include')
         .setDesc(
@@ -570,13 +547,13 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         .addTextArea((text) => {
           text
             .setPlaceholder('tag1, tag2, tag3')
-            .setValue(this.plugin.settings.filteredTags.join(', '))
+            .setValue(this.ctx.settings.filteredTags.join(', '))
             .onChange(async (value) => {
-              this.plugin.settings.filteredTags = value
+              this.ctx.settings.filteredTags = value
                 .split(/[,;\n]/) // We are bit more generous with separation characters
                 .map((tag) => tag.trim())
                 .filter((tag) => tag !== '');
-              await this.plugin.saveSettings();
+              await this.ctx.saveAndApplySettings();
             });
 
           // Adjust the height of the text area
@@ -594,9 +571,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setName('Auto sync when starting')
       .setDesc('Automatically syncs new highlights after opening Obsidian')
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.autoSync).onChange(async (value) => {
-          this.plugin.settings.autoSync = value;
-          await this.plugin.saveSettings();
+        toggle.setValue(this.ctx.settings.autoSync).onChange(async (value) => {
+          this.ctx.settings.autoSync = value;
+          await this.ctx.saveAndApplySettings();
         })
       );
   }
@@ -618,7 +595,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             .setAttr('target', '_blank');
           fragment.appendText(' for details.');
 
-          if (!this.plugin.settings.trackFiles) {
+          if (!this.ctx.settings.trackFiles) {
             fragment.createEl('br');
             fragment.createEl('br');
             fragment.createSpan({
@@ -630,12 +607,15 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       )
       .addToggle((toggle) => {
         // Disable and turn off if tracking is disabled
-        if (!this.plugin.settings.trackFiles) {
+        if (!this.ctx.settings.trackFiles) {
           toggle.setValue(false);
           toggle.setDisabled(true);
-          this.plugin.settings.atomicHighlights = false;
+          if (this.ctx.settings.atomicHighlights) {
+            this.ctx.settings.atomicHighlights = false;
+            this.ctx.saveAndApplySettings(); // Fire and forget is acceptable here
+          }
         } else {
-          toggle.setValue(this.plugin.settings.atomicHighlights).onChange(async (value) => {
+          toggle.setValue(this.ctx.settings.atomicHighlights).onChange(async (value) => {
             if (value) {
               new WarningDialog(
                 this.app,
@@ -655,16 +635,16 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
                 }),
                 async (confirmed: boolean) => {
                   if (confirmed) {
-                    this.plugin.settings.atomicHighlights = true;
-                    await this.plugin.saveSettings();
+                    this.ctx.settings.atomicHighlights = true;
+                    await this.ctx.saveAndApplySettings();
                   } else {
                     toggle.setValue(false);
                   }
                 }
               ).open();
             } else {
-              this.plugin.settings.atomicHighlights = false;
-              await this.plugin.saveSettings();
+              this.ctx.settings.atomicHighlights = false;
+              await this.ctx.saveAndApplySettings();
             }
           });
         }
@@ -684,9 +664,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         })
       )
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.atomicConditionalAtomize).onChange(async (value) => {
-          this.plugin.settings.atomicConditionalAtomize = value;
-          await this.plugin.saveSettings();
+        toggle.setValue(this.ctx.settings.atomicConditionalAtomize).onChange(async (value) => {
+          this.ctx.settings.atomicConditionalAtomize = value;
+          await this.ctx.saveAndApplySettings();
         })
       );
 
@@ -697,10 +677,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .addText((text) =>
         text
           .setPlaceholder('rw-parent')
-          .setValue(this.plugin.settings.atomicParentProperty || 'rw-parent')
+          .setValue(this.ctx.settings.atomicParentProperty || 'rw-parent')
           .onChange(async (value) => {
-            this.plugin.settings.atomicParentProperty = value || 'rw-parent';
-            await this.plugin.saveSettings();
+            this.ctx.settings.atomicParentProperty = value || 'rw-parent';
+            await this.ctx.saveAndApplySettings();
           })
       );
 
@@ -712,9 +692,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         "Inherit the frontmatter from the parent note in atomic highlights. Frontmatter properties defined in atomize blocks will overwrite the parent note's frontmatter."
       )
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.atomicInheritParentFrontmatter).onChange(async (value) => {
-          this.plugin.settings.atomicInheritParentFrontmatter = value;
-          await this.plugin.saveSettings();
+        toggle.setValue(this.ctx.settings.atomicInheritParentFrontmatter).onChange(async (value) => {
+          this.ctx.settings.atomicInheritParentFrontmatter = value;
+          await this.ctx.saveAndApplySettings();
         })
       );
   }
@@ -728,9 +708,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         'If checked, highlights will be listed in order of Location. Combine with above Sort Highlights from Oldest to Newest option to reverse order.'
       )
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.highlightSortByLocation).onChange(async (value) => {
-          this.plugin.settings.highlightSortByLocation = value;
-          await this.plugin.saveSettings();
+        toggle.setValue(this.ctx.settings.highlightSortByLocation).onChange(async (value) => {
+          this.ctx.settings.highlightSortByLocation = value;
+          await this.ctx.saveAndApplySettings();
         })
       );
 
@@ -740,9 +720,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         'If checked, highlights will be listed from oldest to newest. Unchecked, newest highlights will appear first.'
       )
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.highlightSortOldestToNewest).onChange(async (value) => {
-          this.plugin.settings.highlightSortOldestToNewest = value;
-          await this.plugin.saveSettings();
+        toggle.setValue(this.ctx.settings.highlightSortOldestToNewest).onChange(async (value) => {
+          this.ctx.settings.highlightSortOldestToNewest = value;
+          await this.ctx.saveAndApplySettings();
         })
       );
 
@@ -752,9 +732,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         'If enabled, do not display discarded highlights in the Readwise library. (Deleted highlights will still be removed on sync)'
       )
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.highlightDiscard).onChange(async (value) => {
-          this.plugin.settings.highlightDiscard = value;
-          await this.plugin.saveSettings();
+        toggle.setValue(this.ctx.settings.highlightDiscard).onChange(async (value) => {
+          this.ctx.settings.highlightDiscard = value;
+          await this.ctx.saveAndApplySettings();
         })
       );
 
@@ -764,9 +744,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         'If checked, highlights will only be synced if they have a note. This makes it easier to use these notes for Zettelkasten.'
       )
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.syncNotesOnly).onChange(async (value) => {
-          this.plugin.settings.syncNotesOnly = value;
-          await this.plugin.saveSettings();
+        toggle.setValue(this.ctx.settings.syncNotesOnly).onChange(async (value) => {
+          this.ctx.settings.syncNotesOnly = value;
+          await this.ctx.saveAndApplySettings();
         })
       );
   }
@@ -790,7 +770,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         })
       )
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.trackFiles).onChange(async (value) => {
+        toggle.setValue(this.ctx.settings.trackFiles).onChange(async (value) => {
           if (!value) {
             new WarningDialog(
               this.app,
@@ -805,8 +785,8 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
               async (confirmed: boolean) => {
                 if (confirmed) {
-                  this.plugin.settings.trackFiles = false;
-                  await this.plugin.saveSettings();
+                  this.ctx.settings.trackFiles = false;
+                  await this.ctx.saveAndApplySettings();
                   this.display();
                 } else {
                   toggle.setValue(true);
@@ -814,22 +794,22 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               }
             ).open();
           } else {
-            this.plugin.settings.trackFiles = value;
-            await this.plugin.saveSettings();
+            this.ctx.settings.trackFiles = value;
+            await this.ctx.saveAndApplySettings();
             this.display();
           }
         })
       );
 
-    if (this.plugin.settings.trackFiles) {
+    if (this.ctx.settings.trackFiles) {
       new Setting(containerEl)
         .setClass('indent')
         .setName('Tracking property')
         .setDesc('Protected frontmatter property used to track the unique Readwise URL across syncs (default: uri).')
         .addText((text) =>
-          text.setValue(this.plugin.settings.trackingProperty).onChange(async (value) => {
-            this.plugin.settings.trackingProperty = value || 'uri';
-            await this.plugin.saveSettings();
+          text.setValue(this.ctx.settings.trackingProperty).onChange(async (value) => {
+            this.ctx.settings.trackingProperty = value || 'uri';
+            await this.ctx.saveAndApplySettings();
           })
         );
 
@@ -838,7 +818,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         .setName('Track across vault')
         .setDesc('Track, and update files across your entire vault, and not just inside the Readwise library folder.')
         .addToggle((toggle) =>
-          toggle.setValue(this.plugin.settings.trackAcrossVault).onChange(async (value) => {
+          toggle.setValue(this.ctx.settings.trackAcrossVault).onChange(async (value) => {
             if (!value) {
               new WarningDialog(
                 this.app,
@@ -852,8 +832,8 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
                 }),
                 async (confirmed: boolean) => {
                   if (confirmed) {
-                    this.plugin.settings.trackAcrossVault = false;
-                    await this.plugin.saveSettings();
+                    this.ctx.settings.trackAcrossVault = false;
+                    await this.ctx.saveAndApplySettings();
                     this.display();
                   } else {
                     toggle.setValue(true);
@@ -861,8 +841,8 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
                 }
               ).open();
             } else {
-              this.plugin.settings.trackAcrossVault = value;
-              await this.plugin.saveSettings();
+              this.ctx.settings.trackAcrossVault = value;
+              await this.ctx.saveAndApplySettings();
               this.display();
             }
           })
@@ -879,7 +859,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           })
         )
         .addToggle((toggle) =>
-          toggle.setValue(this.plugin.settings.deleteDuplicates).onChange(async (value) => {
+          toggle.setValue(this.ctx.settings.deleteDuplicates).onChange(async (value) => {
             if (value) {
               const modal = new Modal(this.app);
               modal.titleEl.setText('Warning');
@@ -907,15 +887,15 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               };
 
               confirmButton.onclick = async () => {
-                this.plugin.settings.deleteDuplicates = true;
-                await this.plugin.saveSettings();
+                this.ctx.settings.deleteDuplicates = true;
+                await this.ctx.saveAndApplySettings();
                 modal.close();
               };
 
               modal.open();
             } else {
-              this.plugin.settings.deleteDuplicates = false;
-              await this.plugin.saveSettings();
+              this.ctx.settings.deleteDuplicates = false;
+              await this.ctx.saveAndApplySettings();
             }
           })
         );
@@ -923,7 +903,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
   }
 
   private renderFilenameSettings(containerEl: HTMLElement): void {
-    if (this.plugin.settings.trackFiles) {
+    if (this.ctx.settings.trackFiles) {
       new Setting(containerEl).setName('Filename updates and filename templates').setHeading();
 
       new Setting(containerEl)
@@ -943,27 +923,27 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           })
         )
         .addToggle((toggle) =>
-          toggle.setValue(this.plugin.settings.enableFileNameUpdates).onChange(async (value) => {
-            this.plugin.settings.enableFileNameUpdates = value;
-            await this.plugin.saveSettings();
+          toggle.setValue(this.ctx.settings.enableFileNameUpdates).onChange(async (value) => {
+            this.ctx.settings.enableFileNameUpdates = value;
+            await this.ctx.saveAndApplySettings();
             this.display();
           })
         );
     }
 
-    if (this.plugin.settings.trackFiles && this.plugin.settings.enableFileNameUpdates) {
+    if (this.ctx.settings.trackFiles && this.ctx.settings.enableFileNameUpdates) {
       new Setting(containerEl)
         .setName('Use custom filename template')
         .setDesc('Enable custom filename templates using Nunjucks variables.')
         .addToggle((toggle) =>
-          toggle.setValue(this.plugin.settings.useCustomFilename).onChange(async (value) => {
-            this.plugin.settings.useCustomFilename = value;
-            await this.plugin.saveSettings();
+          toggle.setValue(this.ctx.settings.useCustomFilename).onChange(async (value) => {
+            this.ctx.settings.useCustomFilename = value;
+            await this.ctx.saveAndApplySettings();
             this.display();
           })
         );
 
-      if (this.plugin.settings.useCustomFilename) {
+      if (this.ctx.settings.useCustomFilename) {
         new Setting(containerEl)
           .setClass('indent')
           .setName('Filename template')
@@ -971,10 +951,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           .addText((text) =>
             text
               .setPlaceholder('{{title}}')
-              .setValue(this.plugin.settings.filenameTemplate)
+              .setValue(this.ctx.settings.filenameTemplate)
               .onChange(async (value) => {
-                this.plugin.settings.filenameTemplate = value || '{{title}}';
-                await this.plugin.saveSettings();
+                this.ctx.settings.filenameTemplate = value || '{{title}}';
+                await this.ctx.saveAndApplySettings();
               })
           );
       }
@@ -985,16 +965,16 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         .addText((text) =>
           text
             .setPlaceholder('Colon replacement in title')
-            .setValue(this.plugin.settings.colonSubstitute)
+            .setValue(this.ctx.settings.colonSubstitute)
             .onChange(async (value) => {
               if (!value || /[:<>"/\\|?*]/.test(value)) {
-                this.logger.warn(`Colon replacement: empty or invalid value: ${value}`);
-                this.plugin.settings.colonSubstitute = DEFAULT_SETTINGS.colonSubstitute;
+                this.ctx.logger.warn(`Colon replacement: empty or invalid value: ${value}`);
+                this.ctx.settings.colonSubstitute = DEFAULT_SETTINGS.colonSubstitute;
               } else {
-                this.logger.info(`Colon replacement: setting value: ${value}`);
-                this.plugin.settings.colonSubstitute = value;
+                this.ctx.logger.debug(`Colon replacement: setting value: ${value}`);
+                this.ctx.settings.colonSubstitute = value;
               }
-              await this.plugin.saveSettings();
+              await this.ctx.saveAndApplySettings();
             })
         );
 
@@ -1002,15 +982,15 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         .setName('Use slugify for filenames')
         .setDesc('Enable slugification to create clean filenames.')
         .addToggle((toggle) =>
-          toggle.setValue(this.plugin.settings.useSlugify).onChange(async (value) => {
-            this.plugin.settings.useSlugify = value;
-            await this.plugin.saveSettings();
+          toggle.setValue(this.ctx.settings.useSlugify).onChange(async (value) => {
+            this.ctx.settings.useSlugify = value;
+            await this.ctx.saveAndApplySettings();
             // Trigger re-render to show/hide property selector
             this.display();
           })
         );
 
-      if (this.plugin.settings.useSlugify) {
+      if (this.ctx.settings.useSlugify) {
         new Setting(containerEl)
           .setClass('indent')
           .setName('Slugify separator')
@@ -1018,10 +998,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           .addText((text) =>
             text
               .setPlaceholder('-')
-              .setValue(this.plugin.settings.slugifySeparator)
+              .setValue(this.ctx.settings.slugifySeparator)
               .onChange(async (value) => {
-                this.plugin.settings.slugifySeparator = value || '-';
-                await this.plugin.saveSettings();
+                this.ctx.settings.slugifySeparator = value || '-';
+                await this.ctx.saveAndApplySettings();
               })
           );
 
@@ -1030,9 +1010,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           .setName('Slugify lowercase')
           .setDesc('Convert slugified filenames to lowercase.')
           .addToggle((toggle) =>
-            toggle.setValue(this.plugin.settings.slugifyLowercase).onChange(async (value) => {
-              this.plugin.settings.slugifyLowercase = value;
-              await this.plugin.saveSettings();
+            toggle.setValue(this.ctx.settings.slugifyLowercase).onChange(async (value) => {
+              this.ctx.settings.slugifyLowercase = value;
+              await this.ctx.saveAndApplySettings();
             })
           );
       }
@@ -1046,9 +1026,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setName('Display sync notifications')
       .setDesc('Display Obsidian notifications during sync operations')
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.syncNotifications).onChange(async (value) => {
-          this.plugin.settings.syncNotifications = value;
-          await this.plugin.saveSettings();
+        toggle.setValue(this.ctx.settings.syncNotifications).onChange(async (value) => {
+          this.ctx.settings.syncNotifications = value;
+          await this.ctx.saveAndApplySettings();
         })
       );
 
@@ -1056,15 +1036,15 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setName('Sync log')
       .setDesc('Save sync log to file in Library')
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.logFile).onChange(async (value) => {
-          this.plugin.settings.logFile = value;
-          await this.plugin.saveSettings();
+        toggle.setValue(this.ctx.settings.logFile).onChange(async (value) => {
+          this.ctx.settings.logFile = value;
+          await this.ctx.saveAndApplySettings();
           // Trigger re-render to show/hide log filename setting
           this.display();
         })
       );
 
-    if (this.plugin.settings.logFile) {
+    if (this.ctx.settings.logFile) {
       new Setting(containerEl)
         .setClass('indent')
         .setName('Log filename')
@@ -1072,11 +1052,11 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         .addText((text) =>
           text
             .setPlaceholder('Sync.md')
-            .setValue(this.plugin.settings.logFileName)
+            .setValue(this.ctx.settings.logFileName)
             .onChange(async (value) => {
               if (!value) return;
-              this.plugin.settings.logFileName = value;
-              await this.plugin.saveSettings();
+              this.ctx.settings.logFileName = value;
+              await this.ctx.saveAndApplySettings();
             })
         );
     }
@@ -1123,33 +1103,30 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setName('Add frontmatter')
       .setDesc('Add frontmatter (defined with the Frontmatter Template below)')
       .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.frontMatter).onChange(async (value) => {
+        toggle.setValue(this.ctx.settings.frontMatter).onChange(async (value) => {
           // Test template with sample data
           try {
-            const { isValidYaml, error } = validateFrontmatterTemplate(
-              this.plugin.env,
-              this.plugin.settings.frontMatterTemplate
-            );
+            const { isValidYaml, error } = validateFrontmatterTemplate(this.env, this.ctx.settings.frontMatterTemplate);
             if ((value && isValidYaml) || !value) {
               // Save settings and update the template
-              this.plugin.settings.frontMatter = value;
-              await this.plugin.saveSettings();
+              this.ctx.settings.frontMatter = value;
+              await this.ctx.saveAndApplySettings();
               // Trigger re-render to show/hide frontmatter settings
               this.display();
             } else if (value && !isValidYaml) {
-              this.notify.notice(`Invalid frontmatter template: ${error}`);
+              this.ctx.notice(`Invalid frontmatter template: ${error}`);
               toggle.setValue(false);
               // Trigger re-render to show/hide property selector
               this.display();
             }
           } catch (error) {
-            this.logger.error('Error validating frontmatter template:', error);
+            this.ctx.logger.error('Error validating frontmatter template:', error);
             return;
           }
         })
       );
 
-    if (this.plugin.settings.frontMatter) {
+    if (this.ctx.settings.frontMatter) {
       new Setting(containerEl)
         .setClass('indent')
         .setName('Update frontmatter')
@@ -1164,15 +1141,15 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           })
         )
         .addToggle((toggle) =>
-          toggle.setValue(this.plugin.settings.updateFrontmatter).onChange(async (value) => {
-            this.plugin.settings.updateFrontmatter = value;
-            await this.plugin.saveSettings();
+          toggle.setValue(this.ctx.settings.updateFrontmatter).onChange(async (value) => {
+            this.ctx.settings.updateFrontmatter = value;
+            await this.ctx.saveAndApplySettings();
             // Trigger re-render to show/hide protection settings
             this.display();
           })
         );
 
-      if (this.plugin.settings.updateFrontmatter) {
+      if (this.ctx.settings.updateFrontmatter) {
         new Setting(containerEl)
           .setClass('indent')
           .setName('Protect frontmatter fields')
@@ -1185,32 +1162,32 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
                 'Note: Only fields that already exist in the file will be protected. A field marked for protection which is not present yet in the original field will be written normally at the first write/update, and will be protected henceforth.'
               );
               fragment.createEl('br');
-              if (this.plugin.settings.trackFiles) {
+              if (this.ctx.settings.trackFiles) {
                 fragment.appendText('The tracking field ');
                 fragment.createEl('strong', {
-                  text: this.plugin.settings.trackingProperty,
+                  text: this.ctx.settings.trackingProperty,
                 });
                 fragment.appendText(' cannot be protected.');
               }
             })
           )
           .addToggle((toggle) =>
-            toggle.setValue(this.plugin.settings.protectFrontmatter).onChange(async (value) => {
-              this.plugin.settings.protectFrontmatter = value;
-              await this.plugin.saveSettings();
+            toggle.setValue(this.ctx.settings.protectFrontmatter).onChange(async (value) => {
+              this.ctx.settings.protectFrontmatter = value;
+              await this.ctx.saveAndApplySettings();
               this.display();
             })
           );
 
-        if (this.plugin.settings.protectFrontmatter) {
+        if (this.ctx.settings.protectFrontmatter) {
           const validateProtectedFields = (value: string): { isValid: boolean; error?: string } => {
             const fields = value
               .split('\n')
               .map((f) => f.trim())
               .filter((f) => f.length > 0);
-            const dedupField = this.plugin.settings.trackingProperty;
+            const dedupField = this.ctx.settings.trackingProperty;
 
-            if (this.plugin.settings.trackFiles && fields.includes(dedupField)) {
+            if (this.ctx.settings.trackFiles && fields.includes(dedupField)) {
               return {
                 isValid: false,
                 error: `Cannot protect tracking field '${dedupField}'`,
@@ -1236,19 +1213,19 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               text.inputEl.cols = 25;
 
               text
-                .setValue(this.plugin.settings.protectedFields)
+                .setValue(this.ctx.settings.protectedFields)
                 .setPlaceholder('status\ntags')
                 .onChange(async (value) => {
                   const validation = validateProtectedFields(value);
                   errorDiv.setText(validation.error || '');
 
                   if (validation.isValid) {
-                    this.plugin.settings.protectedFields = value;
-                    await this.plugin.saveSettings();
+                    this.ctx.settings.protectedFields = value;
+                    await this.ctx.saveAndApplySettings();
                   }
                 });
 
-              const validation = validateProtectedFields(this.plugin.settings.protectedFields);
+              const validation = validateProtectedFields(this.ctx.settings.protectedFields);
               errorDiv.setText(validation.error || '');
 
               // Initial row adjustment
@@ -1384,24 +1361,24 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         // Display rendered template on load
         try {
           const validationResult: TemplateValidationResult = validateFrontmatterTemplate(
-            this.plugin.env,
-            this.plugin.settings.frontMatterTemplate
+            this.env,
+            this.ctx.settings.frontMatterTemplate
           );
           updatePreview(validationResult);
         } catch (error) {
           // Catch Nunjucks template errors
-          this.logger.error('Error validating frontmatter template:', error);
+          this.ctx.logger.error('Error validating frontmatter template:', error);
           updatePreview({
             isValidYaml: true,
             isValidtemplate: false,
             error: error.message,
-            preview: this.plugin.settings.frontMatterTemplate,
+            preview: this.ctx.settings.frontMatterTemplate,
           });
         }
-        text.setValue(sanitizeFrontmatterTemplate(this.plugin.settings.frontMatterTemplate)).onChange(async (value) => {
+        text.setValue(sanitizeFrontmatterTemplate(this.ctx.settings.frontMatterTemplate)).onChange(async (value) => {
           const noticeEl = containerEl.querySelector('#validation-notice');
           try {
-            const validationResult: TemplateValidationResult = validateFrontmatterTemplate(this.plugin.env, value);
+            const validationResult: TemplateValidationResult = validateFrontmatterTemplate(this.env, value);
 
             // Update validation notice
             if (noticeEl) {
@@ -1409,17 +1386,17 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             }
 
             // Set the frontmatter in settings, but only if enabled
-            if (!value && this.plugin.settings.frontMatter) {
-              this.plugin.settings.frontMatterTemplate = DEFAULT_SETTINGS.frontMatterTemplate;
+            if (!value && this.ctx.settings.frontMatter) {
+              this.ctx.settings.frontMatterTemplate = DEFAULT_SETTINGS.frontMatterTemplate;
             } else {
-              this.plugin.settings.frontMatterTemplate = sanitizeFrontmatterTemplate(value);
+              this.ctx.settings.frontMatterTemplate = sanitizeFrontmatterTemplate(value);
             }
 
             updatePreview(validationResult);
-            await this.plugin.saveSettings();
+            await this.ctx.saveAndApplySettings();
           } catch (error) {
             // Catch Nunjucks template errors
-            this.logger.error('Error validating frontmatter template:', error);
+            this.ctx.logger.error('Error validating frontmatter template:', error);
 
             if (noticeEl) {
               noticeEl.setText(`Error validating frontmatter template: ${error.message}`);
@@ -1481,14 +1458,13 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         text.inputEl.addClass('settings-template-input');
         text.inputEl.rows = initialRows;
         text.inputEl.cols = 50;
-        text.setValue(this.plugin.settings.headerTemplate).onChange(async (value) => {
+        text.setValue(this.ctx.settings.headerTemplate).onChange(async (value) => {
           if (!value) {
-            this.plugin.settings.headerTemplate = DEFAULT_SETTINGS.headerTemplate;
+            this.ctx.settings.headerTemplate = DEFAULT_SETTINGS.headerTemplate;
           } else {
-            this.plugin.settings.headerTemplate = value;
+            this.ctx.settings.headerTemplate = value;
           }
-          this.plugin.headerTemplate = this.plugin.settings.headerTemplate;
-          await this.plugin.saveSettings();
+          await this.ctx.saveAndApplySettings();
         });
 
         // Initial row adjustment
@@ -1541,15 +1517,13 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         text.inputEl.addClass('settings-template-input');
         text.inputEl.rows = initialRows;
         text.inputEl.cols = 50;
-        text.setValue(this.plugin.settings.highlightTemplate).onChange(async (value) => {
+        text.setValue(this.ctx.settings.highlightTemplate).onChange(async (value) => {
           if (!value) {
-            this.plugin.settings.highlightTemplate = DEFAULT_SETTINGS.highlightTemplate;
+            this.ctx.settings.highlightTemplate = DEFAULT_SETTINGS.highlightTemplate;
           } else {
-            this.plugin.settings.highlightTemplate = value;
+            this.ctx.settings.highlightTemplate = value;
           }
-
-          this.plugin.highlightTemplate = this.plugin.settings.highlightTemplate;
-          await this.plugin.saveSettings();
+          await this.ctx.saveAndApplySettings();
         });
 
         // Initial row adjustment

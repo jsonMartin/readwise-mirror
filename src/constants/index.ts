@@ -1,4 +1,4 @@
-import type { PluginSettings } from 'types';
+import type { PluginSettings } from 'types/settings';
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   atomicHighlights: false,

@@ -2,7 +2,7 @@ import { YAML_INDENT } from 'constants/index';
 import md5 from 'md5';
 import { type ConfigureOptions, Environment, type ILoader, type ILoaderAny, Loader, type LoaderSource } from 'nunjucks';
 import { moment, stringifyYaml } from 'obsidian';
-import type { Atom } from 'types';
+import type { Atom } from 'types/document';
 import { AtomizeExtension } from './atomizer';
 
 /**

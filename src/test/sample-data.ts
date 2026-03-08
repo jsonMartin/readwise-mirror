@@ -6,7 +6,8 @@
 // TODO: Base it on Readwise API and not internal metadata
 //
 
-import type { ReadwiseDocument, Tag } from 'types';
+import type { ReadwiseDocument } from 'types/document';
+import type { Tag } from 'types/library';
 
 export const testTags: Tag[] = [
   { id: 1, name: 'important' },

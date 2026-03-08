@@ -1,10 +1,10 @@
 import { Notice } from 'obsidian';
 
 export default class Notify {
-  statusBarItem: HTMLElement;
+  constructor(private _statusBarItem: HTMLElement) {}
 
-  constructor(statusBarItem: HTMLElement) {
-    this.statusBarItem = statusBarItem;
+  get statusBarItem(): HTMLElement {
+    return this._statusBarItem;
   }
 
   notice(message: string, duration = 5000) {
@@ -14,10 +14,10 @@ export default class Notify {
   setStatusBarText(message: string) {
     // Ensure the message is a string
     const text = typeof message === 'string' ? message : '';
-    this.statusBarItem.setText(text);
+    this._statusBarItem.setText(text);
   }
 
   getStatusBarText(): string {
-    return this.statusBarItem.textContent || '';
+    return this._statusBarItem.textContent || '';
   }
 }

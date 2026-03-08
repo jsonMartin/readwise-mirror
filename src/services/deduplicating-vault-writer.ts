@@ -1,9 +1,8 @@
 import md5 from 'md5'; // Fix imports
-import { type App, getFrontMatterInfo, normalizePath, TFile, type Vault } from 'obsidian';
+import { getFrontMatterInfo, normalizePath, TFile, type Vault } from 'obsidian';
 import type { FrontmatterManager } from 'services/frontmatter-manager';
-import type Logger from 'services/logger';
-import type { AtomicFile, BaseFile, PluginSettings, ReadwiseDocument } from 'types';
-import type Notify from 'ui/notify';
+import type { AtomicFile, BaseFile, ReadwiseDocument } from 'types/document';
+import type { PluginContext } from 'types/plugin-context';
 import { isInReadwiseLibrary, isTrackedReadwiseNote } from 'utils/tracking-utils';
 import type { Frontmatter } from './frontmatter';
 
@@ -11,29 +10,18 @@ export class DeduplicatingVaultWriter {
   readonly vault: Vault;
   private totalFileCount = 0;
   private fileCount = 0;
+  private readonly app = this.ctx.app;
 
   constructor(
-    private app: App,
-    private settings: PluginSettings,
-    private frontmatterManager: FrontmatterManager,
-    private logger: Logger,
-    private notify: Notify
+    private readonly ctx: PluginContext,
+    private frontmatterManager: FrontmatterManager
   ) {
-    this.vault = app.vault;
+    this.vault = ctx.app.vault;
   }
 
   private notifyFileCount() {
     this.fileCount++;
-    this.notify.setStatusBarText(`Readwise: ${this.fileCount} of ${this.totalFileCount} files processed`);
-  }
-
-  /**
-   * Creates a normalized path for any vault path
-   * @param segments - Path segments to join
-   * @returns Normalized path string
-   */
-  public getNormalizedPath(...segments: string[]): string {
-    return normalizePath(segments.join('/'));
+    this.ctx.setStatusBarText(`Readwise: ${this.fileCount} of ${this.totalFileCount} files processed`);
   }
 
   /**
@@ -48,7 +36,7 @@ export class DeduplicatingVaultWriter {
 
       if (!abstractFolder) {
         await this.vault.createFolder(path);
-        this.logger.info('Successfully created folder', path);
+        this.ctx.logger.debug('Successfully created folder', path);
       }
     }
   }
@@ -60,7 +48,7 @@ export class DeduplicatingVaultWriter {
    * @returns An array of matching files
    */
   public async findExistingByHighlightsUrl(doc: ReadwiseDocument): Promise<TFile[]> {
-    if (!this.settings.trackFiles || !this.settings.trackingProperty || !doc.readwise_url) {
+    if (!this.ctx.settings.trackFiles || !this.ctx.settings.trackingProperty || !doc.readwise_url) {
       return []; // No tracking or no readwise_url
     }
 
@@ -68,32 +56,51 @@ export class DeduplicatingVaultWriter {
     const files = this.vault.getMarkdownFiles();
 
     // Filter files by the tracking property
-    return files.filter((file) => {
+    const matchedFiles = files.filter((file) => {
       const metadata = this.app.metadataCache.getFileCache(file);
-      const isTracked = isTrackedReadwiseNote(file, this.app, this.settings);
-      const isInLibrary = isInReadwiseLibrary(file, this.settings);
+      const isTracked = isTrackedReadwiseNote(file, this.app, this.ctx.settings);
+      const isInLibrary = isInReadwiseLibrary(file, this.ctx.settings);
 
       // If trackAcrossVault is enabled, only check if it's a Readwise note.
       // Otherwise, check if it's a Readwise note AND in the Readwise library.
-      const shouldKeep = this.settings.trackAcrossVault ? isTracked : isTracked && isInLibrary;
+      const shouldKeep = this.ctx.settings.trackAcrossVault ? isTracked : isTracked && isInLibrary;
 
       if (!shouldKeep) {
         return false;
       }
 
       // Compare the tracking property value to the readwise_url
-      return metadata?.frontmatter?.[this.settings.trackingProperty] === doc.readwise_url;
+      return metadata?.frontmatter?.[this.ctx.settings.trackingProperty] === doc.readwise_url;
+    });
+
+    // Sort: Files WITHOUT "duplicate" property come first
+    return matchedFiles.sort((a, b) => {
+      const cacheA = this.app.metadataCache.getFileCache(a);
+      const cacheB = this.app.metadataCache.getFileCache(b);
+
+      // Check if the 'duplicate' key exists in frontmatter (regardless of value)
+      const hasDuplicateA = cacheA?.frontmatter?.duplicate !== undefined;
+      const hasDuplicateB = cacheB?.frontmatter?.duplicate !== undefined;
+
+      // If both have it or both don't have it, keep original order
+      if (hasDuplicateA === hasDuplicateB) {
+        return 0;
+      }
+
+      // If A does NOT have it, A comes first (-1)
+      // If A HAS it (and B doesn't per above check), A comes last (1)
+      return !hasDuplicateA ? -1 : 1;
     });
   }
 
   /**
-   * Generates a short hash based on the metadata ID
+   * Generates a short hash based on the metadata ID and
    *
-   * @param doc - The readwise document to generate a hash for
+   * @param file - The readwise file to generate a hash for
    * @returns A short hash
    */
-  public generateShortHash(doc: ReadwiseDocument): string {
-    return md5(doc.id.toString()).substring(0, 4);
+  public generateShortHash(basename: string): string {
+    return md5(basename + Date.now()).substring(0, 4);
   }
 
   /**
@@ -109,7 +116,7 @@ export class DeduplicatingVaultWriter {
 
   public getCategoryPath(category: string): string {
     const formattedCategory = category.charAt(0).toUpperCase() + category.slice(1);
-    return this.getNormalizedPath(this.settings.baseFolderName, formattedCategory);
+    return normalizePath(`${this.ctx.settings.baseFolderName}/${formattedCategory}`);
   }
 
   /**
@@ -119,7 +126,7 @@ export class DeduplicatingVaultWriter {
    */
   private async updateExistingFile(readwiseFile: BaseFile): Promise<void> {
     if (!(readwiseFile.primary instanceof TFile)) {
-      this.logger.error('Primary file is not a TFile instance', { primary: readwiseFile.primary });
+      this.ctx.logger.error('Primary file is not a TFile instance', { primary: readwiseFile.primary });
       throw new Error('Primary file is not a TFile instance. This should not happen');
     }
 
@@ -133,13 +140,13 @@ export class DeduplicatingVaultWriter {
         const updatedFrontmatter = this.frontmatterManager.getFrontmatter(readwiseFile, hasFrontmatter);
 
         // Clean up existing frontmatter if updateFrontmatter is disabled
-        if (!this.settings.updateFrontmatter) {
+        if (!this.ctx.settings.updateFrontmatter) {
           for (const key in existingFrontmatter) {
             delete existingFrontmatter[key];
           }
         }
 
-        this.logger.debug(`Updating file ${file.path} with new frontmatter`, updatedFrontmatter);
+        this.ctx.logger.debug(`Updating file ${file.path} with new frontmatter`, updatedFrontmatter);
         for (const [key, value] of updatedFrontmatter.entries()) {
           existingFrontmatter[key] = value;
         }
@@ -147,7 +154,7 @@ export class DeduplicatingVaultWriter {
 
       await this.fileWrite(file, readwiseFile.contents);
     } catch (err) {
-      this.logger.error(`Readwise: Attempt to update file ${file.path} failed`, err);
+      this.ctx.logger.error(`Readwise: Attempt to update file ${file.path} failed`, err);
       throw err;
     }
   }
@@ -163,16 +170,16 @@ export class DeduplicatingVaultWriter {
 
     const frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile);
     try {
-      if (this.settings.deleteDuplicates) {
-        this.logger.debug(`Trashing duplicate ${file.path}`);
+      if (this.ctx.settings.deleteDuplicates) {
+        this.ctx.logger.debug(`Trashing duplicate ${file.path}`);
         await this.vault.trash(file, true);
       } else {
         frontmatter.set('duplicate', true);
-        this.logger.debug(`Marking file ${file.path} as duplicate`, frontmatter);
+        this.ctx.logger.debug(`Marking file ${file.path} as duplicate`, frontmatter);
         await this.frontmatterManager.writeUpdatedFrontmatter(file, frontmatter);
       }
     } catch (err) {
-      this.logger.error(`Failed to handle duplicate ${file.path}`, err);
+      this.ctx.logger.error(`Failed to handle duplicate ${file.path}`, err);
       throw err;
     }
   }
@@ -190,20 +197,13 @@ export class DeduplicatingVaultWriter {
     this.totalFileCount = readwiseFiles.length;
     this.fileCount = 0;
 
-    this.notify.setStatusBarText(`Readwise: ${this.totalFileCount} files to process`);
+    this.ctx.setStatusBarText(`Readwise: ${this.totalFileCount} files to process`);
 
     // Group by path (which includes category and filename)
     const groupedByPath = new Map<string, BaseFile[]>();
 
     for (const file of readwiseFiles) {
-      let path: string;
-      if (file.primary instanceof TFile) {
-        // If we have a primary TFile, use its path for grouping
-        path = file.primary.path;
-      } else if (typeof file.primary === 'string') {
-        // If we have a primary path string, use it for grouping
-        path = file.primary;
-      }
+      const path: string = file.primary instanceof TFile ? file.primary.path : file.primary;
       // Use lowercase path for comparison as filesystems are (potentially) case-insensitive
       if (!groupedByPath.has(path.toLowerCase())) {
         groupedByPath.set(path.toLowerCase(), []);
@@ -213,7 +213,7 @@ export class DeduplicatingVaultWriter {
 
     // Process each path group (i.e. files with the same category and filename)
     for (const [path, groupFiles] of groupedByPath) {
-      this.logger.debug('Processing path group', { path, groupFiles });
+      this.ctx.logger.debug('Processing path group', { path, groupFiles });
 
       // Process the files in the path group
       await this.writePathGroup(groupFiles);
@@ -221,13 +221,13 @@ export class DeduplicatingVaultWriter {
   }
 
   public async processFrontmatter(readwiseFiles: BaseFile[]): Promise<void> {
-    this.logger.debug('Processing frontmatter for Readwise files', { readwiseFiles });
+    this.ctx.logger.debug('Processing frontmatter for Readwise files', { readwiseFiles });
 
     // Reset the file count
     this.totalFileCount = readwiseFiles.length;
     this.fileCount = 0;
 
-    this.notify.setStatusBarText(`Readwise: ${this.totalFileCount} files to process`);
+    this.ctx.setStatusBarText(`Readwise: ${this.totalFileCount} files to process`);
 
     // Process each file
     for (const readwiseFile of readwiseFiles) {
@@ -236,7 +236,7 @@ export class DeduplicatingVaultWriter {
         // Since we are only updating frontmatter, for existing files, we can use the Obsidian file manager for atomic frontmatter updates
         this.app.fileManager.processFrontMatter(file, (existingFrontmatter) => {
           const updates: Frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile);
-          const filteredFrontMatter = this.settings.protectFrontmatter
+          const filteredFrontMatter = this.ctx.settings.protectFrontmatter
             ? this.frontmatterManager.filterProtectedFrontmatter(updates)
             : updates;
           Object.assign(existingFrontmatter, filteredFrontMatter.toObject());
@@ -257,14 +257,14 @@ export class DeduplicatingVaultWriter {
      * Files that share the same filename are duplicates,
      * those with the tracking property will be treated first
      */
-    if (this.settings.trackFiles && this.settings.trackingProperty) {
+    if (this.ctx.settings.trackFiles && this.ctx.settings.trackingProperty) {
       // Update or create primary file based on readwise_url
       for (const file of readwiseFiles) {
         await this.processTrackedFile(file);
       }
     } else {
       // All files are untracked - append hash to all but the first,
-      this.logger.debug('Files are untracked - appending hash to all but the first', { files: readwiseFiles });
+      this.ctx.logger.debug('Files are untracked - appending hash to all but the first', { files: readwiseFiles });
       const [primary, ...duplicates] = readwiseFiles;
       await this.writeFileToVault(primary, true);
 
@@ -286,7 +286,7 @@ export class DeduplicatingVaultWriter {
       await this.updateExistingFile(baseFile);
 
       for (const duplicate of baseFile.duplicates) {
-        this.logger.warn('Existing duplicate file found', { duplicate });
+        this.ctx.logger.warn('Existing duplicate file found', { duplicate });
         await this.handleDuplicate(duplicate, baseFile);
       }
 
@@ -296,7 +296,7 @@ export class DeduplicatingVaultWriter {
     }
 
     // If we have any atoms, process them (atoms will be empty of conditional atomizer leads to no atoms)
-    if (this.settings.atomicHighlights && processedPrimary && baseFile.atoms?.length > 0) {
+    if (this.ctx.settings.atomicHighlights && processedPrimary && baseFile.atoms?.length > 0) {
       await this.processAtomicHighlights(processedPrimary, baseFile);
     }
   }
@@ -318,7 +318,7 @@ export class DeduplicatingVaultWriter {
      */
 
     if (file.type === 'base') this.notifyFileCount();
-    const path = this.getNormalizedPath(this.getCategoryPathFromFile(file), `${file.basename}.md`);
+    const path = normalizePath(`${this.getCategoryPathFromFile(file)}/${file.basename}.md`);
     try {
       const frontmatter = this.frontmatterManager.getFrontmatter(file);
       const fileOptions = {
@@ -330,35 +330,35 @@ export class DeduplicatingVaultWriter {
       if (fileExists) {
         if (overwrite) {
           const existingFile: TFile = await this.vault.getFileByPath(path);
-          this.logger.debug('Overwriting existing file', { doc: file.doc, ...fileOptions });
+          this.ctx.logger.debug('Overwriting existing file', { doc: file.doc, ...fileOptions });
           await this.frontmatterWrite(existingFile, frontmatter);
           await this.fileWrite(existingFile, file.contents, fileOptions);
           return existingFile;
         }
         // Create new path with hash
-        const hash = this.generateShortHash(file.doc);
-        const newPath = this.getNormalizedPath(this.getCategoryPathFromFile(file), `${file.basename} ${hash}.md`);
+        const hash = this.generateShortHash(file.basename);
+        const newPath = normalizePath(`${this.getCategoryPathFromFile(file)}/${file.basename} ${hash}.md`);
         const newFileExists = await this.app.vault.adapter.exists(newPath, false);
         if (newFileExists) {
           const existingNewFile: TFile = await this.vault.getFileByPath(newPath);
-          this.logger.debug('Overwriting existing file (with hash)', { doc: file.doc, ...fileOptions });
+          this.ctx.logger.debug('Overwriting existing file (with hash)', { doc: file.doc, ...fileOptions });
           await this.frontmatterWrite(existingNewFile, frontmatter);
           await this.fileWrite(existingNewFile, file.contents, fileOptions);
           return existingNewFile;
         }
-        this.logger.debug('Creating new file (with hash)', { doc: file.doc, ...fileOptions });
+        this.ctx.logger.debug('Creating new file (with hash)', { doc: file.doc, ...fileOptions });
         const newFile: TFile = await this.vault.create(newPath, file.contents, fileOptions);
         await this.frontmatterWrite(newFile, frontmatter);
         return newFile;
       }
 
       // If the file doesn't exist, create it
-      this.logger.debug('Creating new file', { doc: file.doc, ...fileOptions });
+      this.ctx.logger.debug('Creating new file', { doc: file.doc, ...fileOptions });
       const newFile: TFile = await this.vault.create(path, file.contents, fileOptions);
       await this.frontmatterWrite(newFile, frontmatter);
       return newFile;
     } catch (err) {
-      this.logger.error(`Failed to create file '${path}'`, err);
+      this.ctx.logger.error(`Failed to create file '${path}'`, err);
       throw new Error(`Failed to create file '${path}'. ${err}`);
     }
   }
