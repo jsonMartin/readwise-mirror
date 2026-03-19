@@ -146,7 +146,7 @@ export class AtomizeExtension implements nunjucks.Extension {
 
     switch (this.pass) {
       case 'FIRST': {
-        return new nunjucks.runtime.SafeString(`%%! atomize id=${_id}, basename="${basename.replace(/^\n+|\n+$/g, '').trim()}", embed=${embed} !%%
+        return new nunjucks.runtime.SafeString(`%%! atomize id=${_id}, basename="${String(basename ?? _id).replace(/^\n+|\n+$/g, '').trim()}", embed=${embed} !%%
 %%! frontmatter !%%
 ${frontmatter}
 %%! endfrontmatter !%%
@@ -160,7 +160,8 @@ ${content}
         }
 
         // Sanitize filename
-        const _basename = filenamify(basename.replace(/^\n+|\n+$/g, '').trim() ?? _id.toString(), {
+        const rawBasename = (basename ?? _id.toString());
+        const _basename = filenamify(String(rawBasename).replace(/^\n+|\n+$/g, '').trim() || _id.toString(), {
           replacement: '-',
           maxLength: 252,
         })

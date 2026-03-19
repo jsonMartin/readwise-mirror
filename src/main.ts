@@ -19,6 +19,7 @@ import Notify from 'ui/notify';
 import ReadwiseMirrorSettingTab from 'ui/settings-tab';
 import { normalizeFilename } from 'utils/filename-utils';
 import { createdDate, lastHighlightedDate, updatedDate } from 'utils/highlight-date-utils';
+import { hasAtomizeBlocks } from 'utils/template-utils';
 import { isInReadwiseLibrary, isTrackedReadwiseNote } from 'utils/tracking-utils';
 
 export default class ReadwiseMirror extends Plugin {
@@ -634,6 +635,13 @@ export default class ReadwiseMirror extends Plugin {
       if (Object.keys(library.books).length > 0) {
         if (this.settings.atomicHighlights) {
           library.categories.add('Highlight');
+
+          if (!hasAtomizeBlocks(this.settings.highlightTemplate)) {
+            this.notify.notice(
+              'Readwise: Atomic highlights enabled but your highlight template has no atomize blocks. No atomic notes will be created.',
+              10000
+            );
+          }
         }
 
         await this.writeLibraryToMarkdown(library);

@@ -15,6 +15,7 @@ import type { TemplateValidationResult } from 'types';
 import { WarningDialog } from 'ui/dialog';
 import type Notify from 'ui/notify';
 import { sanitizeFrontmatterTemplate, validateFrontmatterTemplate } from 'utils/frontmatter-utils';
+import { hasAtomizeBlocks } from 'utils/template-utils';
 
 interface SettingsTab {
   id: string;
@@ -626,6 +627,26 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               attr: { style: 'color: var(--text-error);' },
             });
           }
+
+          if (this.plugin.settings.atomicHighlights && !hasAtomizeBlocks(this.plugin.settings.highlightTemplate)) {
+            fragment.createEl('br');
+            fragment.createEl('br');
+            const warningSpan = fragment.createSpan({
+              attr: { style: 'color: var(--text-warning);' },
+            });
+            warningSpan.appendText(
+              'Your highlight template does not contain atomize blocks. Atomic highlights will not be created until you add '
+            );
+            warningSpan.createEl('code', { text: '{% atomize %}...{% endatomize %}' });
+            warningSpan.appendText(' blocks. See the ');
+            warningSpan
+              .createEl('a', {
+                text: 'Wiki',
+                href: 'https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-Atomic-highlights',
+              })
+              .setAttr('target', '_blank');
+            warningSpan.appendText(' for details.');
+          }
         })
       )
       .addToggle((toggle) => {
@@ -657,6 +678,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
                   if (confirmed) {
                     this.plugin.settings.atomicHighlights = true;
                     await this.plugin.saveSettings();
+                    this.display();
                   } else {
                     toggle.setValue(false);
                   }
@@ -665,6 +687,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             } else {
               this.plugin.settings.atomicHighlights = false;
               await this.plugin.saveSettings();
+              this.display();
             }
           });
         }
