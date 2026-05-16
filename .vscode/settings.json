@@ -1,0 +1,20 @@
+{
+  "chat.tools.terminal.autoApprove": {
+    "/^obsidian vault=\"Obsidian Sandbox\" plugin:reload id=readwise-mirror$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "/^obsidian vault=\"Obsidian Sandbox\" plugin id=readwise-mirror$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "/^obsidian vault=\"Obsidian Sandbox\" commands filter=readwise$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "/^obsidian vault=\"Obsidian Sandbox\" command id=readwise-mirror:reset-last-updated$/": {
+      "approve": true,
+      "matchCommandLine": true
+    }
+  }
+}

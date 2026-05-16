@@ -84,17 +84,12 @@ describe('FrontmatterManager', () => {
       expect(title).toContain("'My Book'");
     });
 
-    it('uses EMPTY_FRONTMATTER when frontMatter is false but trackFiles is true', () => {
+    it('throws when EMPTY_FRONTMATTER renders as multiple YAML documents', () => {
       const ctx = setupTestContext();
       ctx.mockSettings.frontMatter = false;
       ctx.mockSettings.trackFiles = true;
 
-      // EMPTY_FRONTMATTER ('---\n---\n') when rendered and parsed results in empty object
-      // which creates an empty Frontmatter instance
-      const result = ctx.manager.getBaseFrontmatter(sampleMetadata);
-
-      // Should have empty or minimal fields from EMPTY_FRONTMATTER template
-      expect(result.keys().length).toBe(0);
+      expect(() => ctx.manager.getBaseFrontmatter(sampleMetadata)).toThrow(/Failed to process frontmatter/);
     });
 
     it('throws FrontmatterError on invalid template', () => {

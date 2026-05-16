@@ -16,11 +16,11 @@
       "main": ["./src/main.ts"],
       "services/*": ["./src/services/*"],
       "src/*": ["./src/*"],
-      "test/*": ["./src/test/*"],
+      "test/*": ["./tests/*"],
       "types/*": ["./src/types/*"],
       "ui/*": ["./src/ui/*"],
       "utils/*": ["./src/utils/*"]
     }
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
 }
