@@ -1,0 +1,134 @@
+{
+  "count": 1,
+  "nextPageCursor": null,
+  "results": [
+    {
+      "user_book_id": 5401,
+      "is_deleted": false,
+      "title": "Building Reliable Reading Systems: Notes from the Field",
+      "author": "Jamie Patel, Morgan Lee",
+      "readable_title": "Building Reliable Reading Systems",
+      "source": "reader",
+      "cover_image_url": "https://images.example.com/covers/reliable-reading.png",
+      "unique_url": "https://reader.example.com/doc/reliable-reading-systems",
+      "book_tags": [
+        { "id": 101, "name": "engineering" },
+        { "id": 102, "name": "knowledge-management" },
+        { "id": 103, "name": "yaml:frontmatter" }
+      ],
+      "category": "articles",
+      "document_note": "Collecting practical implementation details.\nFocus on reliability and edge cases.",
+      "summary": "A compact seed fixture in Readwise export shape used to generate larger stress datasets.",
+      "readwise_url": "https://readwise.io/bookreview/5401",
+      "source_url": "https://example.com/articles/reliable-reading-systems",
+      "asin": null,
+      "highlights": [
+        {
+          "id": 910001,
+          "is_deleted": false,
+          "text": "Reliability starts with deterministic fixtures and explicit expectations.",
+          "note": "Use stable IDs for reproducibility.",
+          "location": 1,
+          "location_type": "order",
+          "highlighted_at": "2024-03-01T10:10:00Z",
+          "created_at": "2024-03-01T10:10:00Z",
+          "updated_at": "2024-03-01T10:10:00Z",
+          "url": "https://example.com/articles/reliable-reading-systems#h1",
+          "readwise_url": "https://readwise.io/open/910001",
+          "color": "yellow",
+          "book_id": 5401,
+          "tags": [
+            { "id": 201, "name": "deterministic" },
+            { "id": 202, "name": "tests" }
+          ],
+          "is_favorite": true,
+          "is_discard": false
+        },
+        {
+          "id": 910002,
+          "is_deleted": false,
+          "text": "Escaping matters: colons, hashes, ampersands, and pipes all affect rendering.",
+          "note": "Examples: key: value, #tag, a & b, block: |",
+          "location": 2,
+          "location_type": "order",
+          "highlighted_at": "2024-03-02T11:20:00Z",
+          "created_at": "2024-03-02T11:20:00Z",
+          "updated_at": "2024-03-02T11:20:00Z",
+          "url": "https://example.com/articles/reliable-reading-systems#h2",
+          "readwise_url": "https://readwise.io/open/910002",
+          "color": "blue",
+          "book_id": 5401,
+          "tags": [
+            { "id": 203, "name": "escaping" },
+            { "id": 204, "name": "yaml" }
+          ],
+          "is_favorite": false,
+          "is_discard": false
+        },
+        {
+          "id": 910003,
+          "is_deleted": false,
+          "text": "Line breaks and markdown syntax can expose subtle template bugs.",
+          "note": "List:\n- keep\n- parse\n- verify",
+          "location": 3,
+          "location_type": "order",
+          "highlighted_at": "2024-03-03T12:30:00Z",
+          "created_at": "2024-03-03T12:30:00Z",
+          "updated_at": "2024-03-03T12:30:00Z",
+          "url": "https://example.com/articles/reliable-reading-systems#h3",
+          "readwise_url": "https://readwise.io/open/910003",
+          "color": "green",
+          "book_id": 5401,
+          "tags": [
+            { "id": 205, "name": "markdown" },
+            { "id": 206, "name": "templates" }
+          ],
+          "is_favorite": true,
+          "is_discard": false
+        },
+        {
+          "id": 910004,
+          "is_deleted": false,
+          "text": "Some highlights are intentionally discarded and should be filterable.",
+          "note": "Useful for highlightDiscard setting.",
+          "location": 4,
+          "location_type": "order",
+          "highlighted_at": "2024-03-04T13:40:00Z",
+          "created_at": "2024-03-04T13:40:00Z",
+          "updated_at": "2024-03-04T13:40:00Z",
+          "url": "https://example.com/articles/reliable-reading-systems#h4",
+          "readwise_url": "https://readwise.io/open/910004",
+          "color": "pink",
+          "book_id": 5401,
+          "tags": [
+            { "id": 207, "name": "discard" },
+            { "id": 208, "name": "filtering" }
+          ],
+          "is_favorite": false,
+          "is_discard": true
+        },
+        {
+          "id": 910005,
+          "is_deleted": true,
+          "text": "Deleted highlights remain relevant for synchronization edge cases.",
+          "note": "Deleted=true to test include/exclude behavior.",
+          "location": 5,
+          "location_type": "order",
+          "highlighted_at": "2024-03-05T14:50:00Z",
+          "created_at": "2024-03-05T14:50:00Z",
+          "updated_at": "2024-03-05T14:50:00Z",
+          "url": null,
+          "readwise_url": "https://readwise.io/open/910005",
+          "color": "orange",
+          "book_id": 5401,
+          "tags": [
+            { "id": 209, "name": "deleted" },
+            { "id": 210, "name": "sync" }
+          ],
+          "is_favorite": false,
+          "is_discard": false
+        }
+      ]
+    }
+  ]
+}
