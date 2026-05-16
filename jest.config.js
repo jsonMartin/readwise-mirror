@@ -9,6 +9,7 @@ module.exports = {
   setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
   moduleNameMapper: {
     "^obsidian$": "<rootDir>/tests/__mocks__/obsidian.ts",
+    "^src/(.*)$": "<rootDir>/src/$1",
     "^test/(.*)$": "<rootDir>/tests/$1",
     "^types/(.*)$": "<rootDir>/src/types/$1",
     "^services/(.*)$": "<rootDir>/src/services/$1",
