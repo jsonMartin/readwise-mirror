@@ -27,7 +27,7 @@ interface SettingsTab {
 class TabView {
   private static lastActiveTab: string;
   private activeTab: string;
-  private tabContent: HTMLElement;
+  private tabContent?: HTMLElement;
 
   constructor(
     private containerEl: HTMLElement,
@@ -66,12 +66,11 @@ class TabView {
   }
 
   private renderActiveTab() {
-    // Clear existing content
-    this.tabContent.empty();
-
     // Render active tab
     const activeTab = this.tabs.find((t) => t.id === this.activeTab);
-    if (activeTab) {
+    if (activeTab && this.tabContent) {
+      // Clear existing content
+      this.tabContent.empty();
       activeTab.render(this.tabContent);
     }
   }
@@ -91,10 +90,10 @@ class TabView {
 }
 
 export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
-  private tokenValidationMessage: HTMLElement;
-  private retrievalButton: ButtonComponent;
-  private tokenValue: TextComponent;
-  private validationButton: ButtonComponent;
+  private tokenValidationMessage?: HTMLElement;
+  private retrievalButton?: ButtonComponent;
+  private tokenValue?: TextComponent;
+  private validationButton?: ButtonComponent;
 
   constructor(
     plugin: ReadwiseMirror,
@@ -318,13 +317,29 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     }
   }
 
+  private requireTokenValidationMessage(): HTMLElement {
+    if (!this.tokenValidationMessage) {
+      throw new Error('Token validation message element is not initialized. Call renderAuthentication() first.');
+    }
+
+    return this.tokenValidationMessage;
+  }
+
+  private getErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return String(error);
+  }
+
   /**
    * Updates the validation message div based on status.
    * @param status 'invalid' | 'success' | 'running' | 'error'
    * @param errorMsg Optional error message for 'error' status
    */
   private setTokenValidationStatus(status: 'invalid' | 'success' | 'running' | 'error' | 'empty', errorMsg?: string) {
-    const el = this.tokenValidationMessage;
+    const el = this.requireTokenValidationMessage();
     el.show();
     switch (status) {
       case 'invalid':
@@ -385,9 +400,9 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           fragment.createEl('a', { text: 'readwise.io/access_token', href: 'https://readwise.io/access_token' });
           fragment.appendText(', or use the "Authenticate with Readwise" button for automatic retrieval of the token.');
           fragment.createEl('br');
-          fragment.append(this.tokenValidationMessage);
+          fragment.append(this.requireTokenValidationMessage());
           // Show success or error message based on token validity
-          if (Controller.validateAPIInstance()) {
+          if (await Controller.validateAPIInstance()) {
             this.setTokenValidationStatus('running');
           } else {
             this.setTokenValidationStatus('error');
@@ -443,41 +458,42 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             };
             authModal.open();
           })
-          .setDisabled(hasValidToken);
+          .setDisabled(Boolean(hasValidToken));
         return this.retrievalButton;
       })
       .addText((text) => {
         this.tokenValue = text;
-        const token = this.ctx.settings.apiToken;
+        const token = this.ctx.settings.apiToken ?? '';
+        const tokenInputEl = text.inputEl;
 
-        this.tokenValue.inputEl.type = 'password';
+        tokenInputEl.type = 'password';
 
         this.tokenValue.setPlaceholder('API Token').setValue(token);
         this.tokenValue.onChange(() => {
-          const value = this.tokenValue.inputEl.value;
+          const value = tokenInputEl.value;
           if (value !== this.ctx.settings.apiToken) {
             this.setTokenValidationStatus('empty');
             this.updateAuthButtons('invalid');
           }
         });
-        this.tokenValue.inputEl.onfocus = () => {
-          this.tokenValue.inputEl.type = 'text';
+        tokenInputEl.onfocus = () => {
+          tokenInputEl.type = 'text';
         };
-        this.tokenValue.inputEl.onblur = () => {
+        tokenInputEl.onblur = () => {
           if (hasValidToken) {
-            this.tokenValue.inputEl.type = 'password';
+            tokenInputEl.type = 'password';
           }
         };
       })
       .addButton((button) => {
         this.validationButton = button;
         this.validationButton
-          .setDisabled(hasValidToken)
+          .setDisabled(Boolean(hasValidToken))
           .setCta()
           .setIcon('check')
           .setButtonText(hasValidToken ? 'Verified' : 'Apply')
           .onClick(async () => {
-            const value = this.tokenValue.inputEl.value;
+            const value = this.tokenValue?.inputEl?.value ?? '';
             if (value === '') {
               this.ctx.settings.apiToken = value;
               this.updateAuthButtons('empty');
@@ -494,7 +510,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
                 const hasValidToken = await Controller.validateAPIInstance();
                 this.updateAuthButtons(hasValidToken ? 'valid' : 'invalid');
               } catch (error) {
-                this.ctx.notice('Failed to verify token:', error.message);
+                this.ctx.notice(`Failed to verify token: ${this.getErrorMessage(error)}`);
                 this.setTokenValidationStatus('invalid');
                 this.updateAuthButtons('invalid');
               }
@@ -1339,10 +1355,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
           if (isInvalidTemplate) {
             errorNotice.setText('Your Frontmatter template contains invalid Nunjucks syntax.');
-            errorDetails.setText(result.error);
+            errorDetails.setText(result.error ?? '');
           } else if (isInvalidYaml) {
             errorNotice.setText('Your Frontmatter template creates invalid YAML.');
-            errorDetails.setText(result.error);
+            errorDetails.setText(result.error ?? '');
           } else {
             errorNotice.setText('');
             errorDetails.setText('');
@@ -1367,10 +1383,11 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
         } catch (error) {
           // Catch Nunjucks template errors
           this.ctx.logger.error('Error validating frontmatter template:', error);
+          const errorMessage = this.getErrorMessage(error);
           updatePreview({
             isValidYaml: true,
             isValidtemplate: false,
-            error: error.message,
+            error: errorMessage,
             preview: this.ctx.settings.frontMatterTemplate,
           });
         }
@@ -1381,7 +1398,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
             // Update validation notice
             if (noticeEl) {
-              noticeEl.setText(validationResult.isValidYaml ? '' : validationResult.error);
+              noticeEl.setText(validationResult.isValidYaml ? '' : (validationResult.error ?? ''));
             }
 
             // Set the frontmatter in settings, but only if enabled
@@ -1396,13 +1413,14 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           } catch (error) {
             // Catch Nunjucks template errors
             this.ctx.logger.error('Error validating frontmatter template:', error);
+            const errorMessage = this.getErrorMessage(error);
 
             if (noticeEl) {
-              noticeEl.setText(`Error validating frontmatter template: ${error.message}`);
+              noticeEl.setText(`Error validating frontmatter template: ${errorMessage}`);
               updatePreview({
                 isValidYaml: true,
                 isValidtemplate: false,
-                error: error.message,
+                error: errorMessage,
                 preview: value,
               });
             }
