@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
-import { DEFAULT_SETTINGS } from 'constants/index';
+import { DEFAULT_SETTINGS } from 'src/constants';
 import * as nunjucks from 'nunjucks';
 import { FileManager } from 'obsidian';
 import { FrontmatterManager } from 'services/frontmatter-manager';

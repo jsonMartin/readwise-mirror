@@ -1,7 +1,7 @@
-import { YAML_INDENT } from 'constants/index';
 import md5 from 'md5';
 import { type ConfigureOptions, Environment, type ILoader, type ILoaderAny, Loader, type LoaderSource } from 'nunjucks';
 import { stringifyYaml } from 'obsidian';
+import { YAML_INDENT } from 'src/constants';
 import type { Atom } from 'types/document';
 import { AtomizeExtension } from './atomizer';
 import { registerCoreTemplateFilters } from './template-rendering';
@@ -82,7 +82,6 @@ export class ReadwiseEnvironment extends Environment {
       return str.replace(/\.qa(.*)\?(.*)/g, '**Q:**$1?\r\n\r\n**A:**$2');
     });
 
-    // biome-ignore lint/suspicious/noExplicitAny: stringifyYaml is accepting `any`
     this.addFilter('fme', (value: any) => {
       // Return if null/undefined
       if (value === null || value === undefined) {

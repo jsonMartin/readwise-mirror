@@ -1,4 +1,4 @@
-import { YAML_INDENT } from 'constants/index';
+import { YAML_INDENT } from 'src/constants';
 import type { ReadwiseDocument } from 'types/document';
 import type { YamlEscapeOptions, YamlStringState } from 'types/utilities';
 

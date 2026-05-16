@@ -1,7 +1,7 @@
 import slugify from '@sindresorhus/slugify';
-import { READWISE_REVIEW_URL_BASE } from 'constants/index';
 import filenamify from 'filenamify';
 import { normalizePath, type TFile, type TFolder } from 'obsidian';
+import { READWISE_REVIEW_URL_BASE } from 'src/constants';
 import type { PluginContext } from 'types/plugin-context';
 import type { PluginSettings } from 'types/settings';
 

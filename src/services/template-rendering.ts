@@ -1,5 +1,5 @@
-import { FRONTMATTER_TO_ESCAPE, NUNJUCKS_CORE_TEMPLATE } from 'constants/index';
 import { type Environment, type ILoader, Loader, type LoaderSource, Template } from 'nunjucks';
+import { FRONTMATTER_TO_ESCAPE, NUNJUCKS_CORE_TEMPLATE } from 'src/constants';
 import type { ReadwiseDocument } from 'types/document';
 import type { Export, Highlight, Tag } from 'types/library';
 import type { PluginSettings } from 'types/settings';

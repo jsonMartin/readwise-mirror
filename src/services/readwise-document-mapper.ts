@@ -1,4 +1,4 @@
-import { AUTHOR_SEPARATORS } from 'constants/index';
+import { AUTHOR_SEPARATORS } from 'src/constants';
 import type { ReadwiseDocument } from 'types/document';
 import type { Export, Highlight, Tag } from 'types/library';
 import type { PluginSettings } from 'types/settings';

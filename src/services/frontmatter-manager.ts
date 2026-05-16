@@ -1,7 +1,7 @@
-import { EMPTY_FRONTMATTER, READWISE_URI_FIELD } from 'constants/index';
 import { type FileManager, parseYaml, type TFile } from 'obsidian';
 import { Frontmatter, FrontmatterError } from 'services/frontmatter';
 import { renderFrontmatterTemplate } from 'services/template-rendering';
+import { EMPTY_FRONTMATTER, READWISE_URI_FIELD } from 'src/constants';
 import type { AtomicFile, BaseFile, ReadwiseDocument } from 'types/document';
 import type { PluginContext } from 'types/plugin-context';
 import type { ReadwiseEnvironment } from './readwise-environment';
