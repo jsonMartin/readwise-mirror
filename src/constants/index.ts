@@ -99,8 +99,7 @@ export const FRONTMATTER_TO_ESCAPE = ['title', 'sanitized_title', 'author', 'aut
 export const EMPTY_FRONTMATTER: string = '---\n---\n';
 
 // Core Template
-export const NUNJUCKS_CORE_TEMPLATE = `
-{%- block header %}
+export const NUNJUCKS_CORE_TEMPLATE = `{%- block header %}
 {#- Render the header using the header template #}
 {%- set id = doc.id %}
 {%- set highlights_url = doc.readwise_url %}
@@ -124,7 +123,6 @@ export const NUNJUCKS_CORE_TEMPLATE = `
 {%- set hl_tags_nohash = doc.hl_tags_nohash %}
 {% include headerTemplate ignore missing %}
 {%- endblock header %}
-
 {%- block highlights %}
   {%- for highlight in highlights %}
   {#- Render each highlight using the highlight template #}

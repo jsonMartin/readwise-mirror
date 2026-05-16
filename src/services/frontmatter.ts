@@ -143,6 +143,7 @@ export class Frontmatter {
       return '';
     }
 
+    // We include a newline at the end of the frontmatter
     return [Frontmatter.DELIMITER, stringifyYaml(this.data).trim(), Frontmatter.DELIMITER].join('\n');
   }
 
