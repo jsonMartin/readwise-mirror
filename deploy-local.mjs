@@ -25,14 +25,16 @@
  * 3. Run `node deploy-local.js`
  */
 
-import dotenv from 'dotenv';
-dotenv.config();
-import { existsSync, readFileSync, writeFileSync, copyFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+if (typeof process.loadEnvFile === "function") {
+  process.loadEnvFile();
+}
 
 // Validate environment
 if (!process.env.OBSIDIAN_PLUGIN_ROOT || !process.env.PACKAGE_NAME) {
-  console.error('OBSIDIAN_PLUGIN_ROOT and/or PACKAGE_NAME are not defined');
+  console.error("OBSIDIAN_PLUGIN_ROOT and/or PACKAGE_NAME are not defined");
   console.log(`$OBSIDIAN_PLUGIN_ROOT: ${process.env.OBSIDIAN_PLUGIN_ROOT}`);
   console.log(`$PACKAGE_NAME: ${process.env.PACKAGE_NAME}`);
   process.exit(1);
@@ -40,7 +42,11 @@ if (!process.env.OBSIDIAN_PLUGIN_ROOT || !process.env.PACKAGE_NAME) {
 
 // Configure deployment
 const DEPLOY_PATH = `${process.env.OBSIDIAN_PLUGIN_ROOT}/${process.env.PACKAGE_NAME}`;
-const DEPLOY_FILES = ['main.js', 'manifest.json', { src: 'src/ui/styles/styles.css', dest: 'styles.css' }];
+const DEPLOY_FILES = [
+  "main.js",
+  "manifest.json",
+  { src: "src/ui/styles/styles.css", dest: "styles.css" },
+];
 
 try {
   // Create deploy directory if it doesn't exist
@@ -50,8 +56,8 @@ try {
 
   // Copy files to plugin directory: use filename if array element is string, otherwise use src/dest object
   for (const file of DEPLOY_FILES) {
-    const src = typeof file === 'string' ? file : file.src;
-    const dest = typeof file === 'string' ? file : file.dest;
+    const src = typeof file === "string" ? file : file.src;
+    const dest = typeof file === "string" ? file : file.dest;
     const destPath = join(DEPLOY_PATH, dest);
 
     // Check if source file exists
@@ -60,13 +66,15 @@ try {
     }
 
     switch (dest) {
-      case 'manifest.json':
+      case "manifest.json":
         try {
-          const manifestContent = readFileSync(src, 'utf8');
+          const manifestContent = readFileSync(src, "utf8");
           const json = JSON.parse(manifestContent);
-          json.version = `${json.version}-${new Date().toISOString().replace(/[-:.TZ]/g, '')}`;
+          json.version = `${json.version}-${new Date().toISOString().replace(/[-:.TZ]/g, "")}`;
           writeFileSync(destPath, `${JSON.stringify(json, null, 4)}\n`);
-          console.log(`Written ${src} to ${destPath} with updated version ${json.version}`);
+          console.log(
+            `Written ${src} to ${destPath} with updated version ${json.version}`,
+          );
         } catch (err) {
           throw new Error(`Failed to process manifest.json: ${err.message}`);
         }
@@ -76,7 +84,9 @@ try {
           copyFileSync(src, destPath);
           console.log(`Copied ${src} to ${destPath}`);
         } catch (err) {
-          throw new Error(`Failed to copy ${src} to ${destPath}: ${err.message}`);
+          throw new Error(
+            `Failed to copy ${src} to ${destPath}: ${err.message}`,
+          );
         }
         break;
     }
@@ -86,4 +96,4 @@ try {
   process.exit(1);
 }
 
-console.log('Deployment completed successfully');
+console.log("Deployment completed successfully");
