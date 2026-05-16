@@ -5,7 +5,9 @@
 
 import { DEFAULT_SETTINGS } from 'constants/index';
 import * as nunjucks from 'nunjucks';
+import { FileManager } from 'obsidian';
 import { FrontmatterManager } from 'services/frontmatter-manager';
+import type { ReadwiseEnvironment } from 'services/readwise-environment';
 import { registerCoreTemplateFilters, TemplateSourceLoader } from 'services/template-rendering';
 import { sampleMetadata } from 'test/sample-data';
 import type { PluginContext } from 'types/plugin-context';
@@ -43,7 +45,7 @@ function setupTestContext(): TestContext {
   const mockEnv = new nunjucks.Environment(loader, { autoescape: false });
   registerCoreTemplateFilters(mockEnv);
 
-  const manager = new FrontmatterManager(mockContext, mockEnv as any, {} as any);
+  const manager = new FrontmatterManager(mockContext, mockEnv as unknown as ReadwiseEnvironment, new FileManager());
 
   return { mockLogger, mockSettings, mockContext, mockEnv, manager };
 }
