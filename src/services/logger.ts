@@ -17,23 +17,19 @@ class Logger {
     this.debugMode = debugMode;
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: console.debug accepts any type
-  debug(...messages: any[]): void {
+  debug(...messages: unknown[]): void {
     this.debugMode && console.debug('Readwise Mirror:', ...messages);
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: console.info accepts any type
-  info(...messages: any[]): void {
+  info(...messages: unknown[]): void {
     this.debugMode && console.info('Readwise Mirror:', ...messages);
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: console.warn accepts any type
-  warn(...messages: any[]): void {
+  warn(...messages: unknown[]): void {
     console.warn('Readwise Mirror:', ...messages);
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: console.error accepts any type
-  error(...messages: any[]): void {
+  error(...messages: unknown[]): void {
     console.error('Readwise Mirror:', ...messages);
   }
 
@@ -41,8 +37,7 @@ class Logger {
     console.time(`Readwise Mirror: ${label}`);
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: console.timeLog accepts any type
-  timeLog(label: string, ...messages: any[]): void {
+  timeLog(label: string, ...messages: unknown[]): void {
     console.timeLog(`Readwise Mirror: ${label}`, ...messages);
   }
 
