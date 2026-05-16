@@ -29,14 +29,14 @@ import { createdDate, lastHighlightedDate, updatedDate } from 'utils/highlight-d
 import type { PluginSettings } from './types/settings';
 
 export default class ReadwiseMirror extends Plugin {
-  private notify: Notify;
-  private settings: PluginSettings;
+  private _notify?: Notify;
+  private _frontmatterManager?: FrontmatterManager;
+  private _deduplicatingVaultWriter?: DeduplicatingVaultWriter;
+  private settings: PluginSettings = { ...DEFAULT_SETTINGS };
   private loader: ReadwiseLoader;
   private env: ReadwiseEnvironment;
   private logger: Logger;
   private lock: Lock<string>;
-  private frontmatterManager: FrontmatterManager;
-  private deduplicatingVaultWriter: DeduplicatingVaultWriter;
 
   constructor(app: App, manifest: PluginManifest) {
     super(app, manifest);
@@ -46,6 +46,30 @@ export default class ReadwiseMirror extends Plugin {
     this.env = new ReadwiseEnvironment(this.loader, { autoescape: false });
     this.logger = new Logger(false);
     this.lock = new Lock<string>();
+  }
+
+  private get notify(): Notify {
+    if (!this._notify) {
+      throw new Error('ReadwiseMirror is not initialized yet: notify is unavailable.');
+    }
+
+    return this._notify;
+  }
+
+  private get frontmatterManager(): FrontmatterManager {
+    if (!this._frontmatterManager) {
+      throw new Error('ReadwiseMirror is not initialized yet: frontmatterManager is unavailable.');
+    }
+
+    return this._frontmatterManager;
+  }
+
+  private get deduplicatingVaultWriter(): DeduplicatingVaultWriter {
+    if (!this._deduplicatingVaultWriter) {
+      throw new Error('ReadwiseMirror is not initialized yet: deduplicatingVaultWriter is unavailable.');
+    }
+
+    return this._deduplicatingVaultWriter;
   }
 
   private get ctx() {
@@ -69,7 +93,7 @@ export default class ReadwiseMirror extends Plugin {
     this.app.workspace.onLayoutReady(async () => {
       await this.lock.acquire('readwise-mirror:loaded');
       const statusBarItem = this.addStatusBarItem();
-      this.notify = new Notify(statusBarItem);
+      this._notify = new Notify(statusBarItem);
       await this.initializeUI();
     });
   }
@@ -85,8 +109,8 @@ export default class ReadwiseMirror extends Plugin {
     this.logger.info('Readwise Mirror plugin loaded.');
 
     // Instantiate controller and attach to context
-    this.frontmatterManager = new FrontmatterManager(this.ctx, this.env, this.app.fileManager);
-    this.deduplicatingVaultWriter = new DeduplicatingVaultWriter(this.ctx, this.frontmatterManager);
+    this._frontmatterManager = new FrontmatterManager(this.ctx, this.env, this.app.fileManager);
+    this._deduplicatingVaultWriter = new DeduplicatingVaultWriter(this.ctx, this.frontmatterManager);
 
     if (!this.settings.apiToken) {
       this.notify.notice('Readwise: API Token not detected\nPlease enter in configuration page');
