@@ -1,10 +1,16 @@
-{{ text }}{%- if category == 'books' %} ([{{ location }}]({{ location_url }})){%- endif %}{%- if color %} %% Color: {{ color }} %%{%- endif %} ^{{id}}{%- if note %}
+{{ text }}
+{%- if category == 'books' %} ([{{ location }}]({{ location_url }})){%- endif -%}
+{%- if color %} %% Color: {{ color }} %%{%- endif -%}
+ ^{{id}}
+{%- if note %}
 
 Note: {{ note }}
-{%- endif %}{%- if tags %}
+{%- endif -%}
+{%- if tags %}
 
 Tags: {{ tags }}
-{%- endif %}{%- if url %}
+{%- endif -%}
+{%- if url %}
 
 [View Highlight]({{ url }})
 {%- endif %}

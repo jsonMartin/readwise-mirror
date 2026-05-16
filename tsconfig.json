@@ -7,6 +7,7 @@
     "allowJs": true,
     "noImplicitAny": true,
     "moduleResolution": "bundler",
+    "types": ["node", "jest"],
     "importHelpers": true,
     "allowSyntheticDefaultImports": true,
     "lib": ["dom", "es2021", "scripthost"],

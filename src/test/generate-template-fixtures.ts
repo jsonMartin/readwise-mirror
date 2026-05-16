@@ -16,6 +16,6 @@ export function generateTemplateFixtures(): void {
   }
 }
 
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.GENERATE_FIXTURES === 'true') {
   generateTemplateFixtures();
 }
