@@ -10,8 +10,6 @@ type RenderSettings = Pick<
   'highlightSortByLocation' | 'highlightSortOldestToNewest' | 'highlightDiscard' | 'syncNotesOnly'
 >;
 
-const FRONTMATTER_BLOCK_REGEX = /^(---\n([\s\S]*?)\n---\s*)/;
-
 export class TemplateSourceLoader extends Loader implements ILoader {
   constructor(private templates: Record<string, string> = {}) {
     super();
@@ -22,7 +20,7 @@ export class TemplateSourceLoader extends Loader implements ILoader {
     this.emit('update', name);
   }
 
-  public getSource(name: string): LoaderSource | null {
+  public getSource(name: string): LoaderSource {
     if (this.templates[name]) {
       return {
         src: this.templates[name],
@@ -31,7 +29,11 @@ export class TemplateSourceLoader extends Loader implements ILoader {
       };
     }
 
-    return null;
+    return {
+      src: '',
+      path: name,
+      noCache: true,
+    };
   }
 }
 
@@ -96,7 +98,7 @@ export function formatDate(dateStr: string): string {
 }
 
 export function formatTags(tags: Tag[], nohash = false, q = ''): string {
-  const uniqueTags = [...new Set(tags.map((tag) => tag.name.replace(/\s/, '-')))];
+  const uniqueTags = [...new Set(tags.map((tag) => tag.name.replace(/\s/g, '-')))];
 
   if (nohash) {
     return uniqueTags.map((tag) => `${q}${tag}${q}`).join(', ');
@@ -169,9 +171,9 @@ export function renderFrontmatterTemplate(
   env: Environment,
   metadata: ReadwiseDocument
 ): string {
-  const template = new Template(frontmatterTemplate, env, null, true);
+  const template = new Template(frontmatterTemplate, env, undefined, true);
 
-  return template.render(escapeMetadata(metadata, FRONTMATTER_TO_ESCAPE)).replaceAll('---', '').trim();
+  return template.render(escapeMetadata(metadata, FRONTMATTER_TO_ESCAPE)).trim();
 }
 
 export function renderMarkdownTemplate(
@@ -196,22 +198,4 @@ export function renderMarkdownTemplate(
     headerTemplate: params.headerTemplate,
     highlightTemplate: params.highlightTemplate,
   });
-}
-
-export function combineFrontmatterAndMarkdown(frontmatter: string, markdown: string): string {
-  const normalizedFrontmatter = frontmatter.trimEnd();
-  if (!normalizedFrontmatter) {
-    return markdown;
-  }
-
-  return `${normalizedFrontmatter}\n${markdown}`;
-}
-
-export function replaceNoteContentPreservingFrontmatter(existingData: string, fileContents: string): string {
-  const match = existingData.match(FRONTMATTER_BLOCK_REGEX);
-  if (!match) {
-    return existingData;
-  }
-
-  return `${match[1].trimEnd()}\n${fileContents}`;
 }

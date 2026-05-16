@@ -50,7 +50,7 @@ export function validateFrontmatterTemplate(
   } catch (error) {
     return {
       isValidYaml: false,
-      error: `Invalid YAML or Template: ${error.message}`,
+      error: `Invalid YAML or Template: ${error instanceof Error ? error.message : String(error)}`,
       preview: renderedTemplate,
     };
   }

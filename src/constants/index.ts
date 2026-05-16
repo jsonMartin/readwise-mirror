@@ -26,13 +26,12 @@ title: {{ title }}
 {# The \`normalize_author\` filter will remove prefixes like 'Dr.', 'Prof.' and others from the author field, for more consistent author names across your library. Remove it if you want to keep this and consult the Wiki for more information. #}
 author: [ {{ author | normalize_author | join(', ') }} ]
 `,
-  headerTemplate: `
-%%
+  headerTemplate: `%%
 ID: {{ id }}
 Updated: {{ updated }}
 %%
 
-![]( {{ cover_image_url }})
+![]({{ cover_image_url }})
 
 # About
 Title: [[{{ title }}]]
@@ -61,7 +60,6 @@ Summary: {{ summary }}
 {%- endif %}
 
 # Highlights
-
 `,
   highlightTemplate: `{{ text }}{%- if category == 'books' %} ([{{ location }}]({{ location_url }})){%- endif %}{%- if color %} %% Color: {{ color }} %%{%- endif %} ^{{id}}{%- if note %}
 
