@@ -13,7 +13,6 @@
     "test:frontmatter": "jest frontmatter-manager",
     "test:templates": "jest template-render",
     "test:templates:update": "jest generate-template-fixtures --runInBand",
-    "test:templates:updates": "npm run test:templates:update",
     "deploy:local": "npm run build && cross-env PACKAGE_NAME=$npm_package_name node deploy-local.mjs",
     "release:local": "npm ci && npm run build && semantic-release --dry-run false",
     "release:dry-run": "npm ci && npm run build && semantic-release --dry-run"
