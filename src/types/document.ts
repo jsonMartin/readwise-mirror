@@ -14,19 +14,21 @@ interface ReadwiseNote {
   basename: string;
   doc: ReadwiseDocument;
   frontmatter?: string;
-  contents: string | undefined;
+  contents?: string;
 }
 
 export interface BaseFile extends ReadwiseNote {
   type: 'base';
+  contents: string; // Required: always set before writing
   primary: TFile | string; // The primary file (TFile object or file path string) in case of duplicates
-  duplicates?: TFile[]; // Array of duplicate TFiles
-  atoms?: Atom[]; // Optional array of atoms if the file is atomized
+  duplicates: TFile[]; // Duplicate TFiles; empty array when none
+  atoms: Atom[]; // Atomized highlights; empty array when not atomized
 }
 
 export interface AtomicFile extends ReadwiseNote {
   type: 'atom';
   id: number; // ID of the atom (the highlight ID)
+  contents: string; // Required: always set when constructing an AtomicFile
 }
 
 /**

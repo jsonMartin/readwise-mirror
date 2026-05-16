@@ -208,7 +208,7 @@ export class DeduplicatingVaultWriter {
       if (!groupedByPath.has(path.toLowerCase())) {
         groupedByPath.set(path.toLowerCase(), []);
       }
-      groupedByPath.get(path.toLowerCase()).push(file);
+      groupedByPath.get(path.toLowerCase())?.push(file);
     }
 
     // Process each path group (i.e. files with the same category and filename)
@@ -296,7 +296,7 @@ export class DeduplicatingVaultWriter {
     }
 
     // If we have any atoms, process them (atoms will be empty of conditional atomizer leads to no atoms)
-    if (this.ctx.settings.atomicHighlights && processedPrimary && baseFile.atoms?.length > 0) {
+    if (this.ctx.settings.atomicHighlights && processedPrimary && baseFile.atoms.length > 0) {
       await this.processAtomicHighlights(processedPrimary, baseFile);
     }
   }
@@ -329,7 +329,8 @@ export class DeduplicatingVaultWriter {
       const fileExists = await this.app.vault.adapter.exists(path, false);
       if (fileExists) {
         if (overwrite) {
-          const existingFile: TFile = await this.vault.getFileByPath(path);
+          const existingFile = this.vault.getFileByPath(path);
+          if (!existingFile) throw new Error(`File not found at '${path}' despite existence check`);
           this.ctx.logger.debug('Overwriting existing file', { doc: file.doc, ...fileOptions });
           await this.frontmatterWrite(existingFile, frontmatter);
           await this.fileWrite(existingFile, file.contents, fileOptions);
@@ -340,7 +341,8 @@ export class DeduplicatingVaultWriter {
         const newPath = normalizePath(`${this.getCategoryPathFromFile(file)}/${file.basename} ${hash}.md`);
         const newFileExists = await this.app.vault.adapter.exists(newPath, false);
         if (newFileExists) {
-          const existingNewFile: TFile = await this.vault.getFileByPath(newPath);
+          const existingNewFile = this.vault.getFileByPath(newPath);
+          if (!existingNewFile) throw new Error(`File not found at '${newPath}' despite existence check`);
           this.ctx.logger.debug('Overwriting existing file (with hash)', { doc: file.doc, ...fileOptions });
           await this.frontmatterWrite(existingNewFile, frontmatter);
           await this.fileWrite(existingNewFile, file.contents, fileOptions);

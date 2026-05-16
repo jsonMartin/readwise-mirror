@@ -414,7 +414,9 @@ export default class ReadwiseMirror extends Plugin {
         primary: readwisePrimary,
         basename,
         doc,
-        contents: undefined,
+        contents: '', // Always overwritten in the atomize branches below before being pushed
+        duplicates: [], // Populated if existing files are found
+        atoms: [], // Populated only when atomizing
       };
       // note_link is just the basename in this case
       doc.linktext = basename;
@@ -433,24 +435,35 @@ export default class ReadwiseMirror extends Plugin {
 
             try {
               for (let i = 0; i < duplicates.length; i++) {
-                let newPath = normalizePath(`${duplicates[i].parent.path}/${basename} ${i + 1}.md`);
+                const duplicate = duplicates[i];
+                const duplicateParent = duplicate.parent;
+                if (!duplicateParent) {
+                  throw new Error(`Cannot rename duplicate file ${duplicate.path}: parent folder is null.`);
+                }
+                const duplicateParentPath = duplicateParent.path;
+                let newPath = normalizePath(`${duplicateParentPath}/${basename} ${i + 1}.md`);
                 // Avoid overwriting existing files
                 let suffix = i + 1;
-                while ((await this.app.vault.adapter.exists(newPath, false)) && newPath !== duplicates[i].path) {
+                while ((await this.app.vault.adapter.exists(newPath, false)) && newPath !== duplicate.path) {
                   suffix++;
-                  newPath = normalizePath(`${duplicates[i].parent.path}/${basename} ${suffix}.md`);
+                  newPath = normalizePath(`${duplicateParentPath}/${basename} ${suffix}.md`);
                 }
-                if (newPath !== duplicates[i].path) {
-                  await this.app.fileManager.renameFile(duplicates[i], newPath);
+                if (newPath !== duplicate.path) {
+                  await this.app.fileManager.renameFile(duplicate, newPath);
                 }
               }
 
               const newFileExists = await this.app.vault.adapter.exists(readwisePrimary, false);
+              const primaryParent = primary.parent;
+              if (!primaryParent) {
+                throw new Error(`Cannot rename primary file ${primary.path}: parent folder is null.`);
+              }
+              const primaryParentPath = primaryParent.path;
               // Add hash to filename if there's a collision (and the primary is not in the duplicates)
               const newPath =
                 newFileExists && readwisePrimary !== primary.path
-                  ? normalizePath(`${primary.parent.path}/${basename} ${hash}.md`)
-                  : normalizePath(`${primary.parent.path}/${basename}.md`);
+                  ? normalizePath(`${primaryParentPath}/${basename} ${hash}.md`)
+                  : normalizePath(`${primaryParentPath}/${basename}.md`);
               this.logger.debug(`Rename file from ${primary.path} to ${newPath}`);
               await this.app.fileManager.renameFile(primary, newPath);
             } catch (error) {
@@ -469,7 +482,7 @@ export default class ReadwiseMirror extends Plugin {
       let frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile, hasExistingFrontmatter);
       if (hasExistingFrontmatter) {
         const primaryFile: TFile = readwiseFile.primary as TFile;
-        const fileMetadata: CachedMetadata = this.app.metadataCache.getFileCache(primaryFile);
+        const fileMetadata: CachedMetadata | null = this.app.metadataCache.getFileCache(primaryFile);
         if (fileMetadata?.frontmatter) {
           const existingFrontmatter = new Frontmatter(fileMetadata.frontmatter);
           frontmatter = existingFrontmatter.merge(frontmatter);
