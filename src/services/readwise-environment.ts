@@ -1,7 +1,7 @@
 import { YAML_INDENT } from 'constants/index';
 import md5 from 'md5';
 import { type ConfigureOptions, Environment, type ILoader, type ILoaderAny, Loader, type LoaderSource } from 'nunjucks';
-import { moment, stringifyYaml } from 'obsidian';
+import { stringifyYaml } from 'obsidian';
 import type { Atom } from 'types/document';
 import { AtomizeExtension } from './atomizer';
 import { registerCoreTemplateFilters } from './template-rendering';
@@ -26,7 +26,7 @@ export class ReadwiseLoader extends Loader implements ILoader {
     this.emit('update', name);
   }
 
-  public getSource(name: string): LoaderSource | null {
+  public getSource(name: string): LoaderSource {
     // Custom logic to retrieve the template source by name
     if (this.templates[name]) {
       return {
@@ -35,7 +35,11 @@ export class ReadwiseLoader extends Loader implements ILoader {
         noCache: true,
       };
     }
-    return null;
+    return {
+      src: '',
+      path: name,
+      noCache: true,
+    };
   }
 }
 
@@ -55,7 +59,7 @@ export class ReadwiseEnvironment extends Environment {
    * Initialize custom filters for the Readwise environment
    */
   private setupFilters(): void {
-    registerCoreTemplateFilters(this, (date, format) => moment(date).format(format));
+    registerCoreTemplateFilters(this, (date, format) => window.moment(date).format(format));
 
     // Convert newlines to blockquotes
     this.addFilter('bq', (str: string) => {
