@@ -7,32 +7,18 @@ import type { Controller } from './controller';
 
 /**
  * Manages command registration for the Readwise Mirror plugin
- * Singleton class to ensure only one instance exists
  */
 export class CommandManager {
-  private static instance: CommandManager;
-
-  private constructor(
+  constructor(
     private plugin: ReadwiseMirror,
     private ctx: PluginContext,
     private ctr: Controller
   ) {}
 
-  // Create and initialize the command manager
-  public static async initialize(plugin: ReadwiseMirror, ctx: PluginContext, ctr: Controller): Promise<CommandManager> {
-    if (!CommandManager.instance) {
-      const instance = new CommandManager(plugin, ctx, ctr);
-      instance.registerCommands();
-      instance.registerEvents();
-      instance.runStartupCommands();
-      CommandManager.instance = instance;
-    }
-    return CommandManager.instance;
-  }
-
-  // Reset the singleton instance (for testing purposes)
-  public static reset(): void {
-    CommandManager.instance = undefined;
+  public initialize(): void {
+    this.registerCommands();
+    this.registerEvents();
+    this.runStartupCommands();
   }
 
   /**
