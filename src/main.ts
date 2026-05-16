@@ -126,13 +126,13 @@ export default class ReadwiseMirror extends Plugin {
     let controllerInstance: Controller;
     try {
       controllerInstance = await Controller.initialize(this, this.ctx);
+      CommandManager.initialize(this, this.ctx, controllerInstance);
     } catch (error) {
       this.logger.error('Error initializing Readwise controller:', error);
       // Show concise user-facing notice but do not rethrow — allow plugin to continue
       // eslint-disable-next-line no-new
       this.notify.notice('Readwise: Controller initialization failed. Check console for details.');
     }
-    CommandManager.initialize(this, this.ctx, controllerInstance);
 
     // Update status bar every second if synced
     this.registerInterval(
