@@ -1,4 +1,3 @@
-import { DEFAULT_SETTINGS } from 'constants/index';
 import type ReadwiseMirror from 'main';
 import {
   type ButtonComponent,
@@ -12,6 +11,7 @@ import {
 import { Controller } from 'services/controller';
 import { TokenValidationError } from 'services/readwise-api';
 import type { ReadwiseEnvironment } from 'services/readwise-environment';
+import { DEFAULT_SETTINGS } from 'src/constants';
 import type { PluginContext } from 'types/plugin-context';
 import type { TemplateValidationResult } from 'types/utilities';
 import { WarningDialog } from 'ui/dialog';
@@ -161,7 +161,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           this.ctx.logger.debug('Token successfully retrieved');
           this.ctx.settings.apiToken = data.userAccessToken as string;
           await this.ctx.saveAndApplySettings();
-          await this.display(); // Refresh the settings page
+          this.display(); // Refresh the settings page
           return true;
         }
       }
@@ -175,7 +175,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     }
 
     const timeout = Math.min(BASE_TIMEOUT * 2 ** attempt, MAX_TIMEOUT);
-    await new Promise((resolve) => setTimeout(resolve, timeout));
+    await new Promise((resolve) => window.setTimeout(resolve, timeout));
     return this.getUserAuthToken(attempt + 1);
   }
 
@@ -223,12 +223,14 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       const syntaxNote = container.createDiv({ cls: 'template-syntax-note' });
       syntaxNote.appendText('Supports Nunjucks templating syntax. See ');
       const link = syntaxNote.createEl('a', {
+        // eslint-disable-next-line obsidianmd/ui/sentence-case
         text: 'built-in filters documentation',
         href: 'https://mozilla.github.io/nunjucks/templating.html#builtin-filters',
       });
       link.setAttr('target', '_blank');
       syntaxNote.appendText(' and the ');
       syntaxNote.createEl('a', {
+        // eslint-disable-next-line obsidianmd/ui/sentence-case
         text: 'documentation in the Wiki',
         href: 'https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-Templating',
       });
@@ -236,7 +238,11 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     });
   }
 
-  async display(): Promise<void> {
+  display(): void {
+    void this.displayAsync();
+  }
+
+  private async displayAsync(): Promise<void> {
     const { containerEl } = this;
     containerEl.empty();
 
@@ -394,36 +400,32 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Readwise authentication')
       .setDesc(
-        createFragment(async (fragment) => {
+        createFragment((fragment) => {
           fragment.createEl('strong', { text: 'How to authenticate: ' });
           fragment.appendText('Paste your API key from ');
+          // eslint-disable-next-line obsidianmd/ui/sentence-case
           fragment.createEl('a', { text: 'readwise.io/access_token', href: 'https://readwise.io/access_token' });
           fragment.appendText(', or use the "Authenticate with Readwise" button for automatic retrieval of the token.');
           fragment.createEl('br');
           fragment.append(this.requireTokenValidationMessage());
-          // Show success or error message based on token validity
-          if (await Controller.validateAPIInstance()) {
-            this.setTokenValidationStatus('running');
-          } else {
-            this.setTokenValidationStatus('error');
-          }
           this.updateAuthButtons('verifying');
+          this.setTokenValidationStatus('running');
 
-          // Validate the token on load
-
-          try {
-            hasValidToken = await Controller.validateAPIInstance();
-            if (hasValidToken) this.ctx.setStatusBarText('Readwise: Click to Sync');
-            this.updateAuthButtons(hasValidToken ? 'valid' : 'invalid');
-            this.setTokenValidationStatus(hasValidToken ? 'success' : 'invalid');
-          } catch (error) {
-            this.updateAuthButtons('invalid');
-            if (error instanceof TokenValidationError) {
-              this.setTokenValidationStatus('error', error.message);
-            } else {
-              this.setTokenValidationStatus('error', 'Token validation error');
+          void (async () => {
+            try {
+              hasValidToken = await Controller.validateAPIInstance();
+              if (hasValidToken) this.ctx.setStatusBarText('Readwise: Click to Sync');
+              this.updateAuthButtons(hasValidToken ? 'valid' : 'invalid');
+              this.setTokenValidationStatus(hasValidToken ? 'success' : 'invalid');
+            } catch (error) {
+              this.updateAuthButtons('invalid');
+              if (error instanceof TokenValidationError) {
+                this.setTokenValidationStatus('error', error.message);
+              } else {
+                this.setTokenValidationStatus('error', 'Token validation error');
+              }
             }
-          }
+          })();
         })
       )
       .addButton((button) => {
@@ -441,20 +443,20 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             });
             authModal.contentEl.createEl('br');
             const buttonContainer = authModal.contentEl.createDiv();
-            buttonContainer.style.display = 'flex';
-            buttonContainer.style.justifyContent = 'flex-end';
-            buttonContainer.style.gap = '10px';
+            buttonContainer.addClass('readwise-modal-actions');
 
             const cancelButton = buttonContainer.createEl('button', { text: 'Cancel' });
             const continueButton = buttonContainer.createEl('button', { text: 'Understood' });
             continueButton.addClass('mod-cta');
 
             cancelButton.onclick = () => authModal.close();
-            continueButton.onclick = async () => {
+            continueButton.onclick = () => {
               authModal.close();
-              const isAuthenticated = await this.getUserAuthToken();
-              this.updateAuthButtons(isAuthenticated ? 'valid' : 'invalid');
-              this.setTokenValidationStatus(isAuthenticated ? 'success' : 'invalid');
+              void (async () => {
+                const isAuthenticated = await this.getUserAuthToken();
+                this.updateAuthButtons(isAuthenticated ? 'valid' : 'invalid');
+                this.setTokenValidationStatus(isAuthenticated ? 'success' : 'invalid');
+              })();
             };
             authModal.open();
           })
@@ -468,7 +470,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
         tokenInputEl.type = 'password';
 
-        this.tokenValue.setPlaceholder('API Token').setValue(token);
+        this.tokenValue.setPlaceholder('API token').setValue(token);
         this.tokenValue.onChange(() => {
           const value = tokenInputEl.value;
           if (value !== this.ctx.settings.apiToken) {
@@ -548,7 +550,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           this.ctx.settings.filterNotesByTag = value;
           // Trigger a refresh of the settings display to show/hide the tags input
           await this.ctx.saveAndApplySettings();
-          await this.display();
+          this.display();
         })
       );
 
@@ -627,7 +629,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           toggle.setDisabled(true);
           if (this.ctx.settings.atomicHighlights) {
             this.ctx.settings.atomicHighlights = false;
-            this.ctx.saveAndApplySettings(); // Fire and forget is acceptable here
+            void this.ctx.saveAndApplySettings(); // Fire and forget is acceptable here
           }
         } else {
           toggle.setValue(this.ctx.settings.atomicHighlights).onChange(async (value) => {
@@ -802,7 +804,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
                 if (confirmed) {
                   this.ctx.settings.trackFiles = false;
                   await this.ctx.saveAndApplySettings();
-                  await this.display();
+                  this.display();
                 } else {
                   toggle.setValue(true);
                 }
@@ -811,7 +813,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           } else {
             this.ctx.settings.trackFiles = value;
             await this.ctx.saveAndApplySettings();
-            await this.display();
+            this.display();
           }
         })
       );
@@ -849,7 +851,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
                   if (confirmed) {
                     this.ctx.settings.trackAcrossVault = false;
                     await this.ctx.saveAndApplySettings();
-                    await this.display();
+                    this.display();
                   } else {
                     toggle.setValue(true);
                   }
@@ -858,7 +860,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             } else {
               this.ctx.settings.trackAcrossVault = value;
               await this.ctx.saveAndApplySettings();
-              await this.display();
+              this.display();
             }
           })
         );
@@ -883,10 +885,8 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               });
 
               const buttonContainer = modal.contentEl.createDiv();
-              buttonContainer.style.display = 'flex';
-              buttonContainer.style.justifyContent = 'flex-end';
-              buttonContainer.style.gap = '10px';
-              buttonContainer.style.marginTop = '20px';
+              buttonContainer.addClass('readwise-modal-actions');
+              buttonContainer.addClass('readwise-modal-actions-spaced');
 
               const cancelButton = buttonContainer.createEl('button', {
                 text: 'Cancel',
@@ -894,17 +894,19 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               const confirmButton = buttonContainer.createEl('button', {
                 text: 'Confirm',
               });
-              confirmButton.style.backgroundColor = 'var(--background-modifier-error)';
+              confirmButton.addClass('readwise-modal-danger-btn');
 
               cancelButton.onclick = () => {
                 toggle.setValue(false);
                 modal.close();
               };
 
-              confirmButton.onclick = async () => {
-                this.ctx.settings.deleteDuplicates = true;
-                await this.ctx.saveAndApplySettings();
-                modal.close();
+              confirmButton.onclick = () => {
+                void (async () => {
+                  this.ctx.settings.deleteDuplicates = true;
+                  await this.ctx.saveAndApplySettings();
+                  modal.close();
+                })();
               };
 
               modal.open();
@@ -941,7 +943,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           toggle.setValue(this.ctx.settings.enableFileNameUpdates).onChange(async (value) => {
             this.ctx.settings.enableFileNameUpdates = value;
             await this.ctx.saveAndApplySettings();
-            await this.display();
+            this.display();
           })
         );
     }
@@ -954,7 +956,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           toggle.setValue(this.ctx.settings.useCustomFilename).onChange(async (value) => {
             this.ctx.settings.useCustomFilename = value;
             await this.ctx.saveAndApplySettings();
-            await this.display();
+            this.display();
           })
         );
 
@@ -1001,7 +1003,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             this.ctx.settings.useSlugify = value;
             await this.ctx.saveAndApplySettings();
             // Trigger re-render to show/hide property selector
-            await this.display();
+            this.display();
           })
         );
 
@@ -1055,7 +1057,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           this.ctx.settings.logFile = value;
           await this.ctx.saveAndApplySettings();
           // Trigger re-render to show/hide log filename setting
-          await this.display();
+          this.display();
         })
       );
 
@@ -1106,7 +1108,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     // Documentation block for templates
 
     new Setting(containerEl)
-      .setName('Frontmatter settings')
+      .setName('Frontmatter options')
       .setDesc(
         createFragment((fragment) => {
           fragment.appendText('Controls the YAML metadata at the top of each note');
@@ -1127,12 +1129,12 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               this.ctx.settings.frontMatter = value;
               await this.ctx.saveAndApplySettings();
               // Trigger re-render to show/hide frontmatter settings
-              await this.display();
+              this.display();
             } else if (value && !isValidYaml) {
               this.ctx.notice(`Invalid frontmatter template: ${error}`);
               toggle.setValue(false);
               // Trigger re-render to show/hide property selector
-              await this.display();
+              this.display();
             }
           } catch (error) {
             this.ctx.logger.error('Error validating frontmatter template:', error);
@@ -1160,7 +1162,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             this.ctx.settings.updateFrontmatter = value;
             await this.ctx.saveAndApplySettings();
             // Trigger re-render to show/hide protection settings
-            await this.display();
+            this.display();
           })
         );
 
@@ -1190,7 +1192,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             toggle.setValue(this.ctx.settings.protectFrontmatter).onChange(async (value) => {
               this.ctx.settings.protectFrontmatter = value;
               await this.ctx.saveAndApplySettings();
-              await this.display();
+              this.display();
             })
           );
 
@@ -1310,29 +1312,18 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
         // Create preview elements below textarea
         const previewContainer = container.createDiv('template-preview');
-        const previewTitle = previewContainer.createDiv({
+        previewContainer.createDiv({
           text: 'Template Preview (Error):',
-          cls: 'template-preview-title',
-          attr: {
-            style: 'color: var(--text-error);',
-          },
+          cls: ['template-preview-title', 'template-preview-title-error'],
         });
-        previewTitle.style.fontWeight = 'bold';
-        previewTitle.style.marginTop = '1em';
 
         const errorNotice = previewContainer.createDiv({
           cls: 'validation-notice',
-          attr: {
-            style: 'color: var(--text-error); margin-top: 1em;',
-          },
         });
         errorNotice.id = 'validation-notice';
 
         const previewContent = previewContainer.createEl('pre', {
           cls: ['template-preview-content', 'settings-template-input'],
-          attr: {
-            style: 'background-color: var(--background-secondary); padding: 1em; border-radius: 4px; overflow-x: auto;',
-          },
         });
         previewContent.id = 'template-preview-content';
 
