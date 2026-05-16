@@ -90,6 +90,9 @@ export function escapeValue(value: string, { multiline = false }: YamlEscapeOpti
 
 export function escapeMetadata(metadata: ReadwiseDocument, fieldsToProcess: Array<string>): ReadwiseDocument {
   const processedMetadata = { ...metadata } as ReadwiseDocument;
+  const setFieldValue = <K extends keyof ReadwiseDocument>(key: K, value: ReadwiseDocument[K]): void => {
+    processedMetadata[key] = value;
+  };
 
   for (const field of fieldsToProcess) {
     if (field in processedMetadata && processedMetadata[field as keyof ReadwiseDocument]) {
@@ -97,11 +100,10 @@ export function escapeMetadata(metadata: ReadwiseDocument, fieldsToProcess: Arra
       const value = processedMetadata[key];
 
       if (Array.isArray(value)) {
-        (processedMetadata[key] as unknown) = value.map((item) =>
-          typeof item === 'string' ? escapeValue(item) : item
-        );
+        const escapedArray = value.map((item) => (typeof item === 'string' ? escapeValue(item) : item));
+        setFieldValue(key, escapedArray as ReadwiseDocument[typeof key]);
       } else if (typeof value === 'string') {
-        (processedMetadata[key] as unknown) = escapeValue(value);
+        setFieldValue(key, escapeValue(value) as ReadwiseDocument[typeof key]);
       }
     }
   }
