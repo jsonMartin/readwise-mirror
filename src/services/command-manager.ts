@@ -1,5 +1,5 @@
 import type ReadwiseMirror from 'main';
-import { type Command, type Menu, type TAbstractFile, TFile, TFolder } from 'obsidian';
+import { type Menu, type TAbstractFile, TFile, TFolder } from 'obsidian';
 import { getTrackingUrl, isFolderInReadwiseLibrary } from 'utils/file-utils';
 import type { PluginContext } from '../types/plugin-context';
 import { getPluginCommands } from '../utils/plugin-commands';
@@ -27,7 +27,7 @@ export class CommandManager {
   private registerCommands(): void {
     const commands = getPluginCommands(this.ctr, this.ctx);
     for (const cmd of commands) {
-      this.plugin.addCommand(cmd as Command);
+      this.plugin.addCommand(cmd);
     }
   }
 
@@ -46,7 +46,7 @@ export class CommandManager {
   public runStartupCommands(): void {
     // Run sync on startup if enabled
     if (this.ctx.settings.autoSync) {
-      this.ctr.sync();
+      void this.ctr.sync();
     }
   }
   /**

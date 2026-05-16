@@ -3,6 +3,20 @@ import spacetime from 'spacetime';
 import { Controller } from '../services/controller';
 import type { PluginContext } from '../types/plugin-context';
 
+function toErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'string') return err;
+  if (typeof err === 'number' || typeof err === 'boolean') return err.toString();
+  if (err === null) return 'null';
+  if (typeof err === 'undefined') return 'undefined';
+
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return 'Unknown error';
+  }
+}
+
 /**
  * Construct all plugin commands for the CommandManager
  * @param ctr ReadwiseController instance
@@ -27,8 +41,8 @@ export function getPluginCommands(ctr: Controller, ctx: PluginContext): Command[
         try {
           const isTokenValid = await Controller.validateAPIInstance();
           ctx.notice(`Readwise: ${isTokenValid ? 'Token is valid' : 'INVALID TOKEN'}`);
-        } catch (err) {
-          ctx.notice(`Failed to validate API key: ${err.message}`);
+        } catch (err: unknown) {
+          ctx.notice(`Failed to validate API key: ${toErrorMessage(err)}`);
         }
       },
     },
@@ -47,7 +61,12 @@ export function getPluginCommands(ctr: Controller, ctx: PluginContext): Command[
       name: 'Adjust Filenames to current settings',
       checkCallback: (checking: boolean) => {
         if (ctx.settings.trackFiles && ctx.settings.enableFileNameUpdates) {
-          if (!checking) ctr.handleFilenameAdjustment();
+          if (!checking) {
+            void ctr.handleFilenameAdjustment().catch((err: unknown) => {
+              ctx.logger.error('Failed to adjust filenames', err);
+              ctx.notice(`Failed to adjust filenames: ${toErrorMessage(err)}`);
+            });
+          }
           return true;
         }
         return false;
@@ -58,7 +77,12 @@ export function getPluginCommands(ctr: Controller, ctx: PluginContext): Command[
       name: 'Update all Readwise note frontmatter',
       checkCallback: (checking: boolean) => {
         if (ctx.settings.frontMatter && ctx.settings.trackFiles) {
-          if (!checking) ctr.updateAllFrontmatter();
+          if (!checking) {
+            void ctr.updateAllFrontmatter().catch((err: unknown) => {
+              ctx.logger.error('Failed to update all frontmatter', err);
+              ctx.notice(`Failed to update frontmatter: ${toErrorMessage(err)}`);
+            });
+          }
           return true;
         }
         return false;
@@ -70,7 +94,12 @@ export function getPluginCommands(ctr: Controller, ctx: PluginContext): Command[
       checkCallback: (checking: boolean) => {
         const trackedFile = ctr.getUpdatableNote(ctx.app.workspace.getActiveFile());
         if (!trackedFile) return false;
-        if (!checking) ctr.updateSingleNote(trackedFile);
+        if (!checking) {
+          void ctr.updateSingleNote(trackedFile).catch((err: unknown) => {
+            ctx.logger.error('Failed to update current note', err);
+            ctx.notice(`Failed to update current note: ${toErrorMessage(err)}`);
+          });
+        }
         return true;
       },
     },
@@ -82,7 +111,9 @@ export function getPluginCommands(ctr: Controller, ctx: PluginContext): Command[
           if (!checking) {
             const d = spacetime.now().subtract(2, 'months');
             ctx.settings.lastUpdated = d.format('iso');
-            ctx.saveAndApplySettings().catch((err) => ctx.notice(`Failed to save settings: ${err.message}`));
+            void ctx
+              .saveAndApplySettings()
+              .catch((err: unknown) => ctx.notice(`Failed to save settings: ${toErrorMessage(err)}`));
           }
           return true;
         }

@@ -89,8 +89,8 @@ export default class ReadwiseApi {
     includeDeleted?: boolean
   ): Promise<Export[]> {
     const url = `${API_ENDPOINT}/${contentType}?`;
-    let data: Record<string, unknown>;
-    let nextPageCursor: string;
+    let data: Record<string, unknown> | undefined;
+    let nextPageCursor: string | undefined;
 
     const results = [];
 
@@ -103,8 +103,8 @@ export default class ReadwiseApi {
         if (lastUpdated && lastUpdated !== '') {
           queryParams.append('updatedAfter', lastUpdated);
         }
-        if (bookId) {
-          queryParams.append('ids', bookId.toString());
+        if (bookId && bookId.length > 0) {
+          queryParams.append('ids', bookId.join(','));
         }
         if (nextPageCursor) {
           queryParams.append('pageCursor', nextPageCursor);
@@ -115,14 +115,17 @@ export default class ReadwiseApi {
 
         // Notify user of progress
         if (lastUpdated) this.ctx.logger.debug(`Checking for new content since ${lastUpdated}`);
-        if (bookId) this.ctx.logger.debug(`Checking for all highlights on book ID: ${bookId}`);
+        if (bookId && bookId.length > 0) {
+          this.ctx.logger.debug(`Checking for all highlights on book IDs: ${bookId.join(',')}`);
+        }
         let statusBarText = `Readwise: Fetching ${contentType}`;
         if (data?.count) statusBarText += ` (${results.length})`;
         this.ctx.setStatusBarText(statusBarText);
 
         // FIXME: When fetching very long period of data, the request might fail due to an URL which is too long (Error 414)
         const response: RequestUrlResponse = await requestUrl({ url: url + queryParams.toString(), ...this.options });
-        data = response.json;
+        const pageData = response.json as Record<string, unknown>;
+        data = pageData;
 
         if (response.status !== 429 && (response.status < 200 || response.status >= 300)) {
           this.ctx.logger.error(`Failed to fetch data. Status: ${response.status}`);
@@ -141,20 +144,21 @@ export default class ReadwiseApi {
           }
           this.ctx.setStatusBarText(`Readwise: API Rate Limited, waiting ${rateLimitedDelayTime}`);
 
-          await new Promise((_) => setTimeout(_, rateLimitedDelayTime));
+          await new Promise((resolve) => activeWindow.setTimeout(resolve, rateLimitedDelayTime));
           this.ctx.logger.debug('Trying to fetch highlights again...');
           this.ctx.setStatusBarText('Readwise: Attempting to retry...');
         } else {
-          if (data.results && Array.isArray(data.results)) {
-            results.push(...data.results);
+          if (pageData.results && Array.isArray(pageData.results)) {
+            results.push(...pageData.results);
           } else {
             this.ctx.logger.warn('No results found in the response data.');
           }
-          nextPageCursor = data.nextPageCursor as string;
+          const rawNextPageCursor = pageData.nextPageCursor;
+          nextPageCursor = typeof rawNextPageCursor === 'string' ? rawNextPageCursor : '';
           if (!nextPageCursor) {
             break;
           }
-          this.ctx.logger.debug(`There are more records left, proceeding to next page: ${data.nextPageCursor}`);
+          this.ctx.logger.debug(`There are more records left, proceeding to next page: ${nextPageCursor}`);
         }
       }
     } finally {

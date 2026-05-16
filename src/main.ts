@@ -1,6 +1,5 @@
 // Plugin classes
 import { Lock } from 'async-await-mutex-lock';
-import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS } from 'constants/index';
 import { type App, type CachedMetadata, normalizePath, Plugin, type PluginManifest, TFile } from 'obsidian';
 import { Atomizer } from 'services/atomizer';
 import { CommandManager } from 'services/command-manager';
@@ -13,6 +12,7 @@ import { buildReadwiseDocument } from 'services/readwise-document-mapper';
 import { ReadwiseEnvironment, ReadwiseLoader } from 'services/readwise-environment';
 import { filterHighlights, renderMarkdownTemplate } from 'services/template-rendering';
 import spacetime from 'spacetime';
+import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS } from 'src/constants';
 import type { BaseFile, ReadwiseDocument } from 'types/document';
 import type { Export, Library } from 'types/library';
 import type { PluginContext } from 'types/plugin-context';
@@ -85,11 +85,13 @@ export default class ReadwiseMirror extends Plugin {
 
   public async onload() {
     // Move UI setup to onLayoutReady
-    this.app.workspace.onLayoutReady(async () => {
-      await this.lock.acquire('readwise-mirror:loaded');
-      const statusBarItem = this.addStatusBarItem();
-      this._notify = new Notify(statusBarItem);
-      await this.initializeUI();
+    this.app.workspace.onLayoutReady(() => {
+      void (async () => {
+        await this.lock.acquire('readwise-mirror:loaded');
+        const statusBarItem = this.addStatusBarItem();
+        this._notify = new Notify(statusBarItem);
+        await this.initializeUI();
+      })();
     });
   }
 
@@ -125,7 +127,6 @@ export default class ReadwiseMirror extends Plugin {
     } catch (error) {
       this.logger.error('Error initializing Readwise controller:', error);
       // Show concise user-facing notice but do not rethrow — allow plugin to continue
-      // eslint-disable-next-line no-new
       this.notify.notice('Readwise: Controller initialization failed. Check console for details.');
     }
 
@@ -275,7 +276,7 @@ export default class ReadwiseMirror extends Plugin {
 
         await vault.process(logFile, (content) => `${content}\n\n${logString}`);
       } else {
-        vault.create(path, logString);
+        await vault.create(path, logString);
       }
     } catch (err) {
       this.logger.error('Error writing to sync log file', err);
@@ -437,11 +438,13 @@ export default class ReadwiseMirror extends Plugin {
       const hasExistingFrontmatter = readwiseFile.primary instanceof TFile;
       let frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile, hasExistingFrontmatter);
       if (hasExistingFrontmatter) {
-        const primaryFile: TFile = readwiseFile.primary as TFile;
-        const fileMetadata: CachedMetadata | null = this.app.metadataCache.getFileCache(primaryFile);
-        if (fileMetadata?.frontmatter) {
-          const existingFrontmatter = new Frontmatter(fileMetadata.frontmatter);
-          frontmatter = existingFrontmatter.merge(frontmatter);
+        const primaryFile = readwiseFile.primary;
+        if (primaryFile instanceof TFile) {
+          const fileMetadata: CachedMetadata | null = this.app.metadataCache.getFileCache(primaryFile);
+          if (fileMetadata?.frontmatter) {
+            const existingFrontmatter = new Frontmatter(fileMetadata.frontmatter);
+            frontmatter = existingFrontmatter.merge(frontmatter);
+          }
         }
       }
 
@@ -456,8 +459,6 @@ export default class ReadwiseMirror extends Plugin {
         highlightTemplate: 'highlight',
         settings: this.settings,
       });
-
-      _contents;
 
       // Assign frontmatter to readwiseFile
       readwiseFile.frontmatter = frontmatter?.toString();

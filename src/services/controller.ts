@@ -1,5 +1,5 @@
-import { READWISE_REVIEW_URL_BASE } from 'constants/index';
 import { TFile, TFolder } from 'obsidian';
+import { READWISE_REVIEW_URL_BASE } from 'src/constants';
 import type { Library } from 'types/library';
 import type { TTrackedFile } from 'types/readwise-note';
 import { getTrackingUrl, isFileInFolder, normalizeFilename } from 'utils/file-utils';
@@ -68,8 +68,7 @@ export class Controller {
     try {
       let library: Library;
       if (!this.ctx.settings.lastUpdated) {
-        if (this.ctx.settings.syncNotifications)
-          this.ctx.notice('Readwise: Downloading full Readwise library');
+        if (this.ctx.settings.syncNotifications) this.ctx.notice('Readwise: Downloading full Readwise library');
         if (!(await Controller.validateAPIInstance())) {
           this.ctx.notice('Readwise: Network connection and valid API Token required');
           return;
@@ -188,7 +187,7 @@ export class Controller {
       this.ctx.logger.debug('Readwise: downloading full library to update frontmatter...');
       const library = await this.api.downloadFullLibrary();
       // ...existing filtering logic...
-      this.plugin.processFrontmatterUpdatesInLibrary(library);
+      await this.plugin.processFrontmatterUpdatesInLibrary(library);
       let message = `Readwise: Updated ${Object.keys(library.books).length} notes`;
       if (this.ctx.settings.filterNotesByTag && this.ctx.settings.filteredTags?.length > 0) {
         message += ` (filtered by tags: ${this.ctx.settings.filteredTags.join(', ')})`;
@@ -304,7 +303,7 @@ export class Controller {
         .getFiles()
         .filter((f) => f.extension === 'md' && f.parent && isFileInFolder(f, folder))
         .map((f) => this.getUpdatableNote(f))
-        .filter((tracked): tracked is TTrackedFile => tracked?.isUpdatable);
+        .filter((tracked): tracked is TTrackedFile => tracked?.isUpdatable === true);
 
       const bookIds = trackedNotes.map((tracked) => tracked.readwiseId);
 

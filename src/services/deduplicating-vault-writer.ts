@@ -172,7 +172,7 @@ export class DeduplicatingVaultWriter {
     try {
       if (this.ctx.settings.deleteDuplicates) {
         this.ctx.logger.debug(`Trashing duplicate ${file.path}`);
-        await this.vault.trash(file, true);
+        await this.app.fileManager.trashFile(file);
       } else {
         frontmatter.set('duplicate', true);
         this.ctx.logger.debug(`Marking file ${file.path} as duplicate`, frontmatter);
@@ -234,7 +234,7 @@ export class DeduplicatingVaultWriter {
       const files: TFile[] = await this.findExistingByHighlightsUrl(readwiseFile.doc);
       for (const file of files) {
         // Since we are only updating frontmatter, for existing files, we can use the Obsidian file manager for atomic frontmatter updates
-        this.app.fileManager.processFrontMatter(file, (existingFrontmatter) => {
+        await this.app.fileManager.processFrontMatter(file, (existingFrontmatter) => {
           const updates: Frontmatter = this.frontmatterManager.getFrontmatter(readwiseFile);
           const filteredFrontMatter = this.ctx.settings.protectFrontmatter
             ? this.frontmatterManager.filterProtectedFrontmatter(updates)
@@ -400,8 +400,7 @@ export class DeduplicatingVaultWriter {
    * @param frontmatter
    */
   private async frontmatterWrite(existingFile: TFile, frontmatter: Frontmatter) {
-    // biome-ignore lint/suspicious/noExplicitAny: Obsidian API exposes this as any
-    await this.app.fileManager.processFrontMatter(existingFile, (existingFrontmatter: any) => {
+    await this.app.fileManager.processFrontMatter(existingFile, (existingFrontmatter: Record<string, unknown>) => {
       for (const [key, value] of frontmatter.entries()) {
         existingFrontmatter[key] = value;
       }
