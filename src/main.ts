@@ -9,23 +9,18 @@ import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
 import { Frontmatter } from 'services/frontmatter';
 import { FrontmatterManager } from 'services/frontmatter-manager';
 import Logger from 'services/logger';
+import { buildReadwiseDocument } from 'services/readwise-document-mapper';
 import { ReadwiseEnvironment, ReadwiseLoader } from 'services/readwise-environment';
-import {
-  filterHighlights,
-  formatDate,
-  formatTags,
-  renderMarkdownTemplate,
-  sortHighlights,
-} from 'services/template-rendering';
+import { filterHighlights, renderMarkdownTemplate } from 'services/template-rendering';
 import spacetime from 'spacetime';
 import type { BaseFile, ReadwiseDocument } from 'types/document';
-import type { Export, Highlight, Library, Tag } from 'types/library';
+import type { Export, Library } from 'types/library';
 import type { PluginContext } from 'types/plugin-context';
 import Notify from 'ui/notify';
 import ReadwiseMirrorSettingTab from 'ui/settings-tab';
 import { normalizeFilename } from 'utils/file-utils';
 import { humanReadableFormat } from 'utils/format-utils';
-import { createdDate, lastHighlightedDate, updatedDate } from 'utils/highlight-date-utils';
+import { createdDate, updatedDate } from 'utils/highlight-date-utils';
 import type { PluginSettings } from './types/settings';
 
 export default class ReadwiseMirror extends Plugin {
@@ -252,17 +247,6 @@ export default class ReadwiseMirror extends Plugin {
       });
   }
 
-  private getTagsFromHighlights(highlights: Highlight[]) {
-    // extract all tags from all Highlights and
-    // construct an array with unique values
-
-    let tags: Tag[] = [];
-    for (const highlight of sortHighlights(highlights, this.settings)) {
-      if (highlight.tags) tags = [...tags, ...highlight.tags];
-    }
-    return tags;
-  }
-
   public async writeLogToMarkdown(library: Library) {
     const vault = this.app.vault;
 
@@ -358,25 +342,7 @@ export default class ReadwiseMirror extends Plugin {
       bookCurrent += 1;
       const book: Export = library.books[bookId];
 
-      const {
-        user_book_id,
-        title,
-        document_note,
-        summary,
-        author,
-        category,
-        cover_image_url,
-        highlights,
-        readwise_url,
-        source_url,
-        unique_url,
-        book_tags,
-      } = book;
-
-      const created = createdDate(highlights); // No reverse sort: we want the oldest entry
-      const updated = updatedDate(highlights);
-
-      const last_highlight_at = lastHighlightedDate(highlights);
+      const { title, category, highlights, source_url } = book;
 
       // Sanitize title, replace colon with substitute from settings
       const basename = this.getFileNameFromDoc(book);
@@ -384,48 +350,14 @@ export default class ReadwiseMirror extends Plugin {
       // Filter highlights
       const filteredHighlights = filterHighlights(highlights, this.settings);
 
-      // Get highlight count from filtered highlights
-      const num_highlights = filteredHighlights.length;
-
       if (filteredHighlights.length === 0) {
         this.logger.debug(`No highlights found for '${title}' (${source_url})`);
       }
 
-      // get an array with all tags from highlights
-      const highlightTags = this.getTagsFromHighlights(filteredHighlights);
-
-      const authors = this.parseAuthor(author);
-
-      const authorStr =
-        authors[0] && authors?.length > 1
-          ? authors.map((authorName: string) => `[[${authorName.trim()}]]`).join(', ')
-          : author
-            ? `[[${author}]]`
-            : '';
-
-      const doc: ReadwiseDocument = {
-        id: user_book_id,
-        readwise_url,
-        unique_url,
-        source_url,
-        title,
-        sanitized_title: basename,
-        author: authors,
-        authorStr,
-        document_note,
-        summary,
-        category,
-        num_highlights,
-        created: created ? formatDate(created) : '',
-        updated: updated ? formatDate(updated) : '',
-        cover_image_url: cover_image_url.replace('SL200', 'SL500').replace('SY160', 'SY500'),
-        highlights,
-        last_highlight_at: last_highlight_at ? formatDate(last_highlight_at) : '',
-        tags: formatTags(book_tags),
-        highlight_tags: formatTags(highlightTags),
-        tags_nohash: formatTags(book_tags, true, "'"),
-        hl_tags_nohash: formatTags(highlightTags, true, "'"),
-      };
+      const doc: ReadwiseDocument = buildReadwiseDocument(book, {
+        basename,
+        settings: this.settings,
+      });
 
       // Get the primary path for new file before checking for duplicates
       const readwisePrimary = normalizePath(
