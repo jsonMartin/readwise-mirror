@@ -16,12 +16,12 @@ import { AUTHOR_SEPARATORS, DEFAULT_SETTINGS } from 'src/constants';
 import type { BaseFile, ReadwiseDocument } from 'types/document';
 import type { Export, Library } from 'types/library';
 import type { PluginContext } from 'types/plugin-context';
+import type { PluginSettings } from 'types/settings';
 import Notify from 'ui/notify';
 import ReadwiseMirrorSettingTab from 'ui/settings-tab';
 import { normalizeFilename } from 'utils/file-utils';
 import { humanReadableFormat } from 'utils/format-utils';
 import { createdDate, updatedDate } from 'utils/highlight-date-utils';
-import type { PluginSettings } from './types/settings';
 
 export default class ReadwiseMirror extends Plugin {
   private _notify?: Notify;
@@ -67,7 +67,7 @@ export default class ReadwiseMirror extends Plugin {
     return this._deduplicatingVaultWriter;
   }
 
-  private get ctx() {
+  private get ctx(): PluginContext {
     // Create plugin context for dependency injection
     const ctx: PluginContext = {
       settings: this.settings,
@@ -76,9 +76,9 @@ export default class ReadwiseMirror extends Plugin {
       syncLock: this.lock,
       statusBarItem: this.notify.statusBarItem,
       // exposed methods
-      notice: this.notify.notice.bind(this.notify),
-      setStatusBarText: this.notify.setStatusBarText.bind(this.notify),
-      saveAndApplySettings: this.saveAndApplySettings.bind(this),
+      notice: (message: string, duration?: number) => this.notify.notice(message, duration),
+      setStatusBarText: (message: string) => this.notify.setStatusBarText(message),
+      saveAndApplySettings: () => this.saveAndApplySettings(),
     };
     return ctx;
   }
@@ -103,7 +103,7 @@ export default class ReadwiseMirror extends Plugin {
 
   private async initializeUI() {
     await this.loadAndApplySettings();
-    this.logger.info('Readwise Mirror plugin loaded.');
+    this.logger.debug('Readwise Mirror plugin loaded.');
 
     // Instantiate controller and attach to context
     this._frontmatterManager = new FrontmatterManager(this.ctx, this.env, this.app.fileManager);
@@ -153,7 +153,8 @@ export default class ReadwiseMirror extends Plugin {
    * In particular, this updates the header and highlight templates.
    */
   async loadAndApplySettings() {
-    this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData()) };
+    const loaded = (await this.loadData()) as Partial<PluginSettings> | null;
+    this.settings = { ...DEFAULT_SETTINGS, ...(loaded ?? {}) };
     if (this.lock.isAcquired('readwise-mirror:loaded')) {
       // Only apply settings if plugin is loaded
       await this.applySettings();

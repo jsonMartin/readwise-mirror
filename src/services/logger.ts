@@ -3,46 +3,69 @@
  * @module services/logger
  */
 class Logger {
+  private groupDepth = 0;
+  private readonly timers = new Map<string, number>();
+
   constructor(private debugMode: boolean) {}
-
-  group(label: string): void {
-    if (this.debugMode) console.group(`Readwise Mirror: ${label}`);
-  }
-
-  groupEnd(): void {
-    if (this.debugMode) console.groupEnd();
-  }
 
   setDebugMode(debugMode: boolean): void {
     this.debugMode = debugMode;
   }
 
-  debug(...messages: unknown[]): void {
-    this.debugMode && console.debug('Readwise Mirror:', ...messages);
+  private getIndent(): string {
+    return '  '.repeat(this.groupDepth);
   }
 
-  info(...messages: unknown[]): void {
-    this.debugMode && console.info('Readwise Mirror:', ...messages);
+  group(label: string): void {
+    if (this.debugMode) {
+      console.debug(`${this.getIndent()}▼ Readwise Mirror: ${label}`);
+      this.groupDepth++;
+    }
+  }
+
+  groupEnd(): void {
+    if (this.debugMode && this.groupDepth > 0) {
+      this.groupDepth--;
+      console.debug(`${this.getIndent()}▲`);
+    }
+  }
+
+  debug(...messages: unknown[]): void {
+    if (this.debugMode) {
+      console.debug(`${this.getIndent()}Readwise Mirror:`, ...messages);
+    }
   }
 
   warn(...messages: unknown[]): void {
-    console.warn('Readwise Mirror:', ...messages);
+    console.warn(`${this.getIndent()}Readwise Mirror:`, ...messages);
   }
 
   error(...messages: unknown[]): void {
-    console.error('Readwise Mirror:', ...messages);
+    console.error(`${this.getIndent()}Readwise Mirror:`, ...messages);
   }
 
   time(label: string): void {
-    console.time(`Readwise Mirror: ${label}`);
+    this.timers.set(label, Date.now());
   }
 
   timeLog(label: string, ...messages: unknown[]): void {
-    console.timeLog(`Readwise Mirror: ${label}`, ...messages);
+    const startTime = this.timers.get(label);
+    if (startTime === undefined) {
+      console.debug(`${this.getIndent()}Readwise Mirror: ${label} (timer not started)`);
+      return;
+    }
+    const elapsedMs = Date.now() - startTime;
+    console.debug(`${this.getIndent()}Readwise Mirror: ${label} (${elapsedMs}ms)`, ...messages);
   }
 
   timeEnd(label: string): void {
-    console.timeEnd(`Readwise Mirror: ${label}`);
+    const startTime = this.timers.get(label);
+    this.timers.delete(label);
+    if (startTime === undefined) {
+      return;
+    }
+    const elapsedMs = Date.now() - startTime;
+    console.debug(`${this.getIndent()}Readwise Mirror: ${label} (${elapsedMs}ms)`);
   }
 }
 
