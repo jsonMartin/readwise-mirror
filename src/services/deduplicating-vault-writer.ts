@@ -134,7 +134,7 @@ export class DeduplicatingVaultWriter {
     this.notifyFileCount();
     try {
       // Process frontmatter atomically
-      await this.app.fileManager.processFrontMatter(file, (existingFrontmatter) => {
+      await this.app.fileManager.processFrontMatter(file, (existingFrontmatter: Record<string, unknown>) => {
         // Only update frontmatter if frontmatter is enabled
         const hasFrontmatter = Object.keys(existingFrontmatter).length > 0;
         const updatedFrontmatter = this.frontmatterManager.getFrontmatter(readwiseFile, hasFrontmatter);

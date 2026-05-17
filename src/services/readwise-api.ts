@@ -33,6 +33,16 @@ export default class ReadwiseApi {
     return api;
   }
 
+  private isExportRecord(value: unknown): value is Export {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      'user_book_id' in value &&
+      'highlights' in value &&
+      Array.isArray((value as { highlights?: unknown }).highlights)
+    );
+  }
+
   /**
    * Returns the options object for the Readwise API instance
    * @returns {Record<string, unknown>} - Returns an object containing the headers for the API request
@@ -92,7 +102,7 @@ export default class ReadwiseApi {
     let data: Record<string, unknown> | undefined;
     let nextPageCursor: string | undefined;
 
-    const results = [];
+    const results: Export[] = [];
 
     this.ctx.logger.group(`Fetch Data: ${contentType}`);
     this.ctx.logger.debug('Fetch parameters:', { lastUpdated, bookId, includeDeleted });
@@ -144,12 +154,14 @@ export default class ReadwiseApi {
           }
           this.ctx.setStatusBarText(`Readwise: API Rate Limited, waiting ${rateLimitedDelayTime}`);
 
-          await new Promise((resolve) => activeWindow.setTimeout(resolve, rateLimitedDelayTime));
+          await new Promise((resolve) => window.setTimeout(resolve, rateLimitedDelayTime));
           this.ctx.logger.debug('Trying to fetch highlights again...');
           this.ctx.setStatusBarText('Readwise: Attempting to retry...');
         } else {
-          if (pageData.results && Array.isArray(pageData.results)) {
-            results.push(...pageData.results);
+          const pageResults = pageData.results;
+          if (Array.isArray(pageResults)) {
+            const exports = pageResults.filter((item): item is Export => this.isExportRecord(item));
+            results.push(...exports);
           } else {
             this.ctx.logger.warn('No results found in the response data.');
           }
@@ -199,7 +211,7 @@ export default class ReadwiseApi {
    * @returns {Promise<Library>} - Returns a promise that resolves to a Library object
    */
   async downloadFullLibrary(): Promise<Library> {
-    const records = (await this.fetchData('export', undefined, undefined, true)) as Export[];
+    const records = await this.fetchData('export', undefined, undefined, true);
 
     return this.buildLibrary(records);
   }
@@ -211,7 +223,7 @@ export default class ReadwiseApi {
    */
   async downloadUpdates(lastUpdated: string): Promise<Library> {
     // Fetch updated books and then fetch all their highlights
-    const recordsUpdated = (await this.fetchData('export', lastUpdated, undefined, true)) as Export[];
+    const recordsUpdated = await this.fetchData('export', lastUpdated, undefined, true);
     const bookIds = recordsUpdated.map((r) => r.user_book_id);
 
     this.ctx.logger.debug(`Fetched ids of ${bookIds.length} updated books...`);
@@ -235,7 +247,7 @@ export default class ReadwiseApi {
 
     for (let i = 0; i < bookIds.length; i += CHUNK) {
       const chunk = bookIds.slice(i, i + CHUNK);
-      const page = (await this.fetchData('export', undefined, chunk, true)) as Export[];
+      const page = await this.fetchData('export', undefined, chunk, true);
       merged = merged.concat(page);
     }
 
@@ -249,7 +261,7 @@ export default class ReadwiseApi {
    */
   async downloadSingleBook(bookId: number): Promise<Library> {
     // Fetch single book and return library
-    const recordsUpdated = (await this.fetchData('export', undefined, [bookId], true)) as Export[];
+    const recordsUpdated = await this.fetchData('export', undefined, [bookId], true);
     return this.buildLibrary(recordsUpdated);
   }
 }

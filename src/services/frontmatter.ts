@@ -42,7 +42,7 @@ export class Frontmatter {
   private validateData(data: FrontmatterData): FrontmatterData {
     try {
       const yamlString = stringifyYaml(data);
-      const parsed = parseYaml(yamlString);
+      const parsed: unknown = parseYaml(yamlString);
 
       if (typeof parsed !== 'object' || parsed === null) {
         throw new Error('Frontmatter must be an object');
@@ -176,7 +176,7 @@ export class Frontmatter {
 
     try {
       const yamlContent = match[2];
-      const data = parseYaml(yamlContent);
+      const data: unknown = parseYaml(yamlContent);
 
       if (typeof data !== 'object' || data === null) {
         throw new Error('Frontmatter must be an object');

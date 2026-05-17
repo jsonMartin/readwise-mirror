@@ -1,5 +1,5 @@
 import { type FileManager, parseYaml, type TFile } from 'obsidian';
-import { Frontmatter, FrontmatterError } from 'services/frontmatter';
+import { Frontmatter, type FrontmatterData, FrontmatterError } from 'services/frontmatter';
 import { renderFrontmatterTemplate } from 'services/template-rendering';
 import { EMPTY_FRONTMATTER, READWISE_URI_FIELD } from 'src/constants';
 import type { AtomicFile, BaseFile, ReadwiseDocument } from 'types/document';
@@ -113,11 +113,14 @@ export class FrontmatterManager {
       // Render and parse the template into YAML
       const renderedTemplate = renderFrontmatterTemplate(frontmatterTemplate, this.env, metadata);
 
-      const yaml = parseYaml(renderedTemplate);
-      return new Frontmatter(yaml);
+      const yaml: unknown = parseYaml(renderedTemplate);
+      if (typeof yaml !== 'object' || yaml === null) {
+        throw new Error('Frontmatter template did not render to an object');
+      }
+      return new Frontmatter(yaml as FrontmatterData);
     } catch (error) {
       if (error instanceof Error) {
-        this.logger.debug('Rendered frontmatter template failed:', (error as Error).stack);
+        this.logger.debug('Rendered frontmatter template failed:', error.stack);
         this.logger.error('Error processing frontmatter template:', error.message);
         throw new FrontmatterError(`Failed to process frontmatter: ${error.message}`, error);
       }
@@ -143,7 +146,7 @@ export class FrontmatterManager {
   public async writeUpdatedFrontmatter(file: TFile, updates: Frontmatter): Promise<void> {
     // File carries a reference to the vault
     try {
-      await this.fm.processFrontMatter(file, (frontmatter) => {
+      await this.fm.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
         // Biome doesn't like assing via { ... frontmatter, ...updates }
         // Iterate over keys in updates and set them in frontmatter
         for (const [key, value] of updates.entries()) {

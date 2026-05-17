@@ -1,4 +1,4 @@
-import type moment from 'moment';
+import { moment } from 'obsidian';
 
 declare global {
   interface Window {

@@ -55,6 +55,6 @@ export function isFolderInReadwiseLibrary(folder: TFolder, ctx: PluginContext): 
 export function getTrackingUrl(file: TFile, ctx: PluginContext): string | undefined {
   const fileCache = ctx.app.metadataCache.getFileCache(file);
   const trackingProperty = ctx.settings.trackingProperty;
-  const trackingUrl = fileCache?.frontmatter?.[trackingProperty];
+  const trackingUrl: unknown = fileCache?.frontmatter?.[trackingProperty];
   return typeof trackingUrl === 'string' && trackingUrl.startsWith(READWISE_REVIEW_URL_BASE) ? trackingUrl : undefined;
 }

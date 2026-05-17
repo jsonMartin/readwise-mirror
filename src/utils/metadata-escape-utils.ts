@@ -89,7 +89,7 @@ export function escapeValue(value: string, { multiline = false }: YamlEscapeOpti
 }
 
 export function escapeMetadata(metadata: ReadwiseDocument, fieldsToProcess: Array<string>): ReadwiseDocument {
-  const processedMetadata = { ...metadata } as ReadwiseDocument;
+  const processedMetadata = { ...metadata };
   const setFieldValue = <K extends keyof ReadwiseDocument>(key: K, value: ReadwiseDocument[K]): void => {
     processedMetadata[key] = value;
   };
