@@ -82,14 +82,14 @@ export class ReadwiseEnvironment extends Environment {
       return str.replace(/\.qa(.*)\?(.*)/g, '**Q:**$1?\r\n\r\n**A:**$2');
     });
 
-    this.addFilter('fme', (value: any) => {
+    this.addFilter('fme', (value: unknown) => {
       // Return if null/undefined
       if (value === null || value === undefined) {
         return null;
       }
 
       // This is a bit of a hack, but a realiable way to get multi-line yaml right
-      const _key = md5(value);
+      const _key = md5(Date().toString());
       const _value = stringifyYaml({ [_key]: value })
         .replace(`${_key}: `, '')
         .trim();
