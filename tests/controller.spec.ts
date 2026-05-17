@@ -16,7 +16,7 @@ jest.mock('utils/tracking-utils', () => ({
 }));
 
 const { normalizeFilename } = jest.requireMock('utils/file-utils') as {
-  normalizeFilename: jest.Mock;
+  normalizeFilename: jest.MockedFunction<(value: string) => string>;
 };
 
 function createFile(filePath: string): TFile {
@@ -159,7 +159,9 @@ describe('Controller rename flows', () => {
       .mockResolvedValueOnce(true)
       .mockResolvedValueOnce(false);
 
-    const renamedCount = await (controller as unknown as { iterativeReadwiseRenamer(folder: TFolder): Promise<number> }).iterativeReadwiseRenamer(root);
+    const renamedCount = await (
+      controller as unknown as { iterativeReadwiseRenamer(folder: TFolder): Promise<number> }
+    ).iterativeReadwiseRenamer(root);
 
     expect(renameSpy).toHaveBeenCalledTimes(2);
     expect(renameSpy).toHaveBeenNthCalledWith(1, topFile);
@@ -173,7 +175,10 @@ describe('Controller rename flows', () => {
 
     vault.getAbstractFileByPath.mockReturnValue(readwiseFolder);
     jest
-      .spyOn(controller as unknown as { iterativeReadwiseRenamer(folder: TFolder): Promise<number> }, 'iterativeReadwiseRenamer')
+      .spyOn(
+        controller as unknown as { iterativeReadwiseRenamer(folder: TFolder): Promise<number> },
+        'iterativeReadwiseRenamer'
+      )
       .mockResolvedValue(2);
 
     await controller.handleFilenameAdjustment();
@@ -189,7 +194,10 @@ describe('Controller rename flows', () => {
 
     vault.getAbstractFileByPath.mockReturnValue(readwiseFolder);
     jest
-      .spyOn(controller as unknown as { iterativeReadwiseRenamer(folder: TFolder): Promise<number> }, 'iterativeReadwiseRenamer')
+      .spyOn(
+        controller as unknown as { iterativeReadwiseRenamer(folder: TFolder): Promise<number> },
+        'iterativeReadwiseRenamer'
+      )
       .mockResolvedValue(0);
 
     await controller.handleFilenameAdjustment();

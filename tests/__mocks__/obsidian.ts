@@ -11,7 +11,11 @@ export const parseYaml = parse;
 export const stringifyYaml = stringify;
 
 export function normalizePath(path: string): string {
-  return path.replace(/\\/g, '/').replace(/\/+/g, '/').replace(/(^|\/)\.\//g, '$1').replace(/\/$/, '');
+  return path
+    .replace(/\\/g, '/')
+    .replace(/\/+/g, '/')
+    .replace(/(^|\/)\.\//g, '$1')
+    .replace(/\/$/, '');
 }
 
 export function getFrontMatterInfo(content: string): { exists: boolean; contentStart: number } {
