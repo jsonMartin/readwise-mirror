@@ -95,6 +95,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
   private tokenValue?: TextComponent;
   private validationButton?: ButtonComponent;
 
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
+  }
+
   constructor(
     plugin: ReadwiseMirror,
     private ctx: PluginContext,
@@ -152,14 +156,13 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     }
 
     let response: RequestUrlResponse;
-    let data: Record<string, unknown>;
     try {
       response = await requestUrl({ url: `${baseURL}/api/auth?token=${uuid}` });
       if (response.status === 200) {
-        data = await response.json;
-        if (data.userAccessToken) {
+        const data: unknown = response.json;
+        if (this.isRecord(data) && typeof data.userAccessToken === 'string' && data.userAccessToken.length > 0) {
           this.ctx.logger.debug('Token successfully retrieved');
-          this.ctx.settings.apiToken = data.userAccessToken as string;
+          this.ctx.settings.apiToken = data.userAccessToken;
           await this.ctx.saveAndApplySettings();
           this.display(); // Refresh the settings page
           return true;
@@ -303,14 +306,14 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       case 'valid':
         this.validationButton?.setDisabled(true).removeCta().setButtonText('Verified');
         this.retrievalButton?.setDisabled(true).setButtonText('Re-authenticate with Readwise');
-        if (this.tokenValue) {
+        if (this.tokenValue !== undefined) {
           this.tokenValue.inputEl.type = 'password';
         }
         break;
       case 'invalid':
         this.validationButton?.setDisabled(false).setCta().setButtonText('Apply');
         this.retrievalButton?.setDisabled(false).setButtonText('Authenticate with Readwise');
-        if (this.tokenValue) this.tokenValue.inputEl.type = 'text';
+        if (this.tokenValue !== undefined) this.tokenValue.inputEl.type = 'text';
         break;
       case 'verifying':
         this.validationButton?.setDisabled(true).setCta();
@@ -335,8 +338,17 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     if (error instanceof Error) {
       return error.message;
     }
-
-    return String(error);
+    if (typeof error === 'string') {
+      return error;
+    }
+    if (typeof error === 'number' || typeof error === 'boolean' || typeof error === 'bigint') {
+      return String(error);
+    }
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return 'Unknown error';
+    }
   }
 
   /**
@@ -544,7 +556,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     // Add new Filter by tag setting
     new Setting(containerEl)
       .setName('Filter by tag')
-      .setDesc('Only sync readwise items with specific document tags')
+      .setDesc('Only sync Readwise items with specific document tags')
       .addToggle((toggle) =>
         toggle.setValue(this.ctx.settings.filterNotesByTag).onChange(async (value) => {
           this.ctx.settings.filterNotesByTag = value;
@@ -559,11 +571,11 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       new Setting(containerEl)
         .setName('Tags to include')
         .setDesc(
-          'Enter tags separated by commas (e.g., important, todo, review). Only readwise items matching ANY of these tags (document level) will be synced.'
+          'Enter tags separated by commas (e.g., important, todo, review). Only Readwise items matching any of these tags (document level) will be synced.'
         )
         .addTextArea((text) => {
           text
-            .setPlaceholder('tag1, tag2, tag3')
+            .setPlaceholder('Tag1, tag2, tag3')
             .setValue(this.ctx.settings.filteredTags.join(', '))
             .onChange(async (value) => {
               this.ctx.settings.filteredTags = value
@@ -650,10 +662,12 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
                     text: 'Would you like to proceed?',
                   });
                 }),
-                async (confirmed: boolean) => {
+                (confirmed: boolean) => {
                   if (confirmed) {
-                    this.ctx.settings.atomicHighlights = true;
-                    await this.ctx.saveAndApplySettings();
+                    void (async () => {
+                      this.ctx.settings.atomicHighlights = true;
+                      await this.ctx.saveAndApplySettings();
+                    })();
                   } else {
                     toggle.setValue(false);
                   }
@@ -676,7 +690,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
       .setDesc(
         createFragment((fragment) => {
           fragment.appendText('Only create atomic notes for Readwise notes where ');
-          fragment.createEl('code', { text: 'rw-atomize: true' });
+          fragment.createEl('code', { text: 'Rw-atomize: true' });
           fragment.appendText(" is set in the highlight's frontmatter. ");
         })
       )
@@ -690,10 +704,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setClass('indent')
       .setName('Atomic parent property')
-      .setDesc('Frontmatter property used to link atomic notes back to their parent document (default: rw-parent).')
+      .setDesc('Frontmatter property used to link atomic notes back to their parent document (default: Rw-parent).')
       .addText((text) =>
         text
-          .setPlaceholder('rw-parent')
+          .setPlaceholder('Rw-parent')
           .setValue(this.ctx.settings.atomicParentProperty || 'rw-parent')
           .onChange(async (value) => {
             this.ctx.settings.atomicParentProperty = value || 'rw-parent';
@@ -722,7 +736,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Sort highlights by location')
       .setDesc(
-        'If checked, highlights will be listed in order of Location. Combine with above Sort Highlights from Oldest to Newest option to reverse order.'
+        'If checked, highlights will be listed in order of location. Combine with above sort highlights from oldest to newest option to reverse order.'
       )
       .addToggle((toggle) =>
         toggle.setValue(this.ctx.settings.highlightSortByLocation).onChange(async (value) => {
@@ -758,7 +772,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Sync highlights with notes only')
       .setDesc(
-        'If checked, highlights will only be synced if they have a note. This makes it easier to use these notes for Zettelkasten.'
+        'If checked, highlights will only be synced if they have a note. This makes it easier to use these notes for zettelkasten.'
       )
       .addToggle((toggle) =>
         toggle.setValue(this.ctx.settings.syncNotesOnly).onChange(async (value) => {
@@ -800,11 +814,13 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
                 fragment.createDiv({ text: 'Are you sure you want to continue?' });
               }),
 
-              async (confirmed: boolean) => {
+              (confirmed: boolean) => {
                 if (confirmed) {
-                  this.ctx.settings.trackFiles = false;
-                  await this.ctx.saveAndApplySettings();
-                  this.display();
+                  void (async () => {
+                    this.ctx.settings.trackFiles = false;
+                    await this.ctx.saveAndApplySettings();
+                    this.display();
+                  })();
                 } else {
                   toggle.setValue(true);
                 }
@@ -847,11 +863,13 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
                   fragment.createEl('br');
                   fragment.createDiv({ text: 'Are you sure you want to continue?' });
                 }),
-                async (confirmed: boolean) => {
+                (confirmed: boolean) => {
                   if (confirmed) {
-                    this.ctx.settings.trackAcrossVault = false;
-                    await this.ctx.saveAndApplySettings();
-                    this.display();
+                    void (async () => {
+                      this.ctx.settings.trackAcrossVault = false;
+                      await this.ctx.saveAndApplySettings();
+                      this.display();
+                    })();
                   } else {
                     toggle.setValue(true);
                   }
@@ -881,7 +899,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               const modal = new Modal(this.app);
               modal.titleEl.setText('Warning');
               modal.contentEl.createEl('p', {
-                text: 'This will permanently delete duplicate files instead of marking them. If enabled, files in your Vault will be deleted when duplicates are found. Are you sure you want to continue?',
+                text: 'This will permanently delete duplicate files instead of marking them. If enabled, files in your vault will be deleted when duplicates are found. Are you sure you want to continue?',
               });
 
               const buttonContainer = modal.contentEl.createDiv();
@@ -951,7 +969,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     if (this.ctx.settings.trackFiles && this.ctx.settings.enableFileNameUpdates) {
       new Setting(containerEl)
         .setName('Use custom filename template')
-        .setDesc('Enable custom filename templates using Nunjucks variables.')
+        .setDesc('Enable custom filename templates using nunjucks variables.')
         .addToggle((toggle) =>
           toggle.setValue(this.ctx.settings.useCustomFilename).onChange(async (value) => {
             this.ctx.settings.useCustomFilename = value;
@@ -1051,7 +1069,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Sync log')
-      .setDesc('Save sync log to file in Library')
+      .setDesc('Save sync log to file in library')
       .addToggle((toggle) =>
         toggle.setValue(this.ctx.settings.logFile).onChange(async (value) => {
           this.ctx.settings.logFile = value;
@@ -1090,17 +1108,17 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           });
 
           fragment.createEl('p', {
-            text: '1. Frontmatter Template: Controls the YAML metadata at the top of each note',
+            text: '1. Frontmatter template: Controls the YAML metadata at the top of each note',
           });
           fragment.createEl('p', {
-            text: '2. Header Template: Controls the main document structure and metadata below the frontmatter',
+            text: '2. Header template: Controls the main document structure and metadata below the frontmatter',
           });
           fragment.createEl('p', {
-            text: '3. Highlight Template: Controls how individual highlights are formatted within the note',
+            text: '3. Highlight template: Controls how individual highlights are formatted within the note',
           });
 
           fragment.createEl('p', {
-            text: 'Each template supports Nunjucks templating syntax and provides access to specific variables relevant to that section.',
+            text: 'Each template supports nunjucks templating syntax and provides access to specific variables relevant to that section.',
           });
         })
       );
@@ -1108,7 +1126,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
     // Documentation block for templates
 
     new Setting(containerEl)
-      .setName('Frontmatter options')
+      .setName('Frontmatter')
       .setDesc(
         createFragment((fragment) => {
           fragment.appendText('Controls the YAML metadata at the top of each note');
@@ -1118,7 +1136,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Add frontmatter')
-      .setDesc('Add frontmatter (defined with the Frontmatter Template below)')
+      .setDesc('Add frontmatter (defined with the frontmatter template below)')
       .addToggle((toggle) =>
         toggle.setValue(this.ctx.settings.frontMatter).onChange(async (value) => {
           // Test template with sample data
@@ -1131,7 +1149,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               // Trigger re-render to show/hide frontmatter settings
               this.display();
             } else if (value && !isValidYaml) {
-              this.ctx.notice(`Invalid frontmatter template: ${error}`);
+              this.ctx.notice(`Invalid frontmatter template: ${this.getErrorMessage(error)}`);
               toggle.setValue(false);
               // Trigger re-render to show/hide property selector
               this.display();
@@ -1231,7 +1249,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
               text
                 .setValue(this.ctx.settings.protectedFields)
-                .setPlaceholder('status\ntags')
+                .setPlaceholder('Status\ntags')
                 .onChange(async (value) => {
                   const validation = validateProtectedFields(value);
                   errorDiv.setText(validation.error || '');
@@ -1345,10 +1363,10 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           const hasError = isInvalidTemplate || isInvalidYaml;
 
           if (isInvalidTemplate) {
-            errorNotice.setText('Your Frontmatter template contains invalid Nunjucks syntax.');
+            errorNotice.setText('Your frontmatter template contains invalid nunjucks syntax.');
             errorDetails.setText(result.error ?? '');
           } else if (isInvalidYaml) {
-            errorNotice.setText('Your Frontmatter template creates invalid YAML.');
+            errorNotice.setText('Your frontmatter template creates invalid YAML.');
             errorDetails.setText(result.error ?? '');
           } else {
             errorNotice.setText('');
