@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { DEFAULT_SETTINGS } from '../src/constants';
+import { DEFAULT_SETTINGS } from 'src/constants';
 import { normalizeFilename } from 'utils/file-utils';
 
 jest.mock('@sindresorhus/slugify', () => ({

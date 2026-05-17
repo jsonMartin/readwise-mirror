@@ -15,6 +15,10 @@
     "/^obsidian vault=\"Obsidian Sandbox\" command id=readwise-mirror:reset-last-updated$/": {
       "approve": true,
       "matchCommandLine": true
+    },
+    "/^obsidian vault=\"Obsidian Sandbox\" command id=readwise-mirror:update$/": {
+      "approve": true,
+      "matchCommandLine": true
     }
   }
 }

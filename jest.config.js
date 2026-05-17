@@ -13,7 +13,6 @@ module.exports = {
     "^test/(.*)$": "<rootDir>/tests/$1",
     "^types/(.*)$": "<rootDir>/src/types/$1",
     "^services/(.*)$": "<rootDir>/src/services/$1",
-    "^constants/(.*)$": "<rootDir>/src/constants/$1",
     "^utils/(.*)$": "<rootDir>/src/utils/$1",
     "^ui/(.*)$": "<rootDir>/src/ui/$1",
   },

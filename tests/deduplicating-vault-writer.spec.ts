@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { jest } from '@jest/globals';
-import { DEFAULT_SETTINGS } from '../src/constants';
 import { TFile } from 'obsidian';
 import { DeduplicatingVaultWriter } from 'services/deduplicating-vault-writer';
 import { Frontmatter } from 'services/frontmatter';
+import { DEFAULT_SETTINGS } from 'src/constants';
 import { sampleMetadata } from 'test/sample-data';
 import type { BaseFile } from 'types/document';
 import type { Export } from 'types/library';
@@ -124,7 +124,9 @@ describe('DeduplicatingVaultWriter', () => {
     vault.create = jest.fn(async () => createdFile) as any;
     jest.spyOn(writer, 'generateShortHash').mockReturnValue('h123');
 
-    const written = await (writer as unknown as { writeFileToVault(file: BaseFile): Promise<TFile> }).writeFileToVault(baseFile);
+    const written = await (writer as unknown as { writeFileToVault(file: BaseFile): Promise<TFile> }).writeFileToVault(
+      baseFile
+    );
 
     expect(adapter.exists).toHaveBeenNthCalledWith(1, 'Readwise/Books & articles/A B C.md', false);
     expect(adapter.exists).toHaveBeenNthCalledWith(2, 'Readwise/Books & articles/A B C h123.md', false);
@@ -141,10 +143,9 @@ describe('DeduplicatingVaultWriter', () => {
     const duplicate = createTFile('Readwise/Articles/duplicate.md');
     const baseFile = createBaseFile();
 
-    await (writer as unknown as { handleDuplicate(file: TFile, readwiseFile: BaseFile): Promise<void> }).handleDuplicate(
-      duplicate,
-      baseFile
-    );
+    await (
+      writer as unknown as { handleDuplicate(file: TFile, readwiseFile: BaseFile): Promise<void> }
+    ).handleDuplicate(duplicate, baseFile);
 
     const frontmatterArg = (frontmatterManager.writeUpdatedFrontmatter as jest.Mock).mock.calls[0][1] as Frontmatter;
     expect(frontmatterManager.writeUpdatedFrontmatter).toHaveBeenCalledWith(duplicate, expect.any(Frontmatter));
@@ -156,10 +157,9 @@ describe('DeduplicatingVaultWriter', () => {
     const duplicate = createTFile('Readwise/Articles/duplicate.md');
     const baseFile = createBaseFile();
 
-    await (writer as unknown as { handleDuplicate(file: TFile, readwiseFile: BaseFile): Promise<void> }).handleDuplicate(
-      duplicate,
-      baseFile
-    );
+    await (
+      writer as unknown as { handleDuplicate(file: TFile, readwiseFile: BaseFile): Promise<void> }
+    ).handleDuplicate(duplicate, baseFile);
 
     expect(fileManager.trashFile).toHaveBeenCalledWith(duplicate);
     expect(frontmatterManager.writeUpdatedFrontmatter).not.toHaveBeenCalled();
