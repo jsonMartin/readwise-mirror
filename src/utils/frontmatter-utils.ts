@@ -6,7 +6,7 @@ import { parseYaml } from 'obsidian';
 import { Frontmatter } from 'services/frontmatter';
 import type { ReadwiseEnvironment } from 'services/readwise-environment';
 import { FRONTMATTER_TO_ESCAPE } from 'src/constants';
-import { sampleMetadata } from 'test/sample-data';
+import { sampleMetadata } from 'tests/sample-data';
 import { escapeMetadata } from 'utils/metadata-escape-utils';
 
 /**

@@ -16,7 +16,7 @@
       "main": ["./src/main.ts"],
       "services/*": ["./src/services/*"],
       "src/*": ["./src/*"],
-      "test/*": ["./tests/*"],
+      "tests/*": ["./tests/*"],
       "types/*": ["./src/types/*"],
       "ui/*": ["./src/ui/*"],
       "utils/*": ["./src/utils/*"]
