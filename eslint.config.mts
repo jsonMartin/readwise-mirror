@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   {
     // Only apply TypeScript linting/parsing to your src files
-    files: ['src/**/*.ts', `manifest.json`, `versions.json`],
+    files: ['src/**/*.ts', `manifest.json`],
     languageOptions: {
       parser: tseslint.parser,
       globals: {
@@ -14,7 +14,7 @@ export default tseslint.config(
       },
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['eslint.config.js', 'manifest.json'],
+          allowDefaultProject: ['eslint.config.mts', 'manifest.json'],
         },
         tsconfigRootDir: import.meta.dirname,
         extraFileExtensions: ['.json'],
