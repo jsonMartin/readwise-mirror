@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   {
     // Only apply TypeScript linting/parsing to your src files
-    files: ['src/**/*.ts', `manifest.json`, `versions.json`, `package.json`],
+    files: ['src/**/*.ts', `manifest.json`, `versions.json`],
     languageOptions: {
       parser: tseslint.parser,
       globals: {
@@ -30,7 +30,8 @@ export default tseslint.config(
     'coverage/',
     '*.js',
     '*.mjs',
-    '*.json',
+    'versions.json',
+    'package.json',
     'main.js',
     'tests/', // Remove this line if you eventually WANT to lint your tests
   ])
