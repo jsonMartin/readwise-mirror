@@ -1,6 +1,6 @@
 //
 // Sample data for testing the Frontmatter Template
-// The data is synthetic and inteded to stress-test
+// The data is synthetic and intended to stress-test
 // the validity of the generated YAML
 // TODO: Add more sample data for testing
 // TODO: Base it on Readwise API and not internal metadata
@@ -153,7 +153,7 @@ export const sampleMetadata: ReadwiseDocument = {
       tags: [testTags[11], testTags[14]],
     },
   ],
-  last_highlight_at: '2024-03-16T09:15:00Z', // Test null value
+  last_highlight_at: '2024-03-16T09:15:00Z',
   tags: '#reading, #non-fiction: genre',
   highlight_tags: '#quote, #important: flag',
   tags_nohash: "'reading', 'non-fiction: genre'",
