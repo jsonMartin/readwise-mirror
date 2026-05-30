@@ -60,7 +60,7 @@ export class FrontmatterManager {
           let atomicFrontmatter = this.settings.atomicInheritParentFrontmatter
             ? this.getBaseFrontmatter(file.doc)
             : new Frontmatter();
-          const currentFrontmatter = Frontmatter.fromString(file.frontmatter);
+          const currentFrontmatter = Frontmatter.fromString(file.frontmatter ?? '');
           const highlight = file.doc.highlights.find((h) => h.id === file.id);
 
           if (currentFrontmatter.keys().length > 0) {
