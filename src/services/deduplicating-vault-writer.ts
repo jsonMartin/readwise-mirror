@@ -420,7 +420,7 @@ export class DeduplicatingVaultWriter {
       (data) => {
         const fmi = getFrontMatterInfo(data);
         if (fmi?.exists) {
-          return `${data.slice(0, fmi.contentStart)}\n${fileContents}`;
+          return `${data.slice(0, fmi.contentStart)}${fileContents}`;
         }
         return data;
       },
