@@ -1,0 +1,101 @@
+import type ReadwiseMirror from 'main';
+import { type Menu, type TAbstractFile, TFile, TFolder } from 'obsidian';
+import { getTrackingUrl, isFolderInReadwiseLibrary } from 'utils/file-utils';
+import type { PluginContext } from '../types/plugin-context';
+import { getPluginCommands } from '../utils/plugin-commands';
+import type { Controller } from './controller';
+
+/**
+ * Manages command registration for the Readwise Mirror plugin
+ */
+export class CommandManager {
+  constructor(
+    private plugin: ReadwiseMirror,
+    private ctx: PluginContext,
+    private ctr: Controller
+  ) {}
+
+  public initialize(): void {
+    this.registerCommands();
+    this.registerEvents();
+    this.runStartupCommands();
+  }
+
+  /**
+   * Register all plugin commands from the manifest
+   */
+  private registerCommands(): void {
+    const commands = getPluginCommands(this.ctr, this.ctx);
+    for (const cmd of commands) {
+      this.plugin.addCommand(cmd);
+    }
+  }
+
+  /**
+   * Register context menu events for Readwise notes and folders
+   */
+  public registerEvents(): void {
+    // Register context menu for files and folders
+    this.plugin.registerEvent(
+      this.ctx.app.workspace.on('file-menu', (menu, file) => this.onMenuOpenCallback(menu, file))
+    );
+
+    this.plugin.registerDomEvent(this.ctx.statusBarItem, 'click', async () => await this.ctr.sync());
+  }
+
+  public runStartupCommands(): void {
+    // Run sync on startup if enabled
+    if (this.ctx.settings.autoSync) {
+      void this.ctr.sync();
+    }
+  }
+  /**
+   * Handle context menu for files and folders
+   */
+  private onMenuOpenCallback(menu: Menu, file: TAbstractFile) {
+    if (file instanceof TFile && file.extension === 'md') {
+      const tracked = this.ctr.getUpdatableNote(file);
+      if (tracked) {
+        // Update this note
+        menu.addItem((item) => {
+          item
+            .setIcon('refresh-cw')
+            .setTitle('Update this note')
+            .onClick(() => this.ctr.updateSingleNote(tracked));
+        });
+
+        // View in Readwise
+        const trackingUrl = getTrackingUrl(file, this.ctx);
+        if (trackingUrl) {
+          menu.addItem((item) => {
+            item
+              .setIcon('external-link')
+              .setTitle('View in Readwise')
+              .onClick(() => window.open(trackingUrl));
+          });
+
+          // Copy Readwise URL
+          menu.addItem((item) => {
+            item
+              .setIcon('copy')
+              .setTitle('Copy Readwise URL')
+              .onClick(async () => {
+                await navigator.clipboard.writeText(trackingUrl);
+                this.ctx.notice('Readwise: URL copied to clipboard');
+              });
+          });
+        }
+      }
+    } else if (file instanceof TFolder) {
+      // Check if this folder is in the Readwise library
+      if (isFolderInReadwiseLibrary(file, this.ctx)) {
+        menu.addItem((item) => {
+          item
+            .setIcon('refresh-cw')
+            .setTitle('Update all notes in folder')
+            .onClick(async () => this.ctr.syncFolder(file));
+        });
+      }
+    }
+  }
+}

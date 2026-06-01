@@ -3,55 +3,69 @@
  * @module services/logger
  */
 class Logger {
-  private debugMode: boolean;
+  private groupDepth = 0;
+  private readonly timers = new Map<string, number>();
 
-  constructor(debugMode: boolean) {
-    this.debugMode = debugMode;
-  }
-
-  group(label: string): void {
-    if (this.debugMode) console.group(`Readwise Mirror: ${label}`);
-  }
-
-  groupEnd(): void {
-    if (this.debugMode) console.groupEnd();
-  }
+  constructor(private debugMode: boolean) {}
 
   setDebugMode(debugMode: boolean): void {
     this.debugMode = debugMode;
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: console.debug accepts any type
-  debug(...messages: any[]): void {
-    this.debugMode && console.debug('Readwise Mirror:', ...messages);
+  private getIndent(): string {
+    return '  '.repeat(this.groupDepth);
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: console.info accepts any type
-  info(...messages: any[]): void {
-    this.debugMode && console.info('Readwise Mirror:', ...messages);
+  group(label: string): void {
+    if (this.debugMode) {
+      console.debug(`${this.getIndent()}▼ Readwise Mirror: ${label}`);
+      this.groupDepth++;
+    }
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: console.warn accepts any type
-  warn(...messages: any[]): void {
-    console.warn('Readwise Mirror:', ...messages);
+  groupEnd(): void {
+    if (this.debugMode && this.groupDepth > 0) {
+      this.groupDepth--;
+      console.debug(`${this.getIndent()}▲`);
+    }
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: console.error accepts any type
-  error(...messages: any[]): void {
-    console.error('Readwise Mirror:', ...messages);
+  debug(...messages: unknown[]): void {
+    if (this.debugMode) {
+      console.debug(`${this.getIndent()}Readwise Mirror:`, ...messages);
+    }
+  }
+
+  warn(...messages: unknown[]): void {
+    console.warn(`${this.getIndent()}Readwise Mirror:`, ...messages);
+  }
+
+  error(...messages: unknown[]): void {
+    console.error(`${this.getIndent()}Readwise Mirror:`, ...messages);
   }
 
   time(label: string): void {
-    console.time(`Readwise Mirror: ${label}`);
+    this.timers.set(label, Date.now());
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: console.timeLog accepts any type
-  timeLog(label: string, ...messages: any[]): void {
-    console.timeLog(`Readwise Mirror: ${label}`, ...messages);
+  timeLog(label: string, ...messages: unknown[]): void {
+    const startTime = this.timers.get(label);
+    if (startTime === undefined) {
+      console.debug(`${this.getIndent()}Readwise Mirror: ${label} (timer not started)`);
+      return;
+    }
+    const elapsedMs = Date.now() - startTime;
+    console.debug(`${this.getIndent()}Readwise Mirror: ${label} (${elapsedMs}ms)`, ...messages);
   }
 
   timeEnd(label: string): void {
-    console.timeEnd(`Readwise Mirror: ${label}`);
+    const startTime = this.timers.get(label);
+    this.timers.delete(label);
+    if (startTime === undefined) {
+      return;
+    }
+    const elapsedMs = Date.now() - startTime;
+    console.debug(`${this.getIndent()}Readwise Mirror: ${label} (${elapsedMs}ms)`);
   }
 }
 

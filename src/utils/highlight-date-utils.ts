@@ -1,4 +1,4 @@
-import type { Highlight } from 'types';
+import type { Highlight } from 'types/library';
 
 /**
  * Get the last highlighted date of the highlights

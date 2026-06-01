@@ -13,7 +13,8 @@
 
 import filenamify from 'filenamify';
 import * as nunjucks from 'nunjucks';
-import type { Atom, AtomizeOptions } from 'types';
+import type { Atom } from 'types/document';
+import type { AtomizeOptions } from 'types/utilities';
 import type { CallExtension, Context, Parser } from '../nunjucks-parser';
 
 /**
@@ -52,8 +53,7 @@ export class Atomizer {
    * @returns
    */
 
-  // biome-ignore lint/suspicious/noExplicitAny: Context can be any object
-  atomize(_contents: string, ctx: Record<string, any>): { contents: string; atoms: Atom[] } {
+  atomize(_contents: string, ctx: Record<string, unknown>): { contents: string; atoms: Atom[] } {
     // Create a new ReadwiseDocument from the atomized content
 
     const contents = this._env.renderString(_contents, ctx);
@@ -88,15 +88,17 @@ export class AtomizeExtension implements nunjucks.Extension {
     private pass: 'FIRST' | 'SECOND' | 'COMPOSITE'
   ) {}
 
-  // biome-ignore lint/suspicious/noExplicitAny: Context can be any object
-  parse(parser: Parser, nodes: any): Promise<CallExtension> {
+  parse(parser: Parser, nodes: { CallExtension: new (...args: unknown[]) => CallExtension }): CallExtension {
     // Get the tag token
     const tok = parser.nextToken();
+    if (!tok) {
+      throw new Error('Unexpected end of token stream in atomizer parser.');
+    }
 
     switch (tok.value) {
       case 'atomize': {
         // Parse arguments
-        const args = parser.parseSignature(null, true);
+        const args = parser.parseSignature(undefined, true);
         parser.advanceAfterBlockEnd(tok.value);
 
         // Parse main content
@@ -106,7 +108,7 @@ export class AtomizeExtension implements nunjucks.Extension {
       }
       case 'frontmatter': {
         // Get the tag token
-        const args = parser.parseSignature(null, true);
+        const args = parser.parseSignature(undefined, true);
         parser.advanceAfterBlockEnd(tok.value);
 
         // Get frontmatter block
@@ -114,6 +116,8 @@ export class AtomizeExtension implements nunjucks.Extension {
         parser.advanceAfterBlockEnd();
         return new nodes.CallExtension(this, 'runFrontmatter', args, [frontmatter]);
       }
+      default:
+        throw new Error(`Unknown atomizer tag: ${tok.value}`);
     }
   }
 
@@ -129,7 +133,6 @@ export class AtomizeExtension implements nunjucks.Extension {
   ): nunjucks.runtime.SafeString {
     // Get highlight-id from the context
     let _id: string | number;
-    let _basename: string;
     const { id, basename, embed } = args;
 
     // We parse the id into a number.

@@ -1,12 +1,13 @@
 //
 // Sample data for testing the Frontmatter Template
-// The data is synthetic and inteded to stress-test
+// The data is synthetic and intended to stress-test
 // the validity of the generated YAML
 // TODO: Add more sample data for testing
 // TODO: Base it on Readwise API and not internal metadata
 //
 
-import type { ReadwiseDocument, Tag } from 'types';
+import type { ReadwiseDocument } from 'types/document';
+import type { Tag } from 'types/library';
 
 export const testTags: Tag[] = [
   { id: 1, name: 'important' },
@@ -19,6 +20,11 @@ export const testTags: Tag[] = [
   { id: 8, name: 'tags_with_underscores' },
   { id: 9, name: '!special#chars@in%tags' },
   { id: 10, name: 'nested/path/tag' },
+  { id: 11, name: 'system-design' },
+  { id: 12, name: 'architecture' },
+  { id: 13, name: 'knowledge-management' },
+  { id: 14, name: 'atomize' },
+  { id: 15, name: 'concatenation-chain' },
 ];
 
 export const sampleMetadata: ReadwiseDocument = {
@@ -26,7 +32,7 @@ export const sampleMetadata: ReadwiseDocument = {
   readwise_url: 'https://readwise.io/bookreview/12345',
   unique_url: 'https://unique.com/[brackets]',
   source_url: 'https://test.com/path?q=special chars: & +',
-  title: "My Book:\nA Subtitle's Journey",
+  title: "'My Book':\nA Subtitle's \"Journey",
   sanitized_title: "My Book - A Subtitle's Journey",
   author: ["Tim O'Reilly", '"Doc" Smith', 'Homer Simpson'],
   authorStr: '[[Tim O\'Reilly]], [["Doc" Smith]] and [["Homer Simpson"]]',
@@ -110,8 +116,44 @@ export const sampleMetadata: ReadwiseDocument = {
       is_favorite: false,
       tags: [testTags[2], testTags[7]],
     },
+    {
+      id: 12349,
+      is_deleted: false,
+      text: 'Atomic information segmentation allows granular reuse across context boundaries.',
+      note: '.atomize\nThis highlight tests the atomize action tag which signals the plugin to extract this as an atomic note fragment.',
+      location: 45,
+      location_type: 'section',
+      highlighted_at: '2024-03-19T14:30:00Z',
+      created_at: '2024-03-19T14:30:00Z',
+      updated_at: '2024-03-19T14:30:00Z',
+      url: 'https://example.com/book?page=45&highlight=12349',
+      readwise_url: 'https://readwise.io/open/429837643',
+      color: 'orange',
+      book_id: 98768,
+      is_discard: false,
+      is_favorite: true,
+      tags: [testTags[11], testTags[13]],
+    },
+    {
+      id: 12350,
+      is_deleted: false,
+      text: 'System architecture requires understanding the concatenation of interdependent subsystems.',
+      note: ".c1\nThis is the first part of a multi-highlight concatenation chain that tests the plugin's tag extraction across sequential highlights.",
+      location: 60,
+      location_type: 'page',
+      highlighted_at: '2024-03-20T09:00:00Z',
+      created_at: '2024-03-20T09:00:00Z',
+      updated_at: '2024-03-20T10:15:00Z',
+      url: 'https://example.com/book?page=60&highlight=12350',
+      readwise_url: 'https://readwise.io/open/539847643',
+      color: 'yellow',
+      book_id: 98768,
+      is_discard: false,
+      is_favorite: false,
+      tags: [testTags[11], testTags[14]],
+    },
   ],
-  last_highlight_at: '2024-03-16T09:15:00Z', // Test null value
+  last_highlight_at: '2024-03-16T09:15:00Z',
   tags: '#reading, #non-fiction: genre',
   highlight_tags: '#quote, #important: flag',
   tags_nohash: "'reading', 'non-fiction: genre'",

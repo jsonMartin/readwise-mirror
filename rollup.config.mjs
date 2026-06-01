@@ -1,5 +1,8 @@
 import commonjs from "@rollup/plugin-commonjs";
+import json from "@rollup/plugin-json";
 import { nodeResolve } from "@rollup/plugin-node-resolve";
+// 1. Import the replace plugin
+import replace from "@rollup/plugin-replace";
 import typescript from "@rollup/plugin-typescript";
 
 const isProd = process.env.BUILD === "production";
@@ -18,12 +21,34 @@ export default {
     sourcemapExcludeSources: isProd,
     format: "cjs",
     exports: "default",
+    // Inline any dynamic imports (e.g. the dev-setup mock) into the single
+    // main.js output file. Without this, Rollup would emit a separate chunk,
+    // which Obsidian won't load. Dead-code elimination then strips the dev
+    // block entirely from production builds once the replace plugin has
+    // substituted process.env.NODE_ENV with "production".
+    inlineDynamicImports: true,
     banner,
   },
   external: [
     "obsidian",
-    // Add these built-in Node.js modules as external
     "node:path",
+    // 2. Since Obsidian plugins run in an Electron app, MSW's browser code
+    // might look for global 'util' or standard Node internals. If you hit issues,
+    // you can explicitly externalize them or mock them via nodeResolve.
   ],
-  plugins: [typescript(), nodeResolve({ browser: true }), commonjs()],
+  plugins: [
+    // 3. Inject the environment variables BEFORE compiling the code
+    replace({
+      preventAssignment: true,
+      values: {
+        "process.env.NODE_ENV": JSON.stringify(
+          isProd ? "production" : "development",
+        ),
+      },
+    }),
+    typescript(),
+    nodeResolve({ browser: true }),
+    json(),
+    commonjs(),
+  ],
 };

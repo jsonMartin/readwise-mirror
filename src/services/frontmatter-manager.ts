@@ -1,18 +1,25 @@
-import { EMPTY_FRONTMATTER, FRONTMATTER_TO_ESCAPE, READWISE_URI_FIELD } from 'constants/index';
-import { type Environment, Template } from 'nunjucks';
 import { type FileManager, parseYaml, type TFile } from 'obsidian';
-import { Frontmatter, FrontmatterError } from 'services/frontmatter';
-import type Logger from 'services/logger';
-import type { AtomicFile, BaseFile, PluginSettings, ReadwiseDocument } from 'types';
-import { escapeMetadata } from 'utils/frontmatter-utils';
+import { Frontmatter, type FrontmatterData, FrontmatterError } from 'services/frontmatter';
+import { renderFrontmatterTemplate } from 'services/template-rendering';
+import { EMPTY_FRONTMATTER, READWISE_URI_FIELD } from 'src/constants';
+import type { AtomicFile, BaseFile, ReadwiseDocument } from 'types/document';
+import type { PluginContext } from 'types/plugin-context';
+import type { ReadwiseEnvironment } from './readwise-environment';
 
 export class FrontmatterManager {
   constructor(
-    private readonly settings: PluginSettings,
-    private readonly logger: Logger,
-    private readonly env: Environment,
+    private readonly ctx: PluginContext,
+    private readonly env: ReadwiseEnvironment,
     private readonly fm: FileManager
   ) {}
+
+  get logger() {
+    return this.ctx.logger;
+  }
+
+  get settings() {
+    return this.ctx.settings;
+  }
 
   /**
    * Get updated and merged frontmatter based on a document's existing frontmatter
@@ -53,7 +60,7 @@ export class FrontmatterManager {
           let atomicFrontmatter = this.settings.atomicInheritParentFrontmatter
             ? this.getBaseFrontmatter(file.doc)
             : new Frontmatter();
-          const currentFrontmatter = Frontmatter.fromString(file.frontmatter);
+          const currentFrontmatter = Frontmatter.fromString(file.frontmatter ?? '');
           const highlight = file.doc.highlights.find((h) => h.id === file.id);
 
           if (currentFrontmatter.keys().length > 0) {
@@ -104,16 +111,16 @@ export class FrontmatterManager {
       this.logger.debug(`Processing merged frontmatter template\n${frontmatterTemplate}`);
 
       // Render and parse the template into YAML
-      const template = new Template(frontmatterTemplate, this.env, null, true);
-      const renderedTemplate = template
-        .render(escapeMetadata(metadata, FRONTMATTER_TO_ESCAPE))
-        .replaceAll(Frontmatter.DELIMITER, '')
-        .trim();
+      const renderedTemplate = renderFrontmatterTemplate(frontmatterTemplate, this.env, metadata);
 
-      const yaml = parseYaml(renderedTemplate);
-      return new Frontmatter(yaml);
+      const yaml: unknown = parseYaml(renderedTemplate);
+      if (typeof yaml !== 'object' || yaml === null) {
+        throw new Error('Frontmatter template did not render to an object');
+      }
+      return new Frontmatter(yaml as FrontmatterData);
     } catch (error) {
       if (error instanceof Error) {
+        this.logger.debug('Rendered frontmatter template failed:', error.stack);
         this.logger.error('Error processing frontmatter template:', error.message);
         throw new FrontmatterError(`Failed to process frontmatter: ${error.message}`, error);
       }
@@ -129,7 +136,7 @@ export class FrontmatterManager {
   public filterProtectedFrontmatter(updates: Frontmatter): Frontmatter {
     const protectedFields = this.settings.protectedFields
       .split('\n')
-      .map((f) => f.trim())
+      .map((f: string) => f.trim())
       .filter(Boolean);
 
     // Using static methods from Frontmatter class
@@ -139,7 +146,7 @@ export class FrontmatterManager {
   public async writeUpdatedFrontmatter(file: TFile, updates: Frontmatter): Promise<void> {
     // File carries a reference to the vault
     try {
-      await this.fm.processFrontMatter(file, (frontmatter) => {
+      await this.fm.processFrontMatter(file, (frontmatter: Record<string, unknown>) => {
         // Biome doesn't like assing via { ... frontmatter, ...updates }
         // Iterate over keys in updates and set them in frontmatter
         for (const [key, value] of updates.entries()) {

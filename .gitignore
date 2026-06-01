@@ -14,3 +14,6 @@ main.js
 data.json
 .DS_Store
 .wiki/
+
+# Jest related folder
+coverage

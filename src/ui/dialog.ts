@@ -53,7 +53,8 @@ export class WarningDialog extends Modal {
           .onClick(() => {
             this.close();
             onSubmit(true);
-          }).buttonEl.style.backgroundColor = 'var(--background-modifier-error)';
+          });
+        btn.buttonEl.addClass('readwise-modal-danger-btn');
       })
       .addButton((btn) =>
         btn.setButtonText('Cancel').onClick(() => {
