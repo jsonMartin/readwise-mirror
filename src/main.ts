@@ -467,17 +467,25 @@ export default class ReadwiseMirror extends Plugin {
       // Atomize only when enabled and when trackFiles is enabled as well
       const atomizer = new Atomizer();
       if (shouldAtomize) {
-        // FIXME: Handle basename changes of the parent file: we need to update all atomized files as well, or ensure we catch a differing basename vs. primary file
-        const { contents, atoms } = atomizer.atomize(_contents, { basename, doc, book });
-        this.logger.debug(`Atomized ${atoms?.length} highlights for '${title}' (${source_url})`);
-        readwiseFile.contents = contents;
-        readwiseFile.atoms = atoms;
+        try {
+          const { contents, atoms } = atomizer.atomize(_contents, { basename, doc, book });
+          this.logger.debug(`Atomized ${atoms?.length} highlights for '${title}' (${source_url})`);
+          readwiseFile.contents = contents;
+          readwiseFile.atoms = atoms;
+        } catch (err) {
+          this.logger.error(`Failed to atomize '${title}' (${unique_url}): ${err}`);
+          readwiseFile.contents = _contents; // fall back to raw contents
+        }
       } else {
-        // Set atomizer to composite mode and remove frontmatter blocks
         atomizer.setCompositeEnvironment();
-        const { contents } = atomizer.atomize(_contents, { basename, doc, book });
-        readwiseFile.contents = contents;
-      }
+        try {
+          const { contents } = atomizer.atomize(_contents, { basename, doc, book });
+          readwiseFile.contents = contents;
+        } catch (err) {
+          this.logger.error(`Failed to process composite '${title}' (${unique_url}): ${err}`);
+          readwiseFile.contents = _contents; // fall back to raw contents
+        }
+      }      
       readwiseFiles.push(readwiseFile);
     }
     return readwiseFiles;
