@@ -4,6 +4,7 @@
     "description": "This is a plugin for Obsidian (https://obsidian.md)",
     "main": "main.js",
     "scripts": {
+        "test": "jest",
         "dev": "rollup --config rollup.config.mjs -w",
         "build": "rollup --config rollup.config.mjs --environment BUILD:production",
         "build:dev": "rollup --config rollup.config.mjs --environment BUILD:development",

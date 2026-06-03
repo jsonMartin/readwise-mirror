@@ -7,10 +7,14 @@
     "target": "es2021",
     "allowJs": true,
     "noImplicitAny": true,
-    "moduleResolution": "node",
+    "moduleResolution": "node10",
     "importHelpers": true,
     "allowSyntheticDefaultImports": true,
-    "lib": ["dom", "es2021", "scripthost"]
+    "lib": ["dom", "es2021", "scripthost"],
+    "resolveJsonModule": true,
+     "types": [
+      "node"
+    ],
   },
   "include": ["src/**/*.ts"]
 }
