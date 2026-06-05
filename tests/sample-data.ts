@@ -153,7 +153,7 @@ export const sampleMetadata: ReadwiseDocument = {
       tags: [testTags[11], testTags[14]],
     },
   ],
-  last_highlight_at: '2024-03-16T09:15:00Z',
+  last_highlight_at: '2024-03-20T09:00:00Z',
   tags: '#reading, #non-fiction: genre',
   highlight_tags: '#quote, #important: flag',
   tags_nohash: "'reading', 'non-fiction: genre'",

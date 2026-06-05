@@ -64,9 +64,9 @@ export function buildReadwiseDocument(
         ? `[[${author}]]`
         : '';
 
-  const created = createdDate(highlights);
-  const updated = updatedDate(highlights);
-  const lastHighlightAt = lastHighlightedDate(highlights);
+  const created = createdDate(filteredHighlights);
+  const updated = updatedDate(filteredHighlights);
+  const lastHighlightAt = lastHighlightedDate(filteredHighlights);
 
   return {
     id: user_book_id,
