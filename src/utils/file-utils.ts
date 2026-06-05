@@ -17,7 +17,7 @@ export function normalizeFilename(filename: string, settings: PluginSettings): s
     ? slugify(filename.replace(/:/g, colonSubstitute ?? '-'), {
         separator: slugifySeparator,
         lowercase: slugifyLowercase,
-      })
+      }).slice(0, 252)
     : // ... else filenamify the title and limit to 252 characters (to account for the `.md` which will be added)
       filenamify(filename.replace(/:/g, colonSubstitute ?? '-'), {
         replacement: ' ',
