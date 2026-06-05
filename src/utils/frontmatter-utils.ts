@@ -35,6 +35,7 @@ export function validateFrontmatterTemplate(
   env: ReadwiseEnvironment,
   template: string
 ): {
+  isValidTemplate: boolean;
   isValidYaml: boolean;
   error?: string;
   preview?: string;
@@ -45,12 +46,23 @@ export function validateFrontmatterTemplate(
       sanitizeFrontmatterTemplate(template),
       escapeMetadata(sampleMetadata, FRONTMATTER_TO_ESCAPE)
     );
-    parseYaml(renderedTemplate);
-    return { isValidYaml: true };
   } catch (error) {
     return {
+      isValidTemplate: false,
       isValidYaml: false,
-      error: `Invalid YAML or Template: ${error instanceof Error ? error.message : String(error)}`,
+      error: `Template render error: ${error instanceof Error ? error.message : String(error)}`,
+      preview: renderedTemplate,
+    };
+  }
+
+  try {
+    parseYaml(renderedTemplate);
+    return { isValidTemplate: true, isValidYaml: true, preview: renderedTemplate };
+  } catch (error) {
+    return {
+      isValidTemplate: true,
+      isValidYaml: false,
+      error: `Invalid YAML: ${error instanceof Error ? error.message : String(error)}`,
       preview: renderedTemplate,
     };
   }
