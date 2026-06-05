@@ -1,4 +1,4 @@
-const { createDefaultPreset } = require("ts-jest");
+/** `@type` {import('ts-jest').JestConfigWithTsJest} */
 
 /** @type {import('ts-jest').JestConfigWithTsJest} */
 module.exports = {
@@ -9,7 +9,7 @@ module.exports = {
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       tsconfig: {
-        module: 'CommonJS',      // override Node16 → CJS for Jest
+        module: 'CommonJS',      // override ESNext → CJS for Jest
         moduleResolution: 'node', // match CommonJS resolution
       }
     }],
