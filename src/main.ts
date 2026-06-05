@@ -344,7 +344,7 @@ export default class ReadwiseMirror extends Plugin {
       bookCurrent += 1;
       const book: Export = library.books[bookId];
 
-      const { title, category, highlights, source_url } = book;
+      const { title, category, highlights, source_url, unique_url } = book;
 
       // Sanitize title, replace colon with substitute from settings
       const basename = this.getFileNameFromDoc(book);
