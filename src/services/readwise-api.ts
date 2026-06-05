@@ -17,13 +17,33 @@ export class TokenValidationError extends Error {
  */
 export default class ReadwiseApi {
   private validToken: boolean | undefined;
-  private apiToken: string;
+
+  static async validateTokenValue(apiToken: string): Promise<boolean> {
+    if (!apiToken) {
+      return false;
+    }
+
+    try {
+      const response = await requestUrl({
+        url: `${API_ENDPOINT}/auth`,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Token ${apiToken}`,
+        },
+      });
+
+      return response.status === 204;
+    } catch (error) {
+      throw new TokenValidationError(
+        `Token validation failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
 
   private constructor(private ctx: PluginContext) {
     if (!ctx.settings.apiToken) {
       throw new Error('API Token Required!');
     }
-    this.apiToken = ctx.settings.apiToken;
   }
 
   // The only way to create an instance
@@ -51,7 +71,7 @@ export default class ReadwiseApi {
     return {
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Token ${this.apiToken}`,
+        Authorization: `Token ${this.ctx.settings.apiToken}`,
       },
     };
   }
