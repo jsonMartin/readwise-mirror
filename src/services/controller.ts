@@ -205,18 +205,27 @@ export class Controller {
    * Handles the adjustment of filenames in the Readwise folder.
    */
   public async handleFilenameAdjustment() {
-    const vault = this.ctx.app.vault;
-    const path = `${this.ctx.settings.baseFolderName}`;
-    const readwiseFolder = vault.getAbstractFileByPath(path);
-    if (readwiseFolder && readwiseFolder instanceof TFolder) {
-      this.ctx.notice('Readwise: Filename adjustment started');
-      // Iterate all files in the Readwise folder and "fix" their names according to the current settings using
-      const renamedFiles = await this.iterativeReadwiseRenamer(readwiseFolder);
-      if (renamedFiles > 0) {
-        this.ctx.notice(`Readwise: Renamed ${renamedFiles} files. Check console for renaming errors.`);
-      } else {
-        this.ctx.notice('Readwise: No files renamed. Check console for renaming errors.');
+    if (this.ctx.syncLock?.isAcquired('filename-adjustment')) {
+      this.ctx.notice('Readwise: Filename adjustment already in progress');
+      return;
+    }
+    await this.ctx.syncLock?.acquire('filename-adjustment');
+    try {
+      const vault = this.ctx.app.vault;
+      const path = `${this.ctx.settings.baseFolderName}`;
+      const readwiseFolder = vault.getAbstractFileByPath(path);
+      if (readwiseFolder && readwiseFolder instanceof TFolder) {
+        this.ctx.notice('Readwise: Filename adjustment started');
+        // Iterate all files in the Readwise folder and "fix" their names according to the current settings using
+        const renamedFiles = await this.iterativeReadwiseRenamer(readwiseFolder);
+        if (renamedFiles > 0) {
+          this.ctx.notice(`Readwise: Renamed ${renamedFiles} files. Check console for renaming errors.`);
+        } else {
+          this.ctx.notice('Readwise: No files renamed. Check console for renaming errors.');
+        }
       }
+    } finally {
+      this.ctx.syncLock?.release('filename-adjustment');
     }
   }
   /**
