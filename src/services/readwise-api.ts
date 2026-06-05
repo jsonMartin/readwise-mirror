@@ -4,6 +4,7 @@ import type { PluginContext } from '../types/plugin-context';
 
 const API_ENDPOINT = 'https://readwise.io/api/v2';
 const API_PAGE_SIZE = 1000; // number of results per page, default 100 / max 1000
+const MAX_RATE_LIMIT_RETRIES = 5;
 
 export class TokenValidationError extends Error {
   constructor(message: string) {
@@ -121,6 +122,7 @@ export default class ReadwiseApi {
     const url = `${API_ENDPOINT}/${contentType}?`;
     let data: Record<string, unknown> | undefined;
     let nextPageCursor: string | undefined;
+    let rateLimitRetries = 0;
 
     const results: Export[] = [];
 
@@ -163,6 +165,10 @@ export default class ReadwiseApi {
         }
 
         if (response.status === 429) {
+          rateLimitRetries++;
+          if (rateLimitRetries > MAX_RATE_LIMIT_RETRIES) {
+            throw new Error(`Rate limit exceeded after ${MAX_RATE_LIMIT_RETRIES} retries for ${contentType}`);
+          }
           // Error handling for rate limit throttling
           let rateLimitedDelayTime = Number.parseInt(response.headers['Retry-After'], 10) * 1000 + 1000;
           if (Number.isNaN(rateLimitedDelayTime)) {
@@ -170,12 +176,16 @@ export default class ReadwiseApi {
             this.ctx.logger.warn("'Retry-After' header is missing or invalid. Defaulting to 1 second delay.");
             rateLimitedDelayTime = 1000;
           } else {
-            this.ctx.logger.warn(`API Rate Limited, waiting to retry for ${rateLimitedDelayTime}`);
+            this.ctx.logger.warn(
+              `API Rate Limited, waiting to retry for ${rateLimitedDelayTime} (attempt ${rateLimitRetries}/${MAX_RATE_LIMIT_RETRIES})`
+            );
           }
           this.ctx.setStatusBarText(`Readwise: API Rate Limited, waiting ${rateLimitedDelayTime}`);
 
           await new Promise((resolve) => window.setTimeout(resolve, rateLimitedDelayTime));
-          this.ctx.logger.debug('Trying to fetch highlights again...');
+          this.ctx.logger.debug(
+            `Trying to fetch highlights again... (attempt ${rateLimitRetries}/${MAX_RATE_LIMIT_RETRIES})`
+          );
           this.ctx.setStatusBarText('Readwise: Attempting to retry...');
         } else {
           const pageResults = pageData.results;
