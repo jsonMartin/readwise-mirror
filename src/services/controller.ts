@@ -313,11 +313,10 @@ export class Controller {
         );
 
         await this.updateMultipleNotes(bookIds);
+        this.ctx.notice(`Readwise: Updated ${bookIds.length} note${bookIds.length !== 1 ? 's' : ''} in "${folder.name}"`);
       } catch (error) {
         this.ctx.logger.warn('Failed to update multiple files', error);
       }
-
-      this.ctx.notice(`Readwise: Updated ${bookIds.length} note${bookIds.length !== 1 ? 's' : ''} in "${folder.name}"`);
     } catch (error) {
       this.ctx.logger.error('Error syncing folder:', error);
       this.ctx.notice(`Readwise: Sync failed. ${error}`);
