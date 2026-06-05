@@ -473,7 +473,7 @@ export default class ReadwiseMirror extends Plugin {
           readwiseFile.contents = contents;
           readwiseFile.atoms = atoms;
         } catch (err) {
-          this.logger.error(`Failed to atomize '${title}' (${unique_url}): ${err}`);
+          this.logger.error(`Failed to atomize '${title}' (${unique_url}): `, err);
           readwiseFile.contents = _contents; // fall back to raw contents
         }
       } else {
@@ -482,10 +482,10 @@ export default class ReadwiseMirror extends Plugin {
           const { contents } = atomizer.atomize(_contents, { basename, doc, book });
           readwiseFile.contents = contents;
         } catch (err) {
-          this.logger.error(`Failed to process composite '${title}' (${unique_url}): ${err}`);
+          this.logger.error(`Failed to process composite '${title}' (${unique_url}): `, err);
           readwiseFile.contents = _contents; // fall back to raw contents
         }
-      }      
+      }
       readwiseFiles.push(readwiseFile);
     }
     return readwiseFiles;
