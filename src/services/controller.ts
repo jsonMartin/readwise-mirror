@@ -103,8 +103,6 @@ export class Controller {
 
   public async deleteLibrary() {
     // Equivalent to plugin.deleteLibrary()
-    this.ctx.settings.lastUpdated = null;
-    await this.ctx.saveAndApplySettings();
     const vault = this.ctx.app.vault;
     const path = `${this.ctx.settings.baseFolderName}`;
     const abstractFile = vault.getAbstractFileByPath(path);
@@ -112,6 +110,8 @@ export class Controller {
       try {
         this.ctx.logger.debug('Attempting to delete entire library at:', abstractFile);
         await this.ctx.app.fileManager.trashFile(abstractFile);
+        this.ctx.settings.lastUpdated = null;
+        await this.ctx.saveAndApplySettings();
         if (this.ctx.settings.syncNotifications) this.ctx.notice('Readwise: library folder deleted');
       } catch (err) {
         this.ctx.logger.error(`Attempted to delete file ${path} but no file was found`, err);
