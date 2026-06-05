@@ -95,7 +95,7 @@ export function escapeMetadata(metadata: ReadwiseDocument, fieldsToProcess: Arra
   };
 
   for (const field of fieldsToProcess) {
-    if (field in processedMetadata && processedMetadata[field as keyof ReadwiseDocument]) {
+    if (field in processedMetadata) {
       const key = field as keyof ReadwiseDocument;
       const value = processedMetadata[key];
 
