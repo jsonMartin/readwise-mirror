@@ -20,5 +20,7 @@
       "approve": true,
       "matchCommandLine": true
     }
-  }
+  },
+  "jest.configPath": "jest.config.js"
 }
+
