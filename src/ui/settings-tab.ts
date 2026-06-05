@@ -1367,7 +1367,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
         // Update preview on template changes
         const updatePreview = (result: TemplateValidationResult) => {
-          const isInvalidTemplate = result.isValidtemplate === false;
+          const isInvalidTemplate = result.isValidTemplate === false;
           const isInvalidYaml = result.isValidYaml === false;
           const hasError = isInvalidTemplate || isInvalidYaml;
 
@@ -1403,8 +1403,8 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           this.ctx.logger.error('Error validating frontmatter template:', error);
           const errorMessage = this.getErrorMessage(error);
           updatePreview({
-            isValidYaml: true,
-            isValidtemplate: false,
+            isValidYaml: false,
+            isValidTemplate: false,
             error: errorMessage,
             preview: this.ctx.settings.frontMatterTemplate,
           });
@@ -1436,8 +1436,8 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             if (noticeEl) {
               noticeEl.setText(`Error validating frontmatter template: ${errorMessage}`);
               updatePreview({
-                isValidYaml: true,
-                isValidtemplate: false,
+                isValidYaml: false,
+                isValidTemplate: false,
                 error: errorMessage,
                 preview: value,
               });
