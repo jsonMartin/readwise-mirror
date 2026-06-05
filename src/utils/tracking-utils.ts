@@ -1,5 +1,5 @@
-import { READWISE_REVIEW_URL_BASE } from 'src/constants';
 import type { App, TFile } from 'obsidian';
+import { READWISE_REVIEW_URL_BASE } from 'src/constants';
 import type { PluginSettings } from 'types/settings';
 
 /**
