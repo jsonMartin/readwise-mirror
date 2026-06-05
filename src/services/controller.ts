@@ -273,12 +273,13 @@ export class Controller {
     }
 
     const idStr = trackingUrl.replace(READWISE_REVIEW_URL_BASE, ''); // Extract the ID from the URL
-    const readwiseId = Number.parseInt(idStr, 10);
 
-    if (Number.isNaN(readwiseId)) {
+    if (!/^\d+$/.test(idStr)) {
       this.ctx.logger.warn(`Tracking URL in note is invalid (ID ${idStr} is not a valid number).`);
       return null;
     }
+
+    const readwiseId = Number(idStr);
 
     // Construct tracked note
     const trackedFile: TTrackedFile = {
