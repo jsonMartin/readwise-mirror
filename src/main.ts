@@ -526,8 +526,8 @@ export default class ReadwiseMirror extends Plugin {
           readwiseFile.contents = _contents; // fall back to raw contents
         }
       } else {
-        atomizer.setCompositeEnvironment();
         try {
+          atomizer.setCompositeEnvironment();
           const { contents } = atomizer.atomize(_contents, { basename, doc, book });
           readwiseFile.contents = contents;
         } catch (err) {
