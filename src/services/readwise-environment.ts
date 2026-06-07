@@ -1,9 +1,10 @@
-import { YAML_INDENT } from 'constants/index';
 import md5 from 'md5';
 import { type ConfigureOptions, Environment, type ILoader, type ILoaderAny, Loader, type LoaderSource } from 'nunjucks';
-import { moment, stringifyYaml } from 'obsidian';
-import type { Atom } from 'types';
+import { stringifyYaml } from 'obsidian';
+import { YAML_INDENT } from 'src/constants';
+import type { Atom } from 'types/document';
 import { AtomizeExtension } from './atomizer';
+import { registerCoreTemplateFilters } from './template-rendering';
 
 /**
  * Template name to source mapping for ReadwiseLoader
@@ -25,7 +26,7 @@ export class ReadwiseLoader extends Loader implements ILoader {
     this.emit('update', name);
   }
 
-  public getSource(name: string): LoaderSource | null {
+  public getSource(name: string): LoaderSource {
     // Custom logic to retrieve the template source by name
     if (this.templates[name]) {
       return {
@@ -34,7 +35,11 @@ export class ReadwiseLoader extends Loader implements ILoader {
         noCache: true,
       };
     }
-    return null;
+    return {
+      src: '',
+      path: name,
+      noCache: true,
+    };
   }
 }
 
@@ -54,6 +59,8 @@ export class ReadwiseEnvironment extends Environment {
    * Initialize custom filters for the Readwise environment
    */
   private setupFilters(): void {
+    registerCoreTemplateFilters(this, (date, format) => window.moment(date).format(format));
+
     // Convert newlines to blockquotes
     this.addFilter('bq', (str: string) => {
       if (typeof str !== 'string') return str;
@@ -75,39 +82,14 @@ export class ReadwiseEnvironment extends Environment {
       return str.replace(/\.qa(.*)\?(.*)/g, '**Q:**$1?\r\n\r\n**A:**$2');
     });
 
-    // Add a date filter
-    this.addFilter('date', (date: moment.MomentInput, format: string) => {
-      return moment(date).format(format);
-    });
-
-    // Add a filter to normalize author names by removing titles like dr. prof. etc.
-    this.addFilter('normalize_author', (author: string | string[]) => {
-      const normalize = (a: string) =>
-        a
-          .replace(/\b(dr|drs|prof|professor|sir|lord|lady|dame|ms|miss|mrs|mr|mx|lt|col)\b\.?/gi, '')
-          .replace(/\s+/g, ' ')
-          .trim();
-
-      if (typeof author === 'string') {
-        return normalize(author);
-      }
-
-      if (Array.isArray(author)) {
-        return author.map(normalize);
-      }
-
-      return author;
-    });
-
-    // biome-ignore lint/suspicious/noExplicitAny: stringifyYaml is accepting `any`
-    this.addFilter('fme', (value: any) => {
+    this.addFilter('fme', (value: unknown) => {
       // Return if null/undefined
       if (value === null || value === undefined) {
         return null;
       }
 
       // This is a bit of a hack, but a realiable way to get multi-line yaml right
-      const _key = md5(value);
+      const _key = md5(Date().toString());
       const _value = stringifyYaml({ [_key]: value })
         .replace(`${_key}: `, '')
         .trim();

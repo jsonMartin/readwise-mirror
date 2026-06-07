@@ -1,6 +1,6 @@
-import { READWISE_REVIEW_URL_BASE } from 'constants/index';
 import type { App, TFile } from 'obsidian';
-import type { PluginSettings } from 'types';
+import { READWISE_REVIEW_URL_BASE } from 'src/constants';
+import type { PluginSettings } from 'types/settings';
 
 /**
  * Determines whether a file is a Readwise-tracked note by checking a configured frontmatter property.
@@ -17,7 +17,7 @@ export function isTrackedReadwiseNote(file: TFile, app: App, settings: PluginSet
   }
   const trackingProperty = settings.trackingProperty;
   const fileCache = app.metadataCache.getFileCache(file);
-  const frontmatterValue = fileCache?.frontmatter?.[trackingProperty];
+  const frontmatterValue: unknown = fileCache?.frontmatter?.[trackingProperty];
 
   if (typeof frontmatterValue !== 'string') {
     return false;

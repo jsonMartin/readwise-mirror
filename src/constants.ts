@@ -1,4 +1,4 @@
-import type { PluginSettings } from 'types';
+import type { PluginSettings } from 'types/settings';
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   atomicHighlights: false,
@@ -26,13 +26,12 @@ title: {{ title }}
 {# The \`normalize_author\` filter will remove prefixes like 'Dr.', 'Prof.' and others from the author field, for more consistent author names across your library. Remove it if you want to keep this and consult the Wiki for more information. #}
 author: [ {{ author | normalize_author | join(', ') }} ]
 `,
-  headerTemplate: `
-%%
+  headerTemplate: `%%
 ID: {{ id }}
 Updated: {{ updated }}
 %%
 
-![]( {{ cover_image_url }})
+![]({{ cover_image_url }})
 
 # About
 Title: [[{{ title }}]]
@@ -61,7 +60,6 @@ Summary: {{ summary }}
 {%- endif %}
 
 # Highlights
-
 `,
   highlightTemplate: `{{ text }}{%- if category == 'books' %} ([{{ location }}]({{ location_url }})){%- endif %}{%- if color %} %% Color: {{ color }} %%{%- endif %} ^{{id}}{%- if note %}
 
@@ -101,37 +99,35 @@ export const FRONTMATTER_TO_ESCAPE = ['title', 'sanitized_title', 'author', 'aut
 export const EMPTY_FRONTMATTER: string = '---\n---\n';
 
 // Core Template
-export const NUNJUCKS_CORE_TEMPLATE = `
-{%- block header %}
-{#- Render the header using the header template #}
-{%- set id = doc.id %}
-{%- set highlights_url = doc.readwise_url %}
-{%- set unique_url = doc.unique_url %}
-{%- set source_url = doc.source_url %}
-{%- set title = doc.title %}
-{%- set sanitized_title = doc.sanitized_title %}
-{%- set author = doc.author %}
-{%- set authorStr = doc.authorStr %}
-{%- set document_note = doc.document_note %}
-{%- set summary = doc.summary %}
-{%- set category = doc.category %}
-{%- set num_highlights = doc.num_highlights %}
-{%- set created = doc.created %}
-{%- set updated = doc.updated %}
-{%- set cover_image_url = doc.cover_image_url %}
-{%- set last_highlight_at = doc.last_highlight_at %}
-{%- set tags = doc.tags %}
-{%- set highlight_tags = doc.highlight_tags %}
-{%- set tags_nohash = doc.tags_nohash %}
-{%- set hl_tags_nohash = doc.hl_tags_nohash %}
-{% include headerTemplate ignore missing %}
-{%- endblock header %}
-
-{%- block highlights %}
-  {%- for highlight in highlights %}
-  {#- Render each highlight using the highlight template #}
-  {#- The parent context (book) is available in the highlight template #}
-  {#- We have to set the variables here as context for the highlight template #}
+export const NUNJUCKS_CORE_TEMPLATE = `{%- block header -%}
+{#- Render the header using the header template -#}
+{%- set id = doc.id -%}
+{%- set highlights_url = doc.readwise_url -%}
+{%- set unique_url = doc.unique_url -%}
+{%- set source_url = doc.source_url -%}
+{%- set title = doc.title -%}
+{%- set sanitized_title = doc.sanitized_title -%}
+{%- set author = doc.author -%}
+{%- set authorStr = doc.authorStr -%}
+{%- set document_note = doc.document_note -%}
+{%- set summary = doc.summary -%}
+{%- set category = doc.category -%}
+{%- set num_highlights = doc.num_highlights -%}
+{%- set created = doc.created -%}
+{%- set updated = doc.updated -%}
+{%- set cover_image_url = doc.cover_image_url -%}
+{%- set last_highlight_at = doc.last_highlight_at -%}
+{%- set tags = doc.tags -%}
+{%- set highlight_tags = doc.highlight_tags -%}
+{%- set tags_nohash = doc.tags_nohash -%}
+{%- set hl_tags_nohash = doc.hl_tags_nohash -%}
+{%- include headerTemplate ignore missing -%}
+{%- endblock header -%}
+{%- block highlights -%}
+  {%- for highlight in highlights -%}
+  {#- Render each highlight using the highlight template -#}
+  {#- The parent context (book) is available in the highlight template -#}
+  {#- We have to set the variables here as context for the highlight template -#}
     {%- set id = highlight.id %}
     {%- set text = highlight.text %}
     {%- set note = highlight.note %}
@@ -144,10 +140,10 @@ export const NUNJUCKS_CORE_TEMPLATE = `
     {%- set updated_at = highlight.updated_at | date("YYYY-MM-DD") %}
     {%- set highlighted_at = highlight.highlighted_at | date("YYYY-MM-DD") %}
     {%- set tags = highlight.tags %}
-    {%- set category = book.category %}
+    {%- set category = book.category -%}
   {% include highlightTemplate ignore missing %}
-  {%- endfor %}
-{%- endblock highlights %}`;
+  {%- endfor -%}
+{%- endblock highlights -%}`;
 // YAML options
 export const YAML_INDENT: string = '  ';
 
