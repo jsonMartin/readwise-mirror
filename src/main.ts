@@ -102,44 +102,47 @@ export default class ReadwiseMirror extends Plugin {
   }
 
   private async initializeUI() {
-    await this.loadAndApplySettings();
-    this.logger.debug('Readwise Mirror plugin loaded.');
-
-    // Instantiate controller and attach to context
-    this._frontmatterManager = new FrontmatterManager(this.ctx, this.env, this.app.fileManager);
-    this._deduplicatingVaultWriter = new DeduplicatingVaultWriter(this.ctx, this.frontmatterManager);
-
-    if (!this.settings.apiToken) {
-      this.notify.notice('Readwise: API Token not detected\nPlease enter in configuration page');
-      this.notify.setStatusBarText('Readwise: API Token Required');
-    } else {
-      //Update status bar with last sync time
-      if (this.settings.lastUpdated)
-        this.notify.setStatusBarText(`Readwise: Updated ${humanReadableFormat(this.settings.lastUpdated)}`);
-      else this.notify.setStatusBarText('Readwise: Click to Sync');
-    }
-
-    // Register all commands and run startup commands
-    let controllerInstance: Controller;
     try {
-      controllerInstance = await Controller.initialize(this, this.ctx);
-      new CommandManager(this, this.ctx, controllerInstance).initialize();
+      this.addSettingTab(new ReadwiseMirrorSettingTab(this, this.ctx, this.env));
+      await this.loadAndApplySettings();
+      this.logger.debug('Readwise Mirror plugin loaded.');
+
+      // Instantiate controller and attach to context
+      this._frontmatterManager = new FrontmatterManager(this.ctx, this.env, this.app.fileManager);
+      this._deduplicatingVaultWriter = new DeduplicatingVaultWriter(this.ctx, this.frontmatterManager);
+
+      if (!this.settings.apiToken) {
+        this.notify.notice('Readwise: API Token not detected\nPlease enter in configuration page');
+        this.notify.setStatusBarText('Readwise: API Token Required');
+      } else {
+        //Update status bar with last sync time
+        if (this.settings.lastUpdated)
+          this.notify.setStatusBarText(`Readwise: Updated ${humanReadableFormat(this.settings.lastUpdated)}`);
+        else this.notify.setStatusBarText('Readwise: Click to Sync');
+      }
+
+      // Register all commands and run startup commands
+      let controllerInstance: Controller;
+      try {
+        controllerInstance = await Controller.initialize(this, this.ctx);
+        new CommandManager(this, this.ctx, controllerInstance).initialize();
+      } catch (error) {
+        this.logger.error('Error initializing Readwise controller:', error);
+        // Show concise user-facing notice but do not rethrow — allow plugin to continue
+        this.notify.notice('Readwise: Controller initialization failed. Check console for details.');
+      }
+
+      // Update status bar every second if synced
+      this.registerInterval(
+        window.setInterval(() => {
+          if (/Synced/.test(this.notify.getStatusBarText())) {
+            this.notify.setStatusBarText(`Readwise: Synced ${humanReadableFormat(this.settings.lastUpdated)}`);
+          }
+        }, 1000)
+      );
     } catch (error) {
-      this.logger.error('Error initializing Readwise controller:', error);
-      // Show concise user-facing notice but do not rethrow — allow plugin to continue
-      this.notify.notice('Readwise: Controller initialization failed. Check console for details.');
+      this.logger.error('Error during plugin initialization:', error);
     }
-
-    // Update status bar every second if synced
-    this.registerInterval(
-      window.setInterval(() => {
-        if (/Synced/.test(this.notify.getStatusBarText())) {
-          this.notify.setStatusBarText(`Readwise: Synced ${humanReadableFormat(this.settings.lastUpdated)}`);
-        }
-      }, 1000)
-    );
-
-    this.addSettingTab(new ReadwiseMirrorSettingTab(this, this.ctx, this.env));
   }
 
   // Reload settings after external change (e.g. after sync)
@@ -156,7 +159,7 @@ export default class ReadwiseMirror extends Plugin {
     const loaded = (await this.loadData()) as Partial<PluginSettings> | null;
     this.settings = { ...DEFAULT_SETTINGS, ...(loaded ?? {}) };
     if (this.lock.isAcquired('readwise-mirror:loaded')) {
-      // Only apply settings if plugin is loaded
+      // Only apply settings if plugin is loaded, and create settings tab at the same time
       await this.applySettings();
     }
   }
