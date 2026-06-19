@@ -96,7 +96,6 @@ Tags: {{ tags }}
 };
 
 export const FRONTMATTER_TO_ESCAPE = ['title', 'sanitized_title', 'author', 'authorStr'];
-export const EMPTY_FRONTMATTER: string = '---\n---\n';
 
 // Core Template
 export const NUNJUCKS_CORE_TEMPLATE = `{%- block header -%}
