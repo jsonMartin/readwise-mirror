@@ -106,8 +106,8 @@ export default class ReadwiseMirror extends Plugin {
 
   private async initializeUI() {
     try {
-      this.addSettingTab(new ReadwiseMirrorSettingTab(this, this.ctx, this.env));
       await this.loadAndApplySettings();
+      this.addSettingTab(new ReadwiseMirrorSettingTab(this, this.ctx, this.env));
       this.logger.debug('Readwise Mirror plugin loaded.');
 
       // Instantiate controller and attach to context
