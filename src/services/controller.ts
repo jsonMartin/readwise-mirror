@@ -120,8 +120,6 @@ export class Controller {
 
   public async deleteLibrary() {
     // Equivalent to plugin.deleteLibrary()
-    this.ctx.settings.lastUpdated = null;
-    await this.ctx.saveAndApplySettings();
     const vault = this.ctx.app.vault;
     const path = `${this.ctx.settings.baseFolderName}`;
     const abstractFile = vault.getAbstractFileByPath(path);
@@ -129,6 +127,8 @@ export class Controller {
       try {
         this.ctx.logger.debug('Attempting to delete entire library at:', abstractFile);
         await this.ctx.app.fileManager.trashFile(abstractFile);
+        this.ctx.settings.lastUpdated = null;
+        await this.ctx.saveAndApplySettings();
         if (this.ctx.settings.syncNotifications) this.ctx.notice('Readwise: library folder deleted');
       } catch (err) {
         this.ctx.logger.error(`Attempted to delete file ${path} but no file was found`, err);
@@ -220,18 +220,27 @@ export class Controller {
    * Handles the adjustment of filenames in the Readwise folder.
    */
   public async handleFilenameAdjustment() {
-    const vault = this.ctx.app.vault;
-    const path = `${this.ctx.settings.baseFolderName}`;
-    const readwiseFolder = vault.getAbstractFileByPath(path);
-    if (readwiseFolder && readwiseFolder instanceof TFolder) {
-      this.ctx.notice('Readwise: Filename adjustment started');
-      // Iterate all files in the Readwise folder and "fix" their names according to the current settings using
-      const renamedFiles = await this.iterativeReadwiseRenamer(readwiseFolder);
-      if (renamedFiles > 0) {
-        this.ctx.notice(`Readwise: Renamed ${renamedFiles} files. Check console for renaming errors.`);
-      } else {
-        this.ctx.notice('Readwise: No files renamed. Check console for renaming errors.');
+    if (this.ctx.syncLock?.isAcquired('filename-adjustment')) {
+      this.ctx.notice('Readwise: Filename adjustment already in progress');
+      return;
+    }
+    await this.ctx.syncLock?.acquire('filename-adjustment');
+    try {
+      const vault = this.ctx.app.vault;
+      const path = `${this.ctx.settings.baseFolderName}`;
+      const readwiseFolder = vault.getAbstractFileByPath(path);
+      if (readwiseFolder && readwiseFolder instanceof TFolder) {
+        this.ctx.notice('Readwise: Filename adjustment started');
+        // Iterate all files in the Readwise folder and "fix" their names according to the current settings using
+        const renamedFiles = await this.iterativeReadwiseRenamer(readwiseFolder);
+        if (renamedFiles > 0) {
+          this.ctx.notice(`Readwise: Renamed ${renamedFiles} files. Check console for renaming errors.`);
+        } else {
+          this.ctx.notice('Readwise: No files renamed. Check console for renaming errors.');
+        }
       }
+    } finally {
+      this.ctx.syncLock?.release('filename-adjustment');
     }
   }
   /**
@@ -279,12 +288,13 @@ export class Controller {
     }
 
     const idStr = trackingUrl.replace(READWISE_REVIEW_URL_BASE, ''); // Extract the ID from the URL
-    const readwiseId = Number.parseInt(idStr, 10);
 
-    if (Number.isNaN(readwiseId)) {
+    if (!/^\d+$/.test(idStr)) {
       this.ctx.logger.warn(`Tracking URL in note is invalid (ID ${idStr} is not a valid number).`);
       return null;
     }
+
+    const readwiseId = Number(idStr);
 
     // Construct tracked note
     const trackedFile: TTrackedFile = {
@@ -328,11 +338,10 @@ export class Controller {
         );
 
         await this.updateMultipleNotes(bookIds);
+        this.ctx.notice(`Readwise: Updated ${bookIds.length} note${bookIds.length !== 1 ? 's' : ''} in "${folder.name}"`);
       } catch (error) {
         this.ctx.logger.warn('Failed to update multiple files', error);
       }
-
-      this.ctx.notice(`Readwise: Updated ${bookIds.length} note${bookIds.length !== 1 ? 's' : ''} in "${folder.name}"`);
     } catch (error) {
       this.ctx.logger.error('Error syncing folder:', error);
       this.ctx.notice(`Readwise: Sync failed. ${error}`);

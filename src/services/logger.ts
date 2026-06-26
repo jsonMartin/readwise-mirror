@@ -49,6 +49,7 @@ class Logger {
   }
 
   timeLog(label: string, ...messages: unknown[]): void {
+    if (!this.debugMode) return;
     const startTime = this.timers.get(label);
     if (startTime === undefined) {
       console.debug(`${this.getIndent()}Readwise Mirror: ${label} (timer not started)`);
@@ -61,7 +62,7 @@ class Logger {
   timeEnd(label: string): void {
     const startTime = this.timers.get(label);
     this.timers.delete(label);
-    if (startTime === undefined) {
+    if (!this.debugMode || startTime === undefined) {
       return;
     }
     const elapsedMs = Date.now() - startTime;

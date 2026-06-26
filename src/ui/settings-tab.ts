@@ -9,7 +9,7 @@ import {
   type TextComponent,
 } from 'obsidian';
 import { Controller } from 'services/controller';
-import { TokenValidationError } from 'services/readwise-api';
+import ReadwiseApi, { TokenValidationError } from 'services/readwise-api';
 import type { ReadwiseEnvironment } from 'services/readwise-environment';
 import { DEFAULT_SETTINGS } from 'src/constants';
 import type { PluginContext } from 'types/plugin-context';
@@ -517,13 +517,22 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               this.ctx.notice('Cleared token. Add or retrieve token to sync.');
             } else if (value !== this.ctx.settings.apiToken) {
               this.updateAuthButtons('verifying');
-              this.ctx.settings.apiToken = value;
-              await this.ctx.saveAndApplySettings();
-              this.ctx.notice('New token set.');
+              this.setTokenValidationStatus('running');
 
               try {
-                const hasValidToken = await Controller.validateAPIInstance();
-                this.updateAuthButtons(hasValidToken ? 'valid' : 'invalid');
+                const isValidToken = await ReadwiseApi.validateTokenValue(value);
+
+                if (isValidToken) {
+                  this.ctx.settings.apiToken = value;
+                  await this.ctx.saveAndApplySettings();
+                  this.setTokenValidationStatus('success');
+                  this.updateAuthButtons('valid');
+                  this.ctx.notice('New token set.');
+                } else {
+                  this.setTokenValidationStatus('invalid');
+                  this.updateAuthButtons('invalid');
+                  this.ctx.notice('Failed to verify token: Invalid API token.');
+                }
               } catch (error) {
                 this.ctx.notice(`Failed to verify token: ${this.getErrorMessage(error)}`);
                 this.setTokenValidationStatus('invalid');
@@ -548,7 +557,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           .setPlaceholder('Readwise')
           .setValue(this.ctx.settings.baseFolderName)
           .onChange(async (value) => {
-            if (!value) return;
+            if (!value) value = DEFAULT_SETTINGS.baseFolderName;
             this.ctx.settings.baseFolderName = value;
             await this.ctx.saveAndApplySettings();
           })
@@ -1381,7 +1390,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
 
         // Update preview on template changes
         const updatePreview = (result: TemplateValidationResult) => {
-          const isInvalidTemplate = result.isValidtemplate === false;
+          const isInvalidTemplate = result.isValidTemplate === false;
           const isInvalidYaml = result.isValidYaml === false;
           const hasError = isInvalidTemplate || isInvalidYaml;
 
@@ -1417,8 +1426,8 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           this.ctx.logger.error('Error validating frontmatter template:', error);
           const errorMessage = this.getErrorMessage(error);
           updatePreview({
-            isValidYaml: true,
-            isValidtemplate: false,
+            isValidYaml: false,
+            isValidTemplate: false,
             error: errorMessage,
             preview: this.ctx.settings.frontMatterTemplate,
           });
@@ -1450,8 +1459,8 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             if (noticeEl) {
               noticeEl.setText(`Error validating frontmatter template: ${errorMessage}`);
               updatePreview({
-                isValidYaml: true,
-                isValidtemplate: false,
+                isValidYaml: false,
+                isValidTemplate: false,
                 error: errorMessage,
                 preview: value,
               });

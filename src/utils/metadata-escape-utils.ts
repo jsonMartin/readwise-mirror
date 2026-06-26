@@ -61,9 +61,10 @@ function normalizeString(value: string): string {
 
 function quoteString(value: string): string {
   const state = analyzeString(value);
+  const escapedValue = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
   if (!state.hasSingleQuotes && !state.hasDoubleQuotes) {
-    return `"${value}"`;
+    return `"${escapedValue}"`;
   }
 
   if (state.hasDoubleQuotes && !state.hasSingleQuotes) {
@@ -71,10 +72,10 @@ function quoteString(value: string): string {
   }
 
   if (state.hasSingleQuotes && !state.hasDoubleQuotes) {
-    return `"${value}"`;
+    return `"${escapedValue}"`;
   }
 
-  return `"${value.replace(/"/g, '\\"')}"`;
+  return `"${escapedValue}"`;
 }
 
 export function escapeValue(value: string, { multiline = false }: YamlEscapeOptions = {}): string {
@@ -95,7 +96,7 @@ export function escapeMetadata(metadata: ReadwiseDocument, fieldsToProcess: Arra
   };
 
   for (const field of fieldsToProcess) {
-    if (field in processedMetadata && processedMetadata[field as keyof ReadwiseDocument]) {
+    if (field in processedMetadata) {
       const key = field as keyof ReadwiseDocument;
       const value = processedMetadata[key];
 

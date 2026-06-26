@@ -20,6 +20,11 @@
   "linter": {
     "enabled": false
   },
+  "json": {
+    "formatter": {
+      "indentWidth": 4
+    }
+  },
   "javascript": {
     "formatter": {
       "jsxQuoteStyle": "double",

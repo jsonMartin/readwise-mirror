@@ -21,7 +21,7 @@ export class TemplateSourceLoader extends Loader implements ILoader {
   }
 
   public getSource(name: string): LoaderSource {
-    if (this.templates[name]) {
+    if (name in this.templates) {
       return {
         src: this.templates[name],
         path: name,

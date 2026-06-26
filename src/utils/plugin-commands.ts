@@ -2,6 +2,7 @@ import type { Command } from 'obsidian';
 import spacetime from 'spacetime';
 import { Controller } from '../services/controller';
 import type { PluginContext } from '../types/plugin-context';
+import { humanReadableFormat } from './format-utils';
 
 function toErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
@@ -114,6 +115,7 @@ export function getPluginCommands(ctr: Controller, ctx: PluginContext): Command[
             void ctx
               .saveAndApplySettings()
               .catch((err: unknown) => ctx.notice(`Failed to save settings: ${toErrorMessage(err)}`));
+            ctx.setStatusBarText(`Readwise: Synced ${humanReadableFormat(ctx.settings.lastUpdated)}`);
           }
           return true;
         }
