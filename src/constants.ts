@@ -61,7 +61,8 @@ Summary: {{ summary }}
 
 # Highlights
 `,
-  highlightTemplate: `{{ text }}{%- if category == 'books' %} ([{{ location }}]({{ location_url }})){%- endif %}{%- if color %} %% Color: {{ color }} %%{%- endif %} ^{{id}}{%- if note %}
+  highlightTemplate: `{% atomize id=id, basename=id, embed=true %}
+{{ text }}{%- if category == 'books' %} ([{{ location }}]({{ location_url }})){%- endif %}{%- if color %} %% Color: {{ color }} %%{%- endif %} ^{{id}}{%- if note %}
 
 Note: {{ note }}
 {%- endif %}{%- if tags %}
@@ -73,6 +74,7 @@ Tags: {{ tags }}
 {%- endif %}
 
 ---
+{% endatomize %}
 `,
   useSlugify: false,
   slugifySeparator: '-',
