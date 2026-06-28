@@ -557,8 +557,8 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           .setPlaceholder('Readwise')
           .setValue(this.ctx.settings.baseFolderName)
           .onChange(async (value) => {
-            if (!value) value = DEFAULT_SETTINGS.baseFolderName;
-            this.ctx.settings.baseFolderName = value;
+            const normalized = value.trim();
+            this.ctx.settings.baseFolderName = normalized || DEFAULT_SETTINGS.baseFolderName;
             await this.ctx.saveAndApplySettings();
           })
       );
