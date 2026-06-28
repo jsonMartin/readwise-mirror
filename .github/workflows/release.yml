@@ -59,5 +59,6 @@ jobs:
         uses: actions/attest@v4
         with:
           subject-path: |
-            build/main.js
-            build/styles.css
+            main.js
+            manifest.json
+            src/ui/styles/styles.css
