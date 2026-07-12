@@ -16,6 +16,7 @@ import type { PluginContext } from 'types/plugin-context';
 import type { TemplateValidationResult } from 'types/utilities';
 import { WarningDialog } from 'ui/dialog';
 import { sanitizeFrontmatterTemplate, validateFrontmatterTemplate } from 'utils/frontmatter-utils';
+import { hasAtomizeBlocks } from 'utils/template-utils';
 
 interface SettingsTab {
   id: string;
@@ -556,8 +557,8 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
           .setPlaceholder('Readwise')
           .setValue(this.ctx.settings.baseFolderName)
           .onChange(async (value) => {
-            if (!value) return;
-            this.ctx.settings.baseFolderName = value;
+            const normalized = value.trim();
+            this.ctx.settings.baseFolderName = normalized || DEFAULT_SETTINGS.baseFolderName;
             await this.ctx.saveAndApplySettings();
           })
       );
@@ -641,6 +642,26 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
               attr: { style: 'color: var(--text-error);' },
             });
           }
+
+          if (this.ctx.settings.atomicHighlights && !hasAtomizeBlocks(this.ctx.settings.highlightTemplate)) {
+            fragment.createEl('br');
+            fragment.createEl('br');
+            const warningSpan = fragment.createSpan({
+              attr: { style: 'color: var(--text-warning);' },
+            });
+            warningSpan.appendText(
+              'Your highlight template does not contain atomize blocks. Atomic highlights will not be created until you add '
+            );
+            warningSpan.createEl('code', { text: '{% atomize %}...{% endatomize %}' });
+            warningSpan.appendText(' blocks. See the ');
+            warningSpan
+              .createEl('a', {
+                text: 'Wiki',
+                href: 'https://github.com/jsonMartin/readwise-mirror/wiki/Guide:-Atomic-highlights',
+              })
+              .setAttr('target', '_blank');
+            warningSpan.appendText(' for details.');
+          }
         })
       )
       .addToggle((toggle) => {
@@ -676,6 +697,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
                     void (async () => {
                       this.ctx.settings.atomicHighlights = true;
                       await this.ctx.saveAndApplySettings();
+                      this.display();
                     })();
                   } else {
                     toggle.setValue(false);
@@ -685,6 +707,7 @@ export default class ReadwiseMirrorSettingTab extends PluginSettingTab {
             } else {
               this.ctx.settings.atomicHighlights = false;
               await this.ctx.saveAndApplySettings();
+              this.display();
             }
           });
         }

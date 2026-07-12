@@ -121,7 +121,7 @@ export default class ReadwiseApi {
   ): Promise<Export[]> {
     const url = `${API_ENDPOINT}/${contentType}?`;
     let data: Record<string, unknown> | undefined;
-    let nextPageCursor: string | undefined;
+    let nextPageCursor: number | undefined;
     let rateLimitRetries = 0;
 
     const results: Export[] = [];
@@ -138,8 +138,8 @@ export default class ReadwiseApi {
         if (bookId && bookId.length > 0) {
           queryParams.append('ids', bookId.join(','));
         }
-        if (nextPageCursor) {
-          queryParams.append('pageCursor', nextPageCursor);
+        if (nextPageCursor !== undefined) {
+          queryParams.append('pageCursor', nextPageCursor.toString());
         }
         if (contentType === 'export' && includeDeleted) {
           queryParams.append('includeDeleted', 'true');
@@ -196,8 +196,8 @@ export default class ReadwiseApi {
             this.ctx.logger.warn('No results found in the response data.');
           }
           const rawNextPageCursor = pageData.nextPageCursor;
-          nextPageCursor = typeof rawNextPageCursor === 'string' ? rawNextPageCursor : '';
-          if (!nextPageCursor) {
+          nextPageCursor = typeof rawNextPageCursor === 'number' ? rawNextPageCursor : undefined;
+          if (nextPageCursor === undefined) {
             break;
           }
           this.ctx.logger.debug(`There are more records left, proceeding to next page: ${nextPageCursor}`);

@@ -78,7 +78,10 @@ export default class ReadwiseMirror extends Plugin {
       // exposed methods
       notice: (message: string, duration?: number) => this.notify.notice(message, duration),
       setStatusBarText: (message: string) => this.notify.setStatusBarText(message),
-      saveAndApplySettings: () => this.saveAndApplySettings(),
+      saveAndApplySettings: () => {
+        this.settings = ctx.settings;
+        return this.saveAndApplySettings();
+      },
     };
     return ctx;
   }
@@ -103,8 +106,8 @@ export default class ReadwiseMirror extends Plugin {
 
   private async initializeUI() {
     try {
-      this.addSettingTab(new ReadwiseMirrorSettingTab(this, this.ctx, this.env));
       await this.loadAndApplySettings();
+      this.addSettingTab(new ReadwiseMirrorSettingTab(this, this.ctx, this.env));
       this.logger.debug('Readwise Mirror plugin loaded.');
 
       // Instantiate controller and attach to context

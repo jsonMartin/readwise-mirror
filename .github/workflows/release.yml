@@ -1,5 +1,5 @@
 name: Release plugin version
-on: 
+on:
   workflow_dispatch:
   push:
     branches: [master, main, beta]
@@ -31,10 +31,34 @@ jobs:
         run: |
           npm audit --audit-level=high --production
           npm audit signatures
-        continue-on-error: true  # Don't fail the build, but report issues
+        continue-on-error: true # Don't fail the build, but report issues
       - name: Build plugin
         run: npm run build
       - name: Release update
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx semantic-release
+      - name: Configure Git
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          git config --global user.name "${{ github.actor }}"
+          git config --global user.email "${{ github.actor }}`@users.noreply.github.com`"
+      - name: Commit manifest.json (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          if git diff --quiet -- manifest.json; then
+            echo "manifest.json unchanged; skipping commit"
+            exit 0
+          fi
+
+          git add manifest.json
+          git commit -m "chore: 🔖 sync manifest version [skip ci]"
+          git push
+      - name: Generate artifact attestation (main release)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            main.js
+            manifest.json
+            src/ui/styles/styles.css

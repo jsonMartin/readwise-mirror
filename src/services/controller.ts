@@ -4,6 +4,7 @@ import type { Library } from 'types/library';
 import type { TTrackedFile } from 'types/readwise-note';
 import { getTrackingUrl, isFileInFolder, normalizeFilename } from 'utils/file-utils';
 import { humanReadableFormat } from 'utils/format-utils';
+import { hasAtomizeBlocks } from 'utils/template-utils';
 import { isInReadwiseLibrary, isTrackedReadwiseNote } from 'utils/tracking-utils';
 import type ReadwiseMirror from '../main';
 import type { PluginContext } from '../types/plugin-context';
@@ -58,6 +59,21 @@ export class Controller {
     }
   }
 
+  private prepareAtomicHighlightsCategory(library: Library): void {
+    if (!this.ctx.settings.atomicHighlights) {
+      return;
+    }
+
+    library.categories.add('Highlight');
+
+    if (!hasAtomizeBlocks(this.ctx.settings.highlightTemplate)) {
+      this.ctx.notice(
+        'Readwise: Atomic highlights enabled but your highlight template has no atomize blocks. No atomic notes will be created.',
+        10000
+      );
+    }
+  }
+
   public async sync() {
     // Equivalent to plugin.sync()
     if (this.ctx.syncLock?.isAcquired('library-sync')) {
@@ -87,6 +103,7 @@ export class Controller {
         library = await this.api.downloadUpdates(this.ctx.settings.lastUpdated);
       }
       // ...existing filtering and writing logic...
+      this.prepareAtomicHighlightsCategory(library);
       await this.plugin.writeLibraryToMarkdown(library);
       if (this.ctx.settings.logFile) await this.plugin.writeLogToMarkdown(library);
       this.ctx.settings.lastUpdated = new Date().toISOString();
@@ -149,9 +166,7 @@ export class Controller {
       this.ctx.logger.debug(`Readwise: downloading current book with ID ${trackedFile.readwiseId}...`);
       const library = await this.api.downloadSingleBook(trackedFile.readwiseId);
       if (Object.keys(library.books).length > 0) {
-        if (this.ctx.settings.atomicHighlights) {
-          library.categories.add('Highlight');
-        }
+        this.prepareAtomicHighlightsCategory(library);
         await this.plugin.writeLibraryToMarkdown(library);
 
         if (this.ctx.settings.logFile) await this.plugin.writeLogToMarkdown(library);
@@ -379,9 +394,7 @@ export class Controller {
     try {
       const library = await this.api.downloadMultipleBooks(bookIds);
       if (Object.keys(library.books).length > 0) {
-        if (this.ctx.settings.atomicHighlights) {
-          library.categories.add('Highlight');
-        }
+        this.prepareAtomicHighlightsCategory(library);
 
         if (this.ctx.settings.syncNotifications)
           this.ctx.notice(`Readwise: writing ${Object.keys(library.books).length} updated books to markdown...`);

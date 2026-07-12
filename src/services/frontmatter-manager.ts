@@ -1,7 +1,7 @@
 import { type FileManager, parseYaml, type TFile } from 'obsidian';
 import { Frontmatter, type FrontmatterData, FrontmatterError } from 'services/frontmatter';
 import { renderFrontmatterTemplate } from 'services/template-rendering';
-import { EMPTY_FRONTMATTER, READWISE_URI_FIELD } from 'src/constants';
+import { READWISE_URI_FIELD } from 'src/constants';
 import type { AtomicFile, BaseFile, ReadwiseDocument } from 'types/document';
 import type { PluginContext } from 'types/plugin-context';
 import type { ReadwiseEnvironment } from './readwise-environment';
@@ -100,18 +100,21 @@ export class FrontmatterManager {
    * @returns The frontmatter record
    */
   public getBaseFrontmatter(metadata: ReadwiseDocument): Frontmatter {
-    // Render a template if frontmatter is managed or file tracking is set
-    if (!this.settings.frontMatter && !this.settings.trackFiles) {
+    // Frontmatter parsing is only needed when frontmatter output is enabled.
+    // Tracking fields are injected later in getFrontmatter.
+    if (!this.settings.frontMatter) {
       return new Frontmatter();
     }
     try {
       // Get frontmatter template string
-      // Add Sync properties
-      const frontmatterTemplate = this.settings.frontMatter ? this.settings.frontMatterTemplate : EMPTY_FRONTMATTER;
+      const frontmatterTemplate = this.settings.frontMatterTemplate;
       this.logger.debug(`Processing merged frontmatter template\n${frontmatterTemplate}`);
 
       // Render and parse the template into YAML
       const renderedTemplate = renderFrontmatterTemplate(frontmatterTemplate, this.env, metadata);
+      if (!renderedTemplate.trim()) {
+        return new Frontmatter();
+      }
 
       const yaml: unknown = parseYaml(renderedTemplate);
       if (typeof yaml !== 'object' || yaml === null) {
