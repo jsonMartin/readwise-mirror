@@ -79,7 +79,6 @@ export default class ReadwiseMirror extends Plugin {
       notice: (message: string, duration?: number) => this.notify.notice(message, duration),
       setStatusBarText: (message: string) => this.notify.setStatusBarText(message),
       saveAndApplySettings: () => this.saveAndApplySettings(),
-      },
     };
     return ctx;
   }
@@ -158,11 +157,11 @@ export default class ReadwiseMirror extends Plugin {
    */
   async loadAndApplySettings() {
     const loaded = (await this.loadData()) as Partial<PluginSettings> | null;
-    
+
     // Mutate the existing object instead of creating a new reference
     // Order matters: defaults first, then loaded values override them
     Object.assign(this.settings, DEFAULT_SETTINGS, loaded ?? {});
-    
+
     if (this.lock.isAcquired('readwise-mirror:loaded')) {
       await this.applySettings();
     }
